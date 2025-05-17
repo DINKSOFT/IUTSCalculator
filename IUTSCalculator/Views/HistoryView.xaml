@@ -1,0 +1,141 @@
+﻿<Window x:Class="IUTSCalculator.Views.HistoryView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:IUTSCalculator.Views"
+        xmlns:vm="clr-namespace:IUTSCalculator.ViewModels"
+        xmlns:converters="clr-namespace:IUTSCalculator.Converters"
+        mc:Ignorable="d"
+        Title="{Binding Title}" Height="600" Width="900">
+
+    <Window.Resources>
+        <converters:BoolToTypeConverter x:Key="BoolToTypeConverter"/>
+        
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="MinWidth" Value="100"/>
+        </Style>
+
+        <Style x:Key="FilterGroupBoxStyle" TargetType="GroupBox">
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Section des filtres -->
+        <Border Grid.Row="0" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Margin="0,0,0,5">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal">
+                    <GroupBox Header="Recherche" Style="{StaticResource FilterGroupBoxStyle}">
+                        <TextBox Width="200" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
+                                 Margin="5" VerticalContentAlignment="Center"/>
+                    </GroupBox>
+
+                    <GroupBox Header="Employé" Style="{StaticResource FilterGroupBoxStyle}">
+                        <ComboBox Width="200" ItemsSource="{Binding EmployeeNames}" 
+                                  SelectedItem="{Binding SelectedEmployeeFilter}" Margin="5"/>
+                    </GroupBox>
+
+                    <GroupBox Header="Type" Style="{StaticResource FilterGroupBoxStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox Content="Annuel uniquement" IsChecked="{Binding ShowAnnualOnly}" Margin="5"/>
+                            <CheckBox Content="Mensuel uniquement" IsChecked="{Binding ShowMonthlyOnly}" Margin="5"/>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal">
+                    <GroupBox Header="Période" Style="{StaticResource FilterGroupBoxStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Du:" VerticalAlignment="Center" Margin="5"/>
+                            <DatePicker SelectedDate="{Binding StartDate}" Width="120" Margin="5"/>
+                            <TextBlock Text="Au:" VerticalAlignment="Center" Margin="5"/>
+                            <DatePicker SelectedDate="{Binding EndDate}" Width="120" Margin="5"/>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Orientation="Vertical" 
+                            VerticalAlignment="Center">
+                    <Button Content="Rafraîchir" Command="{Binding RefreshHistoryCommand}" 
+                            Style="{StaticResource ActionButtonStyle}"/>
+                    <Button Content="Effacer les filtres" Command="{Binding ClearFiltersCommand}" 
+                            Style="{StaticResource ActionButtonStyle}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Liste des calculs -->
+        <DataGrid Grid.Row="1" Margin="10" 
+                  ItemsSource="{Binding Calculations}" 
+                  SelectedItem="{Binding SelectedCalculation}"
+                  AutoGenerateColumns="False" 
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  AlternatingRowBackground="#F5F5F5"
+                  BorderBrush="#DDDDDD"
+                  BorderThickness="1"
+                  RowHeaderWidth="0"
+                  VerticalGridLinesBrush="#EEEEEE"
+                  HorizontalGridLinesBrush="#EEEEEE">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Date" Binding="{Binding CalculationDate, StringFormat=dd/MM/yyyy}" Width="100"/>
+                <DataGridTextColumn Header="ID Employé" Binding="{Binding Employee.EmployeeId}" Width="100"/>
+                <DataGridTextColumn Header="Nom" Binding="{Binding Employee.LastName}" Width="120"/>
+                <DataGridTextColumn Header="Prénom" Binding="{Binding Employee.FirstName}" Width="120"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding IsAnnual, Converter={StaticResource BoolToTypeConverter}}" Width="80"/>
+                <DataGridTextColumn Header="Salaire brut" Binding="{Binding GrossSalary, StringFormat=N0}" Width="120"/>
+                <DataGridTextColumn Header="IUTS" Binding="{Binding TaxAmount, StringFormat=N0}" Width="100"/>
+                <DataGridTextColumn Header="Taux" Binding="{Binding TaxRate, StringFormat=P2}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Actions sur le calcul sélectionné -->
+        <Grid Grid.Row="2" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Statut et progression -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusMessage}" Margin="5"/>
+                <ProgressBar Width="100" Height="15" IsIndeterminate="{Binding IsBusy}" 
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToTypeConverter}}" 
+                             Margin="10,0"/>
+            </StackPanel>
+
+            <!-- Boutons d'action -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Afficher" Command="{Binding ViewCalculationCommand}" 
+                        Style="{StaticResource ActionButtonStyle}"/>
+                <Button Content="Exporter PDF" Command="{Binding ExportCalculationCommand}" 
+                        Style="{StaticResource ActionButtonStyle}"/>
+                <Button Content="Supprimer" Command="{Binding DeleteCalculationCommand}" 
+                        Style="{StaticResource ActionButtonStyle}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

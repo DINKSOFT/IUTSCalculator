@@ -1,0 +1,49 @@
+﻿<Window x:Class="IUTSCalculator.Views.BaseSalaryEstimatorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+        xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+        d:DataContext="{d:DesignInstance Type=viewmodels:BaseSalaryEstimatorViewModel}"
+        Title="Estimation du Salaire de Base" Height="350" Width="400">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="180"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="Salaire net souhaité :" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="0" Grid.Column="1" Margin="5"
+                 Text="{Binding NetSalary, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="Indemnité logement :" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="5"
+                 Text="{Binding HousingAllowance, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="Indemnité fonction :" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="2" Grid.Column="1" Margin="5"
+                 Text="{Binding FunctionAllowance, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="Indemnité transport :" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="3" Grid.Column="1" Margin="5"
+                 Text="{Binding TransportAllowance, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="Charges familiales :" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center"/>
+        <TextBox Grid.Row="4" Grid.Column="1" Margin="5"
+                 Text="{Binding FamilyCharges, UpdateSourceTrigger=PropertyChanged}" />
+
+        <Button Content="Estimer le salaire de base" Grid.Row="5" Grid.ColumnSpan="2" Margin="0,10,0,0"
+                Command="{Binding EstimateCommand}"/>
+
+        <TextBlock Grid.Row="6" Grid.ColumnSpan="2" Margin="0,20,0,0"
+                   FontWeight="Bold" FontSize="16" TextWrapping="Wrap"
+                   Text="{Binding Result}"/>
+    </Grid>
+</Window>

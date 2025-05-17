@@ -1,0 +1,347 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using IUTSCalculator.Models;
+
+namespace IUTSCalculator.Services
+{
+    /// <summary>
+    /// Service pour le calcul de l'Impôt Unique sur les Traitements et Salaires (IUTS)
+    /// selon la législation fiscale du Burkina Faso
+    /// </summary>
+    public class TaxCalculatorService
+    {
+        #region Constantes
+
+        // Limites maximales des indemnités exonérées (selon l'Article 56)
+        private const decimal MAX_HOUSING_ALLOWANCE_RATE = 0.20m; // 20% du salaire brut
+        private const decimal MAX_HOUSING_ALLOWANCE_AMOUNT = 50000m; // 50 000 FCFA/mois
+
+        private const decimal MAX_FUNCTION_ALLOWANCE_RATE = 0.05m; // 5% du salaire brut
+        private const decimal MAX_FUNCTION_ALLOWANCE_AMOUNT = 30000m; // 30 000 FCFA/mois
+
+        private const decimal MAX_TRANSPORT_ALLOWANCE_RATE = 0.05m; // 5% du salaire brut
+        private const decimal MAX_TRANSPORT_ALLOWANCE_AMOUNT = 20000m; // 20 000 FCFA/mois
+
+        // Taux de l'abattement pour cotisations de pension/retraite (Article 56 & 60)
+        private const decimal MAX_PENSION_CONTRIBUTION_RATE = 0.08m; // 8% du salaire de base
+
+        // Taux d'abattement forfaitaire par catégorie (Article 60)
+        private const decimal PROFESSIONAL_DEDUCTION_HIGHER_CATEGORIES = 0.20m; // 20% pour catégories supérieures
+        private const decimal PROFESSIONAL_DEDUCTION_OTHER_CATEGORIES = 0.25m; // 25% pour autres catégories
+
+        #endregion
+
+        #region Tranches d'imposition
+
+        // Définition des tranches d'imposition selon l'Article 61
+        private List<TaxBracket> _taxBrackets = new List<TaxBracket>
+        {
+            new TaxBracket(0m, 30000m, 0m),
+            new TaxBracket(30100m, 50000m, 12.10m),
+            new TaxBracket(50100m, 80000m, 13.90m),
+            new TaxBracket(80100m, 120000m, 15.70m),
+            new TaxBracket(120100m, 170000m, 18.40m),
+            new TaxBracket(170100m, 250000m, 21.70m),
+            new TaxBracket(250100m, decimal.MaxValue, 25.00m)
+        };
+
+        // Définition des abattements pour charges de famille selon l'Article 62
+        private Dictionary<int, decimal> _familyChargeRates = new Dictionary<int, decimal>
+        {
+            { 0, 0m },
+            { 1, 0.08m }, // 8%
+            { 2, 0.10m }, // 10%
+            { 3, 0.12m }, // 12%
+            { 4, 0.14m }, // 14%
+            { 5, 0.16m }, // 16%
+            { 6, 0.18m }, // 18%
+            { 7, 0.20m }  // 20%
+        };
+
+        #endregion
+
+        /// <summary>
+        /// Charge les tranches d'imposition depuis une source externe (fichier, base de données, etc.)
+        /// Actuellement, utilise les valeurs par défaut définies en dur
+        /// </summary>
+        public void LoadTaxBrackets()
+        {
+            // Dans une implémentation future, cette méthode pourrait charger les valeurs 
+            // depuis un fichier de configuration ou une base de données
+            // Pour l'instant, les valeurs par défaut sont déjà définies dans le champ _taxBrackets
+        }
+
+        /// <summary>
+        /// Charge les taux d'abattement pour charges de famille depuis une source externe
+        /// Actuellement, utilise les valeurs par défaut définies en dur
+        /// </summary>
+        public void LoadFamilyCharges()
+        {
+            // Dans une implémentation future, cette méthode pourrait charger les valeurs 
+            // depuis un fichier de configuration ou une base de données
+            // Pour l'instant, les valeurs par défaut sont déjà définies dans le champ _familyChargeRates
+        }
+
+        /// <summary>
+        /// Calcule l'IUTS mensuel pour un employé selon les règles fiscales en vigueur
+        /// </summary>
+        /// <param name="employee">Informations de l'employé</param>
+        /// <returns>Le résultat du calcul d'impôt</returns>
+        public TaxCalculation CalculateMonthlyTax(Employee employee)
+        {
+            var calculation = new TaxCalculation
+            {
+                Employee = employee,
+                CalculationDate = DateTime.Now
+            };
+
+            // Étape 1: Déterminer le revenu brut total
+            decimal grossIncome = employee.BaseSalary;
+            grossIncome += employee.HousingAllowance + employee.FunctionAllowance + employee.TransportAllowance;
+            // Ajouter d'autres revenus si nécessaire
+            decimal otherAllowances = 0m; // À implémenter dans Employee
+            decimal benefitsInKind = 0m;  // À implémenter dans Employee
+            grossIncome += otherAllowances + benefitsInKind;
+
+            calculation.GrossSalary = grossIncome;
+
+            // Étape 2: Calculer les franchises d'indemnités (exonérations) selon Article 56
+            decimal exemptAmount = CalculateExemptAmount(employee);
+            calculation.ExemptAmount = exemptAmount;
+
+            // Étape 3: Déduire les cotisations de retraite (max 8% du salaire de base)
+            decimal pensionContribution = Math.Min(employee.PensionContribution,
+                                                employee.BaseSalary * MAX_PENSION_CONTRIBUTION_RATE);
+
+            // Pour compatibilité avec TaxCalculation
+            decimal professionalDeduction = CalculateProfessionalDeduction(employee);
+
+            // Étape 5: Calculer le revenu imposable net
+            decimal taxableIncome = grossIncome - exemptAmount - pensionContribution - professionalDeduction;
+            calculation.NetTaxableIncome = taxableIncome;
+
+            // Étape 6: Calculer l'impôt brut par tranches
+            decimal grossTax = CalculateGrossTax(taxableIncome);
+
+            // Étape 7: Appliquer l'abattement pour charges de famille
+            int familyCharges = Math.Min(employee.FamilyCharges, 7); // Maximum 7 charges selon Article 62
+            decimal familyChargeRate = _familyChargeRates[familyCharges];
+            decimal familyReduction = grossTax * familyChargeRate;
+            calculation.FamilyChargeReduction = familyReduction;
+
+            // Étape 8: Calculer l'impôt net à payer
+            decimal netTax = grossTax - familyReduction;
+            calculation.TaxAmount = netTax;
+
+            // Calcul du taux moyen d'imposition
+            calculation.TaxRate = grossIncome > 0 ? netTax / grossIncome * 100 : 0;
+
+            // Générer les détails du calcul
+            GenerateCalculationDetails(calculation, exemptAmount, pensionContribution, professionalDeduction, grossTax);
+
+            return calculation;
+        }
+
+        /// <summary>
+        /// Calcule l'abattement forfaitaire pour frais professionnels
+        /// </summary>
+        private decimal CalculateProfessionalDeduction(Employee employee)
+        {
+            bool isHigherCategory = employee.IsHigherCategory;
+            decimal professionalDeductionRate = isHigherCategory
+                ? PROFESSIONAL_DEDUCTION_HIGHER_CATEGORIES
+                : PROFESSIONAL_DEDUCTION_OTHER_CATEGORIES;
+
+            return employee.BaseSalary * professionalDeductionRate;
+        }
+
+        /// <summary>
+        /// Génère les détails du calcul pour affichage
+        /// </summary>
+        private void GenerateCalculationDetails(
+            TaxCalculation calculation,
+            decimal exemptAmount,
+            decimal pensionContribution,
+            decimal professionalDeduction,
+            decimal grossTax)
+        {
+            var details = new System.Text.StringBuilder();
+
+            details.AppendLine("Détails du calcul de l'IUTS :");
+            details.AppendLine($"1. Revenu brut total : {calculation.GrossSalary:N0} FCFA");
+            details.AppendLine($"2. Montants exonérés : {exemptAmount:N0} FCFA");
+            details.AppendLine($"3. Cotisation retraite : {pensionContribution:N0} FCFA");
+            details.AppendLine($"4. Abattement forfaitaire : {professionalDeduction:N0} FCFA");
+            details.AppendLine($"5. Revenu imposable : {calculation.NetTaxableIncome:N0} FCFA");
+            details.AppendLine($"6. Impôt brut : {grossTax:N0} FCFA");
+            details.AppendLine($"7. Réduction pour charges familiales ({calculation.Employee.FamilyCharges} charges) : {calculation.FamilyChargeReduction:N0} FCFA");
+            details.AppendLine($"8. Impôt net à payer : {calculation.TaxAmount:N0} FCFA");
+            details.AppendLine($"9. Taux moyen d'imposition : {calculation.TaxRate:N2}%");
+            details.AppendLine($"10. Salaire net après impôt : {calculation.NetSalaryAfterTax:N0} FCFA");
+
+            calculation.CalculationDetails = details.ToString();
+        }
+
+        /// <summary>
+        /// Calcule le montant des exonérations d'indemnités selon l'Article 56
+        /// </summary>
+        private decimal CalculateExemptAmount(Employee employee)
+        {
+            decimal grossSalaryForCalculation = employee.BaseSalary;
+
+            // Si la cotisation de pension est spécifiée, l'utiliser pour le calcul du salaire brut
+            if (employee.PensionContribution > 0)
+            {
+                grossSalaryForCalculation = employee.BaseSalary -
+                    Math.Min(employee.PensionContribution, employee.BaseSalary * MAX_PENSION_CONTRIBUTION_RATE);
+            }
+
+            // Calculer les montants exonérés pour chaque type d'indemnité
+            decimal exemptHousingAllowance = Math.Min(
+                employee.HousingAllowance,
+                Math.Min(grossSalaryForCalculation * MAX_HOUSING_ALLOWANCE_RATE, MAX_HOUSING_ALLOWANCE_AMOUNT)
+            );
+
+            decimal exemptFunctionAllowance = Math.Min(
+                employee.FunctionAllowance,
+                Math.Min(grossSalaryForCalculation * MAX_FUNCTION_ALLOWANCE_RATE, MAX_FUNCTION_ALLOWANCE_AMOUNT)
+            );
+
+            decimal exemptTransportAllowance = Math.Min(
+                employee.TransportAllowance,
+                Math.Min(grossSalaryForCalculation * MAX_TRANSPORT_ALLOWANCE_RATE, MAX_TRANSPORT_ALLOWANCE_AMOUNT)
+            );
+
+            // La somme des exonérations
+            return exemptHousingAllowance + exemptFunctionAllowance + exemptTransportAllowance;
+        }
+
+        /// <summary>
+        /// Calcule l'impôt brut par tranches selon le barème fiscal
+        /// </summary>
+        private decimal CalculateGrossTax(decimal taxableIncome)
+        {
+            decimal tax = 0m;
+
+            foreach (var bracket in _taxBrackets)
+            {
+                // Si le revenu est inférieur à la borne inférieure, sortir de la boucle
+                if (taxableIncome < bracket.LowerBound)
+                    break;
+
+                // Calculer le montant imposable dans cette tranche
+                decimal amountInBracket = Math.Min(
+                    taxableIncome - bracket.LowerBound,
+                    bracket.UpperBound - bracket.LowerBound
+                );
+
+                // Appliquer le taux d'imposition sur le montant de cette tranche
+                if (amountInBracket > 0)
+                    tax += amountInBracket * bracket.Rate / 100m; // Convertir le taux en pourcentage
+
+                // Si le revenu ne dépasse pas la borne supérieure, sortir de la boucle
+                if (taxableIncome <= bracket.UpperBound)
+                    break;
+            }
+
+            return tax;
+        }
+
+        /// <summary>
+        /// Calcule l'IUTS annuel pour un employé
+        /// </summary>
+        public TaxCalculation CalculateAnnualTax(Employee employee)
+        {
+            var monthlyCalculation = CalculateMonthlyTax(employee);
+
+            var annualCalculation = new TaxCalculation
+            {
+                Employee = employee,
+                CalculationDate = DateTime.Now,
+                GrossSalary = monthlyCalculation.GrossSalary * 12,
+                ExemptAmount = monthlyCalculation.ExemptAmount * 12,
+                NetTaxableIncome = monthlyCalculation.NetTaxableIncome * 12,
+                TaxAmount = monthlyCalculation.TaxAmount * 12,
+                TaxRate = monthlyCalculation.TaxRate,
+                FamilyChargeReduction = monthlyCalculation.FamilyChargeReduction * 12
+            };
+
+            // Générer les détails du calcul annuel
+            var details = new System.Text.StringBuilder();
+            details.AppendLine("Calcul de l'IUTS annuel :");
+            details.AppendLine($"Basé sur le calcul mensuel multiplié par 12");
+            details.AppendLine($"1. Revenu brut annuel : {annualCalculation.GrossSalary:N0} FCFA");
+            details.AppendLine($"2. Revenu imposable annuel : {annualCalculation.NetTaxableIncome:N0} FCFA");
+            details.AppendLine($"3. Impôt annuel à payer : {annualCalculation.TaxAmount:N0} FCFA");
+
+            annualCalculation.CalculationDetails = details.ToString();
+
+            return annualCalculation;
+        }
+
+        /// <summary>
+        /// Calcule la régularisation annuelle des impôts
+        /// selon l'Article 69 du code des impôts
+        /// </summary>
+        public TaxCalculation CalculateAnnualRegularization(List<TaxCalculation> monthlyCalculations)
+        {
+            if (monthlyCalculations == null || !monthlyCalculations.Any())
+                throw new ArgumentException("Les calculs mensuels doivent être fournis pour la régularisation");
+
+            var employee = monthlyCalculations.First().Employee;
+
+            // Somme des éléments des calculs mensuels
+            decimal totalGrossSalary = monthlyCalculations.Sum(c => c.GrossSalary);
+            decimal totalExemptAmount = monthlyCalculations.Sum(c => c.ExemptAmount);
+            decimal totalNetTaxableIncome = monthlyCalculations.Sum(c => c.NetTaxableIncome);
+            decimal totalTaxPaid = monthlyCalculations.Sum(c => c.TaxAmount);
+
+            // Recalcul de l'impôt annuel de façon correcte
+            decimal annualGrossTax = CalculateGrossTax(totalNetTaxableIncome);
+
+            int familyCharges = Math.Min(employee.FamilyCharges, 7);
+            decimal familyChargeRate = _familyChargeRates[familyCharges];
+            decimal annualFamilyReduction = annualGrossTax * familyChargeRate;
+
+            decimal annualNetTax = annualGrossTax - annualFamilyReduction;
+
+            // Différence entre ce qui a été payé et ce qui aurait dû être payé
+            decimal taxDifference = annualNetTax - totalTaxPaid;
+
+            var regularization = new TaxCalculation
+            {
+                Employee = employee,
+                CalculationDate = DateTime.Now,
+                GrossSalary = totalGrossSalary,
+                ExemptAmount = totalExemptAmount,
+                NetTaxableIncome = totalNetTaxableIncome,
+                TaxAmount = annualNetTax,
+                FamilyChargeReduction = annualFamilyReduction,
+                TaxRate = totalGrossSalary > 0 ? annualNetTax / totalGrossSalary * 100 : 0
+            };
+
+            // Générer les détails de la régularisation
+            var details = new System.Text.StringBuilder();
+            details.AppendLine("Régularisation annuelle de l'IUTS :");
+            details.AppendLine($"1. Total des revenus bruts : {totalGrossSalary:N0} FCFA");
+            details.AppendLine($"2. Total des revenus imposables : {totalNetTaxableIncome:N0} FCFA");
+            details.AppendLine($"3. Impôt brut recalculé : {annualGrossTax:N0} FCFA");
+            details.AppendLine($"4. Réduction pour charges familiales : {annualFamilyReduction:N0} FCFA");
+            details.AppendLine($"5. Impôt net recalculé : {annualNetTax:N0} FCFA");
+            details.AppendLine($"6. Total des impôts déjà payés : {totalTaxPaid:N0} FCFA");
+            details.AppendLine($"7. Différence à régulariser : {taxDifference:N0} FCFA");
+
+            if (taxDifference > 0)
+                details.AppendLine("   → Complément d'impôt à payer");
+            else if (taxDifference < 0)
+                details.AppendLine("   → Trop-perçu à rembourser");
+            else
+                details.AppendLine("   → Aucune régularisation nécessaire");
+
+            regularization.CalculationDetails = details.ToString();
+
+            return regularization;
+        }
+    }
+}
