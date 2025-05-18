@@ -10,24 +10,23 @@
              d:DesignHeight="700" d:DesignWidth="800">
 
     <UserControl.Resources>
-        <converters:BooleanToTextConverter x:Key="BooleanToTextConverter" />
-        <converters:BoolToTypeConverter x:Key="BoolToTypeConverter" />
-        <converters:DecimalToStringConverter x:Key="DecimalToString" />
-        <Style x:Key="GroupBoxStyle" TargetType="GroupBox">
+
+        <!--<Style x:Key="FormGroupBoxStyle" TargetType="GroupBox">
             <Setter Property="Margin" Value="5" />
             <Setter Property="Padding" Value="5" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="#CCCCCC" />
         </Style>
-        <Style x:Key="LabelStyle" TargetType="Label">
+        <Style x:Key="FormLabelStyle" TargetType="Label">
             <Setter Property="Margin" Value="2" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style x:Key="TextBoxStyle" TargetType="TextBox">
+        <Style x:Key="FormTextBoxStyle" TargetType="TextBox">
             <Setter Property="Margin" Value="2" />
             <Setter Property="Padding" Value="5,2" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Height" Value="28" />
+            <EventSetter Event="GotFocus" Handler="TextBox_GotFocus_ClearIfZero" />
         </Style>
         <Style x:Key="CheckBoxStyle" TargetType="CheckBox">
             <Setter Property="Margin" Value="5" />
@@ -39,12 +38,12 @@
             <Setter Property="MinWidth" Value="120" />
             <Setter Property="Height" Value="35" />
         </Style>
-        <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
+        <Style x:Key="FormComboBoxStyle" TargetType="ComboBox">
             <Setter Property="Margin" Value="2" />
             <Setter Property="Padding" Value="5,2" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Height" Value="28" />
-        </Style>
+        </Style>-->
     </UserControl.Resources>
 
     <Grid>
@@ -58,13 +57,14 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5">
             <Button Content="Nouveau calcul" 
                     Command="{Binding CreateNewEmployeeCommand}" 
-                    Style="{StaticResource ButtonStyle}"/>
+                    Style="{StaticResource MenuButtonStyle}"
+                    Tag="{StaticResource IconNew}"/>
             <Button Content="Charger employé" 
                     Command="{Binding LoadEmployeeCommand}" 
-                    Style="{StaticResource ButtonStyle}"/>
+                    Style="{StaticResource MenuButtonStyle}"/>
             <Button Content="Effacer formulaire" 
                     Command="{Binding ClearFormCommand}" 
-                    Style="{StaticResource ButtonStyle}"/>
+                    Style="{StaticResource MenuButtonStyle}"/>
         </StackPanel>
 
         <!-- Contenu principal -->
@@ -82,21 +82,21 @@
                 </Grid.RowDefinitions>
 
                 <!-- Type de calcul -->
-                <GroupBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Header="Type de calcul" Style="{StaticResource GroupBoxStyle}">
+                <GroupBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Header="Type de calcul" Style="{StaticResource FormGroupBoxStyle}">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton Content="Calcul mensuel" IsChecked="{Binding IsAnnual, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}" Margin="5"/>
                         <RadioButton Content="Calcul annuel" IsChecked="{Binding IsAnnual}" Margin="15,5,5,5"/>
                         <CheckBox Content="Régularisation" IsChecked="{Binding IsRegularization}" Margin="20,5,5,5"/>
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}">
-                            <Label Content="Impôt déjà payé:" Style="{StaticResource LabelStyle}" />
-                            <TextBox Width="120" Text="{Binding PreviousTaxPaid, StringFormat=N0}" Style="{StaticResource TextBoxStyle}" />
-                            <Label Content="FCFA" Style="{StaticResource LabelStyle}" />
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}" HorizontalAlignment="Right">
+                            <Label Content="Impôt déjà payé:" Style="{StaticResource FormLabelStyle}" />
+                            <TextBox Width="120" Text="{Binding PreviousTaxPaid, StringFormat=N0}" Style="{StaticResource FormTextBoxStyle}" />
+                            <Label Content="FCFA" Style="{StaticResource FormLabelStyle}" />
                         </StackPanel>
                     </StackPanel>
                 </GroupBox>
 
                 <!-- Informations employé -->
-                <GroupBox Grid.Row="1" Grid.Column="0" Header="Informations de l'employé" Style="{StaticResource GroupBoxStyle}">
+                <GroupBox Grid.Row="1" Grid.Column="0" Header="Informations de l'employé" Style="{StaticResource FormGroupBoxStyle}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -111,32 +111,32 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <Label Grid.Row="0" Grid.Column="0" Content="ID:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentEmployee.EmployeeId}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" />
+                        <Label Grid.Row="0" Grid.Column="0" Content="ID:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentEmployee.EmployeeId}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" />
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Nom:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentEmployee.LastName}" Style="{StaticResource TextBoxStyle}" />
+                        <Label Grid.Row="1" Grid.Column="0" Content="Nom:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentEmployee.LastName}" Style="{StaticResource FormTextBoxStyle}" />
 
-                        <Label Grid.Row="2" Grid.Column="0" Content="Prénom:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentEmployee.FirstName }" Style="{StaticResource TextBoxStyle}" />
+                        <Label Grid.Row="2" Grid.Column="0" Content="Prénom:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentEmployee.FirstName }" Style="{StaticResource FormTextBoxStyle}" />
 
-                        <Label Grid.Row="3" Grid.Column="0" Content="Catégorie:" Style="{StaticResource LabelStyle}" />
+                        <Label Grid.Row="3" Grid.Column="0" Content="Catégorie:" Style="{StaticResource FormLabelStyle}" />
                         <ComboBox Grid.Row="3" Grid.Column="1" 
                                   ItemsSource="{Binding EmployeeCategories}" 
                                   SelectedItem="{Binding CurrentEmployee.Category}" 
-                                  Style="{StaticResource ComboBoxStyle}" />
+                                  Style="{StaticResource FormComboBoxStyle}" />
 
-                        <Label Grid.Row="4" Grid.Column="0" Content="Charges familiales:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentEmployee.FamilyCharges}" Style="{StaticResource TextBoxStyle}" />
+                        <Label Grid.Row="4" Grid.Column="0" Content="Charges familiales:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentEmployee.FamilyCharges}" Style="{StaticResource FormTextBoxStyle}" />
 
                         <CheckBox Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Content="Conjoint(e) salarié(e)" 
                                   IsChecked="{Binding CurrentEmployee.IsSpouseWorking}" 
-                                  Style="{StaticResource CheckBoxStyle}" />
+                                  Style="{StaticResource FormCheckBoxStyle}" />
                     </Grid>
                 </GroupBox>
 
                 <!-- Rémunération -->
-                <GroupBox Grid.Row="1" Grid.Column="1" Header="Rémunération" Style="{StaticResource GroupBoxStyle}">
+                <GroupBox Grid.Row="1" Grid.Column="1" Header="Rémunération" Style="{StaticResource FormGroupBoxStyle}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -151,51 +151,54 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <Label Grid.Row="0" Grid.Column="0" Content="Salaire de base:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentEmployee.BaseSalary, StringFormat=N0}" Style="{StaticResource TextBoxStyle}" />
-                        <Label Grid.Row="0" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                        <Label Grid.Row="0" Grid.Column="0" Content="Salaire de base:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentEmployee.BaseSalary, StringFormat=N0}" Style="{StaticResource FormTextBoxStyle}" />
+                        <Label Grid.Row="0" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Indemnité de logement:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentEmployee.HousingAllowance, StringFormat=N0}" Style="{StaticResource TextBoxStyle}" />
-                        <Label Grid.Row="1" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                        <Label Grid.Row="1" Grid.Column="0" Content="Indemnité de logement:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentEmployee.HousingAllowance, StringFormat=N0}" Style="{StaticResource FormTextBoxStyle}" />
+                        <Label Grid.Row="1" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                        <Label Grid.Row="2" Grid.Column="0" Content="Indemnité de transport:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentEmployee.TransportAllowance, StringFormat=N0}" Style="{StaticResource TextBoxStyle}" />
-                        <Label Grid.Row="2" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                        <Label Grid.Row="2" Grid.Column="0" Content="Indemnité de transport:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentEmployee.TransportAllowance, StringFormat=N0}" Style="{StaticResource FormTextBoxStyle}" />
+                        <Label Grid.Row="2" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                        <Label Grid.Row="3" Grid.Column="0" Content="Indemnité de fonction:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CurrentEmployee.FunctionAllowance, StringFormat=N0}" Style="{StaticResource TextBoxStyle}" />
-                        <Label Grid.Row="3" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                        <Label Grid.Row="3" Grid.Column="0" Content="Indemnité de fonction:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CurrentEmployee.FunctionAllowance, StringFormat=N0}" Style="{StaticResource FormTextBoxStyle}" />
+                        <Label Grid.Row="3" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                        <Label Grid.Row="4" Grid.Column="0" Content="Cotisation retraite:" Style="{StaticResource LabelStyle}" />
-                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentEmployee.PensionContribution, StringFormat=N0}" Style="{StaticResource TextBoxStyle}" />
-                        <Label Grid.Row="4" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                        <Label Grid.Row="4" Grid.Column="0" Content="Cotisation retraite:" Style="{StaticResource FormLabelStyle}" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentEmployee.PensionContribution, StringFormat=N0}" Style="{StaticResource FormTextBoxStyle}" />
+                        <Label Grid.Row="4" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
                     </Grid>
                 </GroupBox>
 
                 <!-- Boutons de calcul -->
                 <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
                     <Button Content="Calculer l'impôt" 
-                            Command="{Binding CalculateTaxCommand}" 
-                            Style="{StaticResource ButtonStyle}" 
+                            Command="{Binding CalculateTaxCommand}"                            
+                            Style="{StaticResource MenuButtonStyle}" 
+                            Tag="{StaticResource IconCalculator}"
                             Background="#2980b9" 
-                            Foreground="White" />
+                            Foreground="White" Width="133" />
                     <Button Content="Enregistrer le calcul" 
                             Command="{Binding SaveCalculationCommand}" 
-                            Style="{StaticResource ButtonStyle}" 
+                            Tag="{StaticResource IconSave}"
+                            Style="{StaticResource MenuButtonStyle}" 
                             Background="#27ae60" 
                             Foreground="White" 
-                            Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}" />
+                            Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}" Width="164" />
                     <Button Content="Export Excel" 
+                            Tag="{StaticResource IconExcel}"
                             Command="{Binding ExportExcelCommand}" 
-                            Style="{StaticResource ButtonStyle}" 
+                            Style="{StaticResource MenuButtonStyle}" 
                             Background="#f39c12" 
                             Foreground="White" 
-                            Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}" />
+                            Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}" Width="126" />
                 </StackPanel>
 
                 <!-- Résultats du calcul -->
-                <GroupBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Header="Résultats du calcul" Style="{StaticResource GroupBoxStyle}">
+                <GroupBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Header="Résultats du calcul" Style="{StaticResource FormGroupBoxStyle}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -228,34 +231,34 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <Label Grid.Row="0" Grid.Column="0" Content="Salaire brut:" Style="{StaticResource LabelStyle}" />
-                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentCalculation.SalaireBrut, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" />
-                            <Label Grid.Row="0" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                            <Label Grid.Row="0" Grid.Column="0" Content="Salaire brut:" Style="{StaticResource FormLabelStyle}" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurrentCalculation.SalaireBrut, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" />
+                            <Label Grid.Row="0" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                            <Label Grid.Row="1" Grid.Column="0" Content="Montant exonéré:" Style="{StaticResource LabelStyle}" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentCalculation.ExemptAmount, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" />
-                            <Label Grid.Row="1" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                            <Label Grid.Row="1" Grid.Column="0" Content="Montant exonéré:" Style="{StaticResource FormLabelStyle}" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CurrentCalculation.ExemptAmount, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" />
+                            <Label Grid.Row="1" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                            <Label Grid.Row="2" Grid.Column="0" Content="Revenu imposable:" Style="{StaticResource LabelStyle}" />
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentCalculation.BaseIUTSHorsDeduction, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" />
-                            <Label Grid.Row="2" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                            <Label Grid.Row="2" Grid.Column="0" Content="Revenu imposable:" Style="{StaticResource FormLabelStyle}" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CurrentCalculation.BaseIUTSHorsDeduction, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" />
+                            <Label Grid.Row="2" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                            <Label Grid.Row="3" Grid.Column="0" Content="Réduction familiale:" Style="{StaticResource LabelStyle}" />
-                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CurrentCalculation.FamilyChargeReduction, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" />
-                            <Label Grid.Row="3" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" />
+                            <Label Grid.Row="3" Grid.Column="0" Content="Réduction familiale:" Style="{StaticResource FormLabelStyle}" />
+                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CurrentCalculation.FamilyChargeReduction, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" />
+                            <Label Grid.Row="3" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" />
 
-                            <Label Grid.Row="4" Grid.Column="0" Content="Montant de l'impôt:" Style="{StaticResource LabelStyle}" FontWeight="Bold" />
-                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentCalculation.IUTSNet, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" FontWeight="Bold" Background="#f0f8ff" />
-                            <Label Grid.Row="4" Grid.Column="2" Content="FCFA" Style="{StaticResource LabelStyle}" FontWeight="Bold" />
+                            <Label Grid.Row="4" Grid.Column="0" Content="Montant de l'impôt:" Style="{StaticResource FormLabelStyle}" FontWeight="Bold" />
+                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding CurrentCalculation.IUTSNet, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" FontWeight="Bold" Background="#f0f8ff" />
+                            <Label Grid.Row="4" Grid.Column="2" Content="FCFA" Style="{StaticResource FormLabelStyle}" FontWeight="Bold" />
 
-                            <Label Grid.Row="5" Grid.Column="0" Content="Taux d'imposition:" Style="{StaticResource LabelStyle}" />
-                            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding CurrentCalculation.TaxRate, StringFormat=N2}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" />
-                            <Label Grid.Row="5" Grid.Column="2" Content="%" Style="{StaticResource LabelStyle}" />
+                            <Label Grid.Row="5" Grid.Column="0" Content="Taux d'imposition:" Style="{StaticResource FormLabelStyle}" />
+                            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding CurrentCalculation.TaxRate, StringFormat=N2}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" />
+                            <Label Grid.Row="5" Grid.Column="2" Content="%" Style="{StaticResource FormLabelStyle}" />
 
                             <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}">
-                                <Label Content="Différence à payer/rembourser:" Style="{StaticResource LabelStyle}" FontWeight="Bold" />
-                                <TextBox Width="120" Text="{Binding CurrentCalculation.TaxDifference, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource TextBoxStyle}" FontWeight="Bold" />
-                                <Label Content="FCFA" Style="{StaticResource LabelStyle}" FontWeight="Bold" />
+                                <Label Content="Différence à payer/rembourser:" Style="{StaticResource FormLabelStyle}" FontWeight="Bold" />
+                                <TextBox Width="120" Text="{Binding CurrentCalculation.TaxDifference, StringFormat=N0}" IsReadOnly="True" Style="{StaticResource FormTextBoxStyle}" FontWeight="Bold" />
+                                <Label Content="FCFA" Style="{StaticResource FormLabelStyle}" FontWeight="Bold" />
                             </StackPanel>
                         </Grid>
 

@@ -1,0 +1,33 @@
+﻿<Window x:Class="IUTSCalculator.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Connexion - IUTS Calculator"
+        Height="400" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#FFF8F8F8"
+        WindowStyle="SingleBorderWindow"
+        FontFamily="Segoe UI"
+        >
+    <Border CornerRadius="12" Background="White" Padding="32" Margin="16" BorderBrush="#FFCCCCCC" BorderThickness="1">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" >
+            <TextBlock Text="Connexion" FontSize="22" FontWeight="Bold" Foreground="#2D2D2D" Margin="0,0,0,18" HorizontalAlignment="Center"/>
+            <TextBlock Text="Nom d'utilisateur" Margin="0,0,0,4" Foreground="#444"/>
+            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Height="32" Margin="0,0,0,12" Padding="8" BorderBrush="#FFCCCCCC" BorderThickness="1" />
+            <TextBlock Text="Mot de passe" Margin="0,0,0,4" Foreground="#444"/>
+            <PasswordBox x:Name="PasswordBox" Height="32" Margin="0,0,0,12" Padding="8" BorderBrush="#FFCCCCCC" BorderThickness="1"
+                         PasswordChanged="PasswordBox_PasswordChanged"/>
+            <TextBlock Text="{Binding StatusMessage}" Foreground="Red" FontSize="12" Margin="0,0,0,8" TextWrapping="Wrap"/>
+            <Button Style="{StaticResource MenuButtonStyle}" Content="Se connecter" Command="{Binding LoginCommand}"/>
+                                        
+            <Button Content="Mot de passe oublié ?"
+                    Command="{Binding ResetPasswordCommand}"
+                    Height="30"
+                    Background="Transparent"
+                    Foreground="#0078D7"
+                    BorderThickness="0"
+                    HorizontalAlignment="Right"
+                    />
+        </StackPanel>
+    </Border>
+</Window>

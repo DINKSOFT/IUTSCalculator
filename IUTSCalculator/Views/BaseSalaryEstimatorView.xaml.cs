@@ -1,15 +1,24 @@
-﻿using System.Windows;
-using IUTSCalculator.Services;
+﻿using System.Windows.Controls;
 using IUTSCalculator.ViewModels;
+using IUTSCalculator.Services;
 
 namespace IUTSCalculator.Views
 {
-    public partial class BaseSalaryEstimatorView : Window
+    /// <summary>
+    /// Logique d'interaction pour BaseSalaryEstimatorView.xaml (UserControl)
+    /// </summary>
+    public partial class BaseSalaryEstimatorView : UserControl
     {
-        public BaseSalaryEstimatorView(TaxCalculatorService taxCalculatorService)
+        public BaseSalaryEstimatorView()
         {
             InitializeComponent();
-            DataContext = new BaseSalaryEstimatorViewModel(taxCalculatorService);
+        }
+
+        // Si vous souhaitez injecter le ViewModel manuellement :
+        public BaseSalaryEstimatorView(DataService dataService, TaxCalculatorService taxCalculatorService)
+            : this()
+        {
+            DataContext = new BaseSalaryEstimatorViewModel(dataService, taxCalculatorService);
         }
     }
 }

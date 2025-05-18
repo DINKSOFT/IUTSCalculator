@@ -6,7 +6,6 @@
         xmlns:local="clr-namespace:IUTSCalculator"
         xmlns:views="clr-namespace:IUTSCalculator.Views"
         xmlns:viewModels="clr-namespace:IUTSCalculator.ViewModels"
-        xmlns:converters="clr-namespace:IUTSCalculator.Converters"
         mc:Ignorable="d"
         Title="Calculateur d'Impôts IUTS" 
         Height="650" 
@@ -16,47 +15,20 @@
 
     <Window.Resources>
         <ResourceDictionary>
-            <!-- Convertisseurs -->
-            <converters:BoolToTypeConverter x:Key="BoolToTypeConverter"/>
-            <converters:BooleanToTextConverter x:Key="BooleanToTextConverter"/>
-            <converters:DecimalToStringConverter x:Key="DecimalToStringConverter"/>
-            <converters:StringEqualsConverter x:Key="StringEqualsConverter"/>
 
-            <!-- Styles -->
-            <Style x:Key="MenuButtonStyle" TargetType="Button">
-                <Setter Property="Margin" Value="5"/>
-                <Setter Property="Padding" Value="10,5"/>
-                <Setter Property="Background" Value="#3498db"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="FontSize" Value="14"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="BorderThickness" Value="0"/>
-                <Setter Property="MinWidth" Value="120"/>
-                <Setter Property="Height" Value="40"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}" 
-                                    BorderBrush="{TemplateBinding BorderBrush}" 
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="4">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#2980b9"/>
-                                </Trigger>
-                                <Trigger Property="IsPressed" Value="True">
-                                    <Setter Property="Background" Value="#1f618d"/>
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter Property="Background" Value="#bdc3c7"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
+            <!-- DataTemplates pour les ViewModels -->
+            <DataTemplate DataType="{x:Type viewModels:CalculationViewModel}">
+                <views:CalculationView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:HistoryViewModel}">
+                <views:HistoryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:SettingsViewModel}">
+                <views:SettingsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:BaseSalaryEstimatorViewModel}">
+                <views:BaseSalaryEstimatorView />
+            </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -70,14 +42,14 @@
         <!-- Barre de menu -->
         <Menu Grid.Row="0" FontSize="14">
             <MenuItem Header="Fichier">
-                <MenuItem Header="Nouveau calcul" Click="NewCalculation_Click"/>
-                <MenuItem Header="Historique" Click="OpenHistory_Click"/>
-                <MenuItem Header="Exporter" Click="Export_Click"/>
+                <MenuItem Header="Nouveau calcul" Command="{Binding NewCalculationCommand}"/>
+                <MenuItem Header="Historique" Command="{Binding NavigateToHistoryCommand}"/>
+                <MenuItem Header="Exporter" Command="{Binding ExportToPdfCommand}"/>
                 <Separator/>
                 <MenuItem Header="Quitter" Click="Exit_Click"/>
             </MenuItem>
             <MenuItem Header="Options">
-                <MenuItem Header="Paramètres" Click="OpenSettings_Click"/>
+                <MenuItem Header="Paramètres" Command="{Binding NavigateToSettingsCommand}"/>
                 <MenuItem Header="Préférences d'affichage" Click="DisplayPreferences_Click"/>
             </MenuItem>
             <MenuItem Header="Aide">
@@ -95,25 +67,32 @@
 
             <!-- Barre d'outils pour accès rapide -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                <Button Style="{StaticResource MenuButtonStyle}" Content="Nouveau calcul" Click="NewCalculation_Click"/>
-                <Button Style="{StaticResource MenuButtonStyle}" Content="Historique" Click="OpenHistory_Click"/>
-                <Button Style="{StaticResource MenuButtonStyle}" Content="Paramètres" Click="OpenSettings_Click"/>
+                <Button Style="{StaticResource MenuButtonStyle}" 
+                        Tag="{StaticResource IconNew}"
+                        Content="Nouveau calcul" Command="{Binding NewCalculationCommand}" Width="143"/>
+                <Button Style="{StaticResource MenuButtonStyle}" 
+                        Tag="{StaticResource IconHistory}"
+                        Content="Historique" Command="{Binding NavigateToHistoryCommand}"/>
+                <Button Style="{StaticResource MenuButtonStyle}" 
+                        Tag="{StaticResource IconSettings}"
+                        Content="Paramètres" Command="{Binding NavigateToSettingsCommand}"/>
+                <Button Style="{StaticResource MenuButtonStyle}" 
+                        Tag="{StaticResource IconEstimate}"
+                        Content="Estimation Salaire Base" Command="{Binding NavigateToBaseSalaryEstimatorCommand}" Width="194"/>                
             </StackPanel>
 
-            <!-- Vue de calcul par défaut -->
-            <ContentControl Grid.Row="1" x:Name="MainContent">
-                <!-- Utilisez la vue de calcul -->
-            </ContentControl>
+            <!-- Vue dynamique selon le ViewModel courant -->
+            <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />
         </Grid>
 
         <!-- Barre de statut -->
         <StatusBar Grid.Row="2" Background="#f0f0f0">
             <StatusBarItem>
-                <TextBlock x:Name="StatusText" Text="Prêt" FontSize="12"/>
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="VersionText" Text="Version 1.0" FontSize="12"/>
+                <TextBlock Text="{Binding ApplicationTitle}" FontSize="12"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>

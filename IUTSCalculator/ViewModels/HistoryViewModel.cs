@@ -14,8 +14,10 @@ namespace IUTSCalculator.ViewModels
     /// </summary>
     public class HistoryViewModel : BaseViewModel
     {
+        public bool CanEditData => UserSession.Instance.CanEdit;
+        public bool IsAdmin => UserSession.Instance.IsAdmin;
+        public bool IsReadOnly => UserSession.Instance.IsReadOnly;
         private readonly DataService _dataService;
-        private readonly TaxCalculatorService _taxCalculatorService;
         private ObservableCollection<TaxCalculation> _calculations;
         private TaxCalculation _selectedCalculation;
         private string _searchText;
@@ -181,7 +183,6 @@ namespace IUTSCalculator.ViewModels
         public HistoryViewModel(DataService dataService, TaxCalculatorService taxCalculatorService)
         {
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
-            _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
 
             Title = "Historique";
 

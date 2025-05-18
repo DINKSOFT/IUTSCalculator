@@ -2,8 +2,183 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:IUTSCalculator"
+             xmlns:converters="clr-namespace:IUTSCalculator.Converters"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <ResourceDictionary>
+            <!-- Palette de couleurs -->
+            <Color x:Key="PrimaryBlue">#3498db</Color>
+            <Color x:Key="PrimaryBlueDark">#2980b9</Color>
+            <Color x:Key="PrimaryBlueDarker">#1f618d</Color>
+            <Color x:Key="GrayLight">#f0f0f0</Color>
+            <Color x:Key="GrayMedium">#bdc3c7</Color>
+            <Color x:Key="GrayDark">#7f8c8d</Color>
+            <Color x:Key="Red">#e74c3c</Color>
+            <Color x:Key="Green">#27ae60</Color>
+            <Color x:Key="White">#ffffff</Color>
+
+            <!-- Création des SolidColorBrush à partir des couleurs -->
+            <SolidColorBrush x:Key="PrimaryBlueBrush" Color="{StaticResource PrimaryBlue}"/>
+            <SolidColorBrush x:Key="PrimaryBlueDarkBrush" Color="{StaticResource PrimaryBlueDark}"/>
+            <SolidColorBrush x:Key="PrimaryBlueDarkerBrush" Color="{StaticResource PrimaryBlueDarker}"/>
+            <SolidColorBrush x:Key="GrayLightBrush" Color="{StaticResource GrayLight}"/>
+            <SolidColorBrush x:Key="GrayMediumBrush" Color="{StaticResource GrayMedium}"/>
+            <SolidColorBrush x:Key="GrayDarkBrush" Color="{StaticResource GrayDark}"/>
+            <SolidColorBrush x:Key="RedBrush" Color="{StaticResource Red}"/>
+            <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource Green}"/>
+            <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
+
+            <!-- Icônes Segoe MDL2 Assets -->
+            <sys:String x:Key="IconCalculator">&#xE8CD;</sys:String>
+            <sys:String x:Key="IconHistory">&#xE709;</sys:String>
+            <sys:String x:Key="IconSettings">&#xE713;</sys:String>
+            <sys:String x:Key="IconEstimate">&#xE8EF;</sys:String>
+            <sys:String x:Key="IconPdf">&#xE8A5;</sys:String>
+            <sys:String x:Key="IconExcel">&#xE7C6;</sys:String>
+            <sys:String x:Key="IconNew">&#xE109;</sys:String>
+            <sys:String x:Key="IconSave">&#xE105;</sys:String>
+
+            <Style x:Key="FormLabelStyle" TargetType="Label">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,4,0,2" />
+                <Setter Property="Padding" Value="2,0,2,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+                <Setter Property="Background" Value="Transparent" />
+            </Style>
+
+            <!-- Style pour les boutons principaux avec icône à gauche -->
+            <Style x:Key="MenuButtonStyle" TargetType="Button">
+                <Setter Property="Margin" Value="5"/>
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="Background" Value="{StaticResource PrimaryBlueBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="MinWidth" Value="120"/>
+                <Setter Property="Height" Value="40"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Icône à gauche, via Tag -->
+                                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                                               Text="{TemplateBinding Tag}"
+                                               FontSize="18"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center"/>
+                                    <!-- Texte du bouton -->
+                                    <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                                </StackPanel>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueDarkBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource PrimaryBlueDarkerBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="{StaticResource GrayMediumBrush}"/>
+                                    <Setter Property="Foreground" Value="{StaticResource GrayDarkBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Style pour les TextBox -->
+            <Style TargetType="TextBox" x:Key="FormTextBoxStyle">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Padding" Value="6,2"/>
+                <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource GrayMediumBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Margin" Value="0,2,0,8"/>
+                <Setter Property="Foreground" Value="#2c3e50"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <EventSetter Event="GotFocus" Handler="TextBox_GotFocus_ClearIfZero" />
+                <Style.Triggers>
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Style pour les DataGrid -->
+            <Style TargetType="DataGrid" x:Key="MainDataGridStyle">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="RowBackground" Value="{StaticResource WhiteBrush}"/>
+                <Setter Property="AlternatingRowBackground" Value="#fafbfc"/>
+                <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource GrayMediumBrush}"/>
+                <Setter Property="VerticalGridLinesBrush" Value="{StaticResource GrayMediumBrush}"/>
+                <Setter Property="Background" Value="{StaticResource WhiteBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource GrayMediumBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+            </Style>
+
+            <!-- Style pour les CheckBox -->
+            <Style x:Key="FormCheckBoxStyle" TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{StaticResource PrimaryBlueBrush}" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="5,4,0,4" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            </Style>
+
+            <!-- Style pour les ComboBox -->
+            <Style x:Key="FormComboBoxStyle" TargetType="ComboBox">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="Normal" />
+                <Setter Property="Foreground" Value="#2c3e50" />
+                <Setter Property="Background" Value="{StaticResource WhiteBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource GrayMediumBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="6,2" />
+                <Setter Property="Margin" Value="0,2,0,8" />
+                <Setter Property="Height" Value="28" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="SnapsToDevicePixels" Value="True" />
+                <Style.Triggers>
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBlueBrush}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- Style pour les GroupBox -->
+            <Style x:Key="FormGroupBoxStyle" TargetType="GroupBox">
+                <Setter Property="Margin" Value="8,8,8,8" />
+                <Setter Property="Padding" Value="10" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderBrush" Value="{StaticResource GrayMediumBrush}" />
+                <Setter Property="Background" Value="{StaticResource GrayLightBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="HeaderTemplate">
+                    <Setter.Value>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" Foreground="{StaticResource PrimaryBlueBrush}" FontWeight="Bold" FontSize="15"/>
+                        </DataTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Convertisseurs -->
+            <converters:BoolToTypeConverter x:Key="BoolToTypeConverter"/>
+            <converters:BooleanToTextConverter x:Key="BooleanToTextConverter"/>
+            <converters:DecimalToStringConverter x:Key="DecimalToStringConverter"/>
+            <converters:StringEqualsConverter x:Key="StringEqualsConverter"/>
+            
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using IUTSCalculator.Services;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -14,6 +15,9 @@ namespace IUTSCalculator.ViewModels
         private string _title;
         private bool _isBusy;
         private string _statusMessage;
+        //public bool CanEditData => UserSession.Instance.CanEdit;
+        //public bool IsAdmin => UserSession.Instance.IsAdmin;
+        //public bool IsReadOnly => UserSession.Instance.IsReadOnly;
 
         /// <summary>
         /// Indique si ce ViewModel est actuellement actif/affiché

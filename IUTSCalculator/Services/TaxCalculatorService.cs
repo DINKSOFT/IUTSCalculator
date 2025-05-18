@@ -415,6 +415,77 @@ namespace IUTSCalculator.Services
                 return salaireBrut * taux;
         }
 
+        /// <summary>
+        /// Estime le salaire de base à partir du salaire net et des indemnités.
+        /// </summary>
+        /// <param name="netSalary">Salaire net à payer</param>
+        /// <param name="housingAllowance">Indemnité de logement</param>
+        /// <param name="functionAllowance">Indemnité de fonction</param>
+        /// <param name="transportAllowance">Indemnité de transport</param>
+        /// <param name="employee">Employé (pour charges familiales, catégorie, etc.)</param>
+        /// <param name="tolerance">Tolérance d'arrêt (par défaut 100 FCFA)</param>
+        /// <param name="maxIterations">Nombre max d'itérations</param>
+        /// <returns>Salaire de base estimé</returns>
+        public decimal CalculateBaseSalaryFromNet(
+    decimal netSalary,
+    decimal housingAllowance,
+    decimal functionAllowance,
+    decimal transportAllowance,
+    Employee employee,
+    decimal tolerance = 0m,
+    int maxIterations = 50)
+        {
+            if (employee == null)
+                throw new ArgumentNullException(nameof(employee));
+
+            // Estimation initiale
+            decimal estimatedBase = netSalary;
+            decimal step = 1000m;
+            decimal lastDifference = decimal.MaxValue;
+            int iteration = 0;
+
+            while (iteration < maxIterations)
+            {
+                // On clone l'employé pour ne pas modifier l'original
+                var tempEmployee = new Employee
+                {
+                    BaseSalary = estimatedBase,
+                    HousingAllowance = housingAllowance,
+                    FunctionAllowance = functionAllowance,
+                    TransportAllowance = transportAllowance,
+                    FamilyCharges = employee.FamilyCharges,
+                    Category = employee.Category, // Déclenche le calcul de IsHigherCategory
+                    IsSpouseWorking = employee.IsSpouseWorking
+                };
+
+                var calc = CalculateMonthlyTax(tempEmployee);
+
+                // On considère le salaire net à payer (salaire brut - impôts - cotisations)
+                decimal calculatedNet = calc.SalaireNetaPayer > 0 ? calc.SalaireNetaPayer : calc.NetSalaryAfterTax;
+
+                decimal difference = calculatedNet - netSalary;
+
+                if (Math.Abs(difference) <= tolerance)
+                    return estimatedBase;
+
+                // Ajustement : si le net calculé est trop élevé, on baisse le brut, sinon on l'augmente
+                if (difference > 0)
+                    estimatedBase -= step;
+                else
+                    estimatedBase += step;
+
+                // Réduire le pas si on change de signe (pour accélérer la convergence)
+                if (Math.Sign(difference) != Math.Sign(lastDifference))
+                    step /= 2;
+
+                lastDifference = difference;
+                iteration++;
+            }
+
+            // Retourne la dernière estimation si la convergence n'est pas atteinte
+            return estimatedBase;
+        }
+
 
 
         /// <summary>

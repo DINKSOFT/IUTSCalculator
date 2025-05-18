@@ -13,10 +13,14 @@ namespace IUTSCalculator.ViewModels
     /// </summary>
     public class MainViewModel : BaseViewModel
     {
+        public bool CanEditData => UserSession.Instance.CanEdit;
+        public bool IsAdmin => UserSession.Instance.IsAdmin;
+        public bool IsReadOnly => UserSession.Instance.IsReadOnly;
         private BaseViewModel _currentViewModel;
         private readonly CalculationViewModel _calculationViewModel;
         private readonly HistoryViewModel _historyViewModel;
         private readonly SettingsViewModel _settingsViewModel;
+        private readonly BaseSalaryEstimatorViewModel _baseSalaryEstimatorViewModel; // Ajout du ViewModel pour l'estimation du salaire
         private readonly DataService _dataService;
         private readonly TaxDataService _taxDataService;
         private readonly TaxCalculatorService _taxCalculatorService;
@@ -67,6 +71,11 @@ namespace IUTSCalculator.ViewModels
         public ICommand NavigateToSettingsCommand { get; private set; }
 
         /// <summary>
+        /// Commande pour naviguer vers l'estimateur de salaire de base
+        /// </summary>
+        public ICommand NavigateToBaseSalaryEstimatorCommand { get; private set; }
+
+        /// <summary>
         /// Commande pour exporter le calcul actuel en PDF
         /// </summary>
         public ICommand ExportToPdfCommand { get; private set; }
@@ -98,6 +107,7 @@ namespace IUTSCalculator.ViewModels
             _calculationViewModel = new CalculationViewModel(_taxCalculatorService, _dataService);
             _historyViewModel = new HistoryViewModel(_dataService, _taxCalculatorService);
             _settingsViewModel = new SettingsViewModel(_dataService);
+            _baseSalaryEstimatorViewModel = new BaseSalaryEstimatorViewModel(_dataService,_taxCalculatorService);
 
             // Configurer la navigation par défaut
             CurrentViewModel = _calculationViewModel;
@@ -127,6 +137,10 @@ namespace IUTSCalculator.ViewModels
 
             NavigateToSettingsCommand = new RelayCommand(
                 execute: () => NavigateTo(_settingsViewModel),
+                canExecute: () => !IsBusy);
+
+            NavigateToBaseSalaryEstimatorCommand = new RelayCommand(
+                execute: () => NavigateTo(_baseSalaryEstimatorViewModel),
                 canExecute: () => !IsBusy);
 
             ExportToPdfCommand = new RelayCommand(
@@ -167,6 +181,8 @@ namespace IUTSCalculator.ViewModels
                 _calculationViewModel.RefreshSettings();
                 _historyViewModel.RefreshSettings();
             };
+
+            // Si besoin d'écouter des événements du BaseSalaryEstimatorViewModel, ajoutez-les ici
         }
 
         /// <summary>

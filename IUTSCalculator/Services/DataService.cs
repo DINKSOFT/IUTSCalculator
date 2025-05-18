@@ -9,6 +9,7 @@ using System.IO.Compression;
 using System.Globalization;
 using IUTSCalculator.ViewModels;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
+using System.Collections.ObjectModel;
 
 
 namespace IUTSCalculator.Services
@@ -21,7 +22,7 @@ namespace IUTSCalculator.Services
     public class DataService
     {
         #region Constantes et champs privés
-
+        public ObservableCollection<string> EmployeeCategories { get; }
         private readonly string _appDataFolder;
         private readonly string _employeesFilePath;
         private readonly string _calculationsFilePath;
@@ -58,11 +59,19 @@ namespace IUTSCalculator.Services
             _cachedEmployees = new List<Employee>();
             _cachedCalculations = new List<TaxCalculation>();
             _cachedSettings = new AppSettings();
+
+            EmployeeCategories = new ObservableCollection<string>
+        {
+            "Cadre Supérieur",
+            "Cadre Inférieur"
+        };
         }
 
         #endregion
 
         #region Gestion des employés
+
+
 
         /// <summary>
         /// Charge la liste des employés depuis le stockage persistant
@@ -261,7 +270,29 @@ namespace IUTSCalculator.Services
             await SaveCalculationsHistoryAsync(_cachedCalculations);
         }
 
+        /// <summary>
+        /// Supprime un calcul de l'historique par son ID
+        /// </summary>
+        public async Task DeleteCalculationFromHistoryAsync(string calculationId)
+        {
+            if (string.IsNullOrEmpty(calculationId))
+                throw new ArgumentException("L'ID du calcul est requis", nameof(calculationId));
 
+            // Chargement de l'historique actuel
+            await LoadCalculationsHistoryAsync();
+
+            // Recherche et suppression du calcul
+            TaxCalculation calculationToRemove = _cachedCalculations.FirstOrDefault(c => c.Id == calculationId);
+            if (calculationToRemove != null)
+            {
+                _cachedCalculations.Remove(calculationToRemove);
+                await SaveCalculationsHistoryAsync(_cachedCalculations);
+            }
+            else
+            {
+                throw new KeyNotFoundException($"Calcul avec ID {calculationId} non trouvé");
+            }
+        }
 
         /// <summary>
         /// Supprime un calcul de l'historique par son ID

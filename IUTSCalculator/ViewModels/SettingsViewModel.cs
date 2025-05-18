@@ -13,6 +13,9 @@ namespace IUTSCalculator.ViewModels
     /// </summary>
     public class SettingsViewModel : BaseViewModel
     {
+        public bool CanEditData => UserSession.Instance.CanEdit;
+        public bool IsAdmin => UserSession.Instance.IsAdmin;
+        public bool IsReadOnly => UserSession.Instance.IsReadOnly;
         private readonly DataService _dataService;
         private List<TaxBracket> _taxBrackets;
         private List<FamilyCharge> _familyCharges;

@@ -3,7 +3,9 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using IUTSCalculator.ViewModels;
-using IUTSCalculator.Services; // Ajouté pour accéder aux services
+using System.Globalization;
+using IUTSCalculator.Services;
+using System.Windows.Media; // Ajouté pour accéder aux services
 
 namespace IUTSCalculator.Views
 {
@@ -72,9 +74,48 @@ namespace IUTSCalculator.Views
         /// </summary>
         private void OnCalculationCompleted(object sender, EventArgs e)
         {
-            // Cette méthode peut être utilisée pour effectuer des actions UI après un calcul
-            // Par exemple, faire défiler vers les résultats, ou mettre en évidence certains éléments
+                       // Faire défiler jusqu'à la fin du ScrollViewer principal
+            var scrollViewer = FindScrollViewer(this);
+            if (scrollViewer != null)
+            {
+                scrollViewer.ScrollToEnd();
+            }
         }
+
+        /// <summary>
+        /// Recherche récursivement le premier ScrollViewer dans l'arborescence visuelle
+        /// </summary>
+        private ScrollViewer FindScrollViewer(DependencyObject parent)
+        {
+            if (parent == null) return null;
+            if (parent is ScrollViewer sv) return sv;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                var result = FindScrollViewer(child);
+                if (result != null)
+                    return result;
+            }
+            return null;
+        }
+
+        private void TextBox_GotFocus_ClearIfZero(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox tb)
+            {
+                var text = tb.Text?.Trim();
+                if (text == "0" || text == "0,00" || text == "0.00")
+                {
+                    tb.Clear();
+                }
+                else if (decimal.TryParse(text, NumberStyles.Any, CultureInfo.CurrentCulture, out decimal value) && value == 0)
+                {
+                    tb.Clear();
+                }
+            }
+        }
+
 
         /// <summary>
         /// Méthode appelée lors du déchargement de la vue
@@ -89,5 +130,6 @@ namespace IUTSCalculator.Views
 
             Unloaded -= CalculationView_Unloaded;
         }
+
     }
 }

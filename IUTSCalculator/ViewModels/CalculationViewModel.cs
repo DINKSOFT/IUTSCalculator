@@ -17,13 +17,16 @@ namespace IUTSCalculator.ViewModels
     /// </summary>
     public class CalculationViewModel : BaseViewModel
     {
+        public bool CanEditData => UserSession.Instance.CanEdit;
+        public bool IsAdmin => UserSession.Instance.IsAdmin;
+        public bool IsReadOnly => UserSession.Instance.IsReadOnly;
         private readonly TaxCalculatorService _taxCalculatorService;
+        public ObservableCollection<string> EmployeeCategories => _dataService.EmployeeCategories;
         private readonly DataService _dataService;
         private Employee _currentEmployee;
         private TaxCalculation _currentCalculation;
         private string _resultMessage;
-        private bool _isNewEmployee;
-        private ObservableCollection<string> _employeeCategories;
+        private bool _isNewEmployee;        
         private bool _isAnnual;
         private bool _isRegularization;
         private decimal _previousTaxPaid;
@@ -72,11 +75,11 @@ namespace IUTSCalculator.ViewModels
         /// <summary>
         /// Liste des catégories d'employés disponibles
         /// </summary>
-        public ObservableCollection<string> EmployeeCategories
-        {
-            get => _employeeCategories;
-            set => SetProperty(ref _employeeCategories, value);
-        }
+        //public ObservableCollection<string> EmployeeCategories
+        //{
+        //    get => _employeeCategories;
+        //    set => SetProperty(ref _employeeCategories, value);
+        //}
 
         /// <summary>
         /// Indique si le calcul est annuel ou mensuel
@@ -152,10 +155,10 @@ namespace IUTSCalculator.ViewModels
 
             // Initialiser les collections
             //"P", "A", "B", "C", "D", "E", "F", "G", "1", "2", "3", "4", "5", "6" valeurs initiales
-            EmployeeCategories = new ObservableCollection<string>
-            {
-                "Cadre Supérieur", "Cadre Inférieur"
-            };
+            //EmployeeCategories = new ObservableCollection<string>
+            //{
+            //    "Cadre Supérieur", "Cadre Inférieur"
+            //};
 
             // Initialiser les commandes
             InitializeCommands();
