@@ -20,5 +20,10 @@ namespace IUTSCalculator.Views
         {
             DataContext = new BaseSalaryEstimatorViewModel(dataService, taxCalculatorService);
         }
+
+        private void TextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+
+        }
     }
 }

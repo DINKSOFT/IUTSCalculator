@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="IUTSCalculator.Views.HistoryView"
+<UserControl x:Class="IUTSCalculator.Views.HistoryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -7,128 +7,156 @@
              xmlns:vm="clr-namespace:IUTSCalculator.ViewModels"
              xmlns:converters="clr-namespace:IUTSCalculator.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="900">
+             d:DesignHeight="620" d:DesignWidth="1000">
 
     <UserControl.Resources>
-        <converters:BoolToTypeConverter x:Key="BoolToTypeConverter"/>
-        <Style x:Key="ActionButtonStyle" TargetType="Button">
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="MinWidth" Value="100"/>
-        </Style>
-        <Style x:Key="FilterGroupBoxStyle" TargetType="GroupBox">
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Padding" Value="5"/>
+        <Style x:Key="FilterLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
     </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Section des filtres -->
-        <Border Grid.Row="0" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Margin="0,0,0,5">
-            <Grid Margin="10">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Row="0" Orientation="Horizontal">
-                    <GroupBox Header="Recherche" Style="{StaticResource FilterGroupBoxStyle}">
-                        <TextBox Width="200" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                 Margin="5" VerticalContentAlignment="Center"/>
-                    </GroupBox>
-                    <GroupBox Header="Employé" Style="{StaticResource FilterGroupBoxStyle}">
-                        <ComboBox Width="200" ItemsSource="{Binding EmployeeNames}" 
-                                  SelectedItem="{Binding SelectedEmployeeFilter}" Margin="5"/>
-                    </GroupBox>
-                    <GroupBox Header="Type" Style="{StaticResource FilterGroupBoxStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <CheckBox Content="Annuel uniquement" IsChecked="{Binding ShowAnnualOnly}" Margin="5"/>
-                            <CheckBox Content="Mensuel uniquement" IsChecked="{Binding ShowMonthlyOnly}" Margin="5"/>
-                        </StackPanel>
-                    </GroupBox>
-                </StackPanel>
-
-                <StackPanel Grid.Row="1" Orientation="Horizontal">
-                    <GroupBox Header="Période" Style="{StaticResource FilterGroupBoxStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Du:" VerticalAlignment="Center" Margin="5"/>
-                            <DatePicker SelectedDate="{Binding StartDate}" Width="120" Margin="5"/>
-                            <TextBlock Text="Au:" VerticalAlignment="Center" Margin="5"/>
-                            <DatePicker SelectedDate="{Binding EndDate}" Width="120" Margin="5"/>
-                        </StackPanel>
-                    </GroupBox>
-                </StackPanel>
-
-                <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Orientation="Vertical" 
-                            VerticalAlignment="Center">
-                    <Button Content="Rafraîchir" Command="{Binding RefreshHistoryCommand}" 
-                            Style="{StaticResource ActionButtonStyle}"/>
-                    <Button Content="Effacer les filtres" Command="{Binding ClearFiltersCommand}" 
-                            Style="{StaticResource ActionButtonStyle}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- Liste des calculs -->
-        <DataGrid Grid.Row="1" Margin="10" 
-                  ItemsSource="{Binding Calculations}" 
-                  SelectedItem="{Binding SelectedCalculation}"
-                  AutoGenerateColumns="False" 
-                  IsReadOnly="True"
-                  SelectionMode="Single"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  AlternatingRowBackground="#F5F5F5"
-                  BorderBrush="#DDDDDD"
-                  BorderThickness="1"
-                  RowHeaderWidth="0"
-                  VerticalGridLinesBrush="#EEEEEE"
-                  HorizontalGridLinesBrush="#EEEEEE">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Date" Binding="{Binding CalculationDate, StringFormat=dd/MM/yyyy}" Width="100"/>
-                <DataGridTextColumn Header="ID Employé" Binding="{Binding Employee.EmployeeId}" Width="100"/>
-                <DataGridTextColumn Header="Nom" Binding="{Binding Employee.LastName}" Width="120"/>
-                <DataGridTextColumn Header="Prénom" Binding="{Binding Employee.FirstName}" Width="120"/>
-                <DataGridTextColumn Header="Type" Binding="{Binding IsAnnual, Converter={StaticResource BoolToTypeConverter}}" Width="80"/>
-                <DataGridTextColumn Header="Salaire brut" Binding="{Binding GrossSalary, StringFormat=N0}" Width="120"/>
-                <DataGridTextColumn Header="IUTS" Binding="{Binding TaxAmount, StringFormat=N0}" Width="100"/>
-                <DataGridTextColumn Header="Taux" Binding="{Binding TaxRate, StringFormat=P2}" Width="80"/>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- Actions sur le calcul sélectionné -->
-        <Grid Grid.Row="2" Margin="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Statut et progression -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{Binding StatusMessage}" Margin="5"/>
-                <ProgressBar Width="100" Height="15" IsIndeterminate="{Binding IsBusy}" 
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToTypeConverter}}" 
-                             Margin="10,0"/>
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Historique" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}">
+                    <Run Text="{Binding Calculations.Count, Mode=OneWay}"/>
+                    <Run Text="calculs enregistrés dans ce dossier"/>
+                </TextBlock>
             </StackPanel>
 
-            <!-- Boutons d'action -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Content="Afficher" Command="{Binding ViewCalculationCommand}" 
-                        Style="{StaticResource ActionButtonStyle}"/>
-                <Button Content="Exporter PDF" Command="{Binding ExportCalculationCommand}" 
-                        Style="{StaticResource ActionButtonStyle}"/>
-                <Button Content="Supprimer" Command="{Binding DeleteCalculationCommand}" 
-                        Style="{StaticResource ActionButtonStyle}"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Effacer les filtres" Tag="{StaticResource IconClear}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ClearFiltersCommand}"/>
+                <Button Content="Rafraîchir" Tag="{StaticResource IconRefresh}" Margin="0"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding RefreshHistoryCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Filtres ═══════════
+             Une seule rangée alignée, au lieu de quatre GroupBox côte à côte. -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="FILTRES" Style="{StaticResource SectionLabelStyle}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Recherche" Style="{StaticResource FilterLabel}"/>
+                    <TextBox   Grid.Row="1" Grid.Column="0" Margin="0"
+                               Style="{StaticResource FormTextBoxStyle}"
+                               Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Employé" Style="{StaticResource FilterLabel}"/>
+                    <ComboBox  Grid.Row="1" Grid.Column="2" Margin="0"
+                               Style="{StaticResource FormComboBoxStyle}"
+                               ItemsSource="{Binding EmployeeNames}"
+                               SelectedItem="{Binding SelectedEmployeeFilter}"/>
+
+                    <TextBlock  Grid.Row="0" Grid.Column="4" Text="Du" Style="{StaticResource FilterLabel}"/>
+                    <DatePicker Grid.Row="1" Grid.Column="4" Width="132" Margin="0"
+                                Style="{StaticResource FormDatePickerStyle}"
+                                SelectedDate="{Binding StartDate}"/>
+
+                    <TextBlock  Grid.Row="0" Grid.Column="6" Text="Au" Style="{StaticResource FilterLabel}"/>
+                    <DatePicker Grid.Row="1" Grid.Column="6" Width="132" Margin="0"
+                                Style="{StaticResource FormDatePickerStyle}"
+                                SelectedDate="{Binding EndDate}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="8" Text="Type" Style="{StaticResource FilterLabel}"/>
+                    <StackPanel Grid.Row="1" Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center">
+                        <CheckBox Content="Annuel" Margin="0,0,14,0"
+                                  Style="{StaticResource FormCheckBoxStyle}"
+                                  IsChecked="{Binding ShowAnnualOnly}"/>
+                        <CheckBox Content="Mensuel" Margin="0"
+                                  Style="{StaticResource FormCheckBoxStyle}"
+                                  IsChecked="{Binding ShowMonthlyOnly}"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════ Liste des calculs ═══════════ -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <DataGrid ItemsSource="{Binding Calculations}"
+                      SelectedItem="{Binding SelectedCalculation}"
+                      Style="{StaticResource FormDataGridStyle}"
+                      Margin="0" BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Date"
+                                        Binding="{Binding CalculationDate, StringFormat=dd/MM/yyyy}"
+                                        Width="110"/>
+                    <DataGridTextColumn Header="Nom" Binding="{Binding Employee.LastName}" Width="*"/>
+                    <DataGridTextColumn Header="Prénom" Binding="{Binding Employee.FirstName}" Width="*"/>
+                    <DataGridTextColumn Header="Type"
+                                        Binding="{Binding IsAnnual, Converter={StaticResource BoolToTypeConverter}}"
+                                        Width="100"/>
+                    <!-- Ces deux colonnes étaient liées à GrossSalary et TaxAmount, qui
+                         n'existent pas sur TaxCalculation : elles restaient vides. -->
+                    <DataGridTextColumn Header="Salaire brut"
+                                        Binding="{Binding SalaireBrut, StringFormat=N0}"
+                                        Width="130"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    <DataGridTextColumn Header="IUTS"
+                                        Binding="{Binding IUTSNet, StringFormat=N0}"
+                                        Width="120"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    <!-- TaxRate est déjà exprimé en pourcentage : le format P2 le
+                         multipliait une seconde fois par cent. -->
+                    <DataGridTextColumn Header="Taux"
+                                        Binding="{Binding TaxRate, StringFormat={}{0:N2} %}"
+                                        Width="90"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- ═══════════ Actions ═══════════ -->
+        <Grid Grid.Row="3" Margin="0,14,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                           Foreground="{StaticResource InkSubtleBrush}" VerticalAlignment="Center"/>
+                <ProgressBar Width="110" Height="4" Margin="12,0,0,0" VerticalAlignment="Center"
+                             IsIndeterminate="{Binding IsBusy}"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToTypeConverter}}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Supprimer" Tag="{StaticResource IconDelete}"
+                        Style="{StaticResource DangerButtonStyle}"
+                        Command="{Binding DeleteCalculationCommand}"/>
+                <Button Content="Exporter en PDF" Tag="{StaticResource IconPdf}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ExportCalculationCommand}"/>
+                <Button Content="Afficher" Tag="{StaticResource IconView}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}"
+                        Command="{Binding ViewCalculationCommand}"/>
             </StackPanel>
         </Grid>
     </Grid>

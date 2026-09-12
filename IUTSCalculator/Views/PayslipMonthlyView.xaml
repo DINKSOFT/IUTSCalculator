@@ -1,0 +1,63 @@
+﻿<UserControl x:Class="IUTSCalculator.Views.PayslipMonthlyView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:IUTSCalculator.Models"
+             xmlns:vm="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008">
+             <!--d:DesignHeight="500" d:DesignWidth="600">-->
+    
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Bulletin de salaire mensuel"
+                   FontSize="20" FontWeight="Bold" Margin="0,0,0,20" />
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="3*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,20,0">
+                <TextBlock Text="Employé :" FontWeight="Bold"/>
+                <TextBlock Text="{Binding Payslip.Employee.LastName}" />
+                <TextBlock Text="{Binding Payslip.Employee.FirstName}" />
+                <TextBlock Text="Période :" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding Payslip.Period, StringFormat='{}{0:MMMM yyyy}'}" />
+                <TextBlock Text="Catégorie :" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding Payslip.Employee.Category}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="Salaire de base :" />
+                <TextBlock Text="{Binding Payslip.BaseSalary, StringFormat=N0}"/>
+                <TextBlock Text="Indemnité logement :" />
+                <TextBlock Text="{Binding Payslip.HousingAllowance, StringFormat=N0}"/>
+                <TextBlock Text="Indemnité fonction :" />
+                <TextBlock Text="{Binding Payslip.FunctionAllowance, StringFormat=N0}"/>
+                <TextBlock Text="Indemnité transport :" />
+                <TextBlock Text="{Binding Payslip.TransportAllowance, StringFormat=N0}"/>
+                <TextBlock Text="Salaire brut :" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding Payslip.GrossSalary, StringFormat=N0}"/>
+                <TextBlock Text="CNSS employé :" />
+                <TextBlock Text="{Binding Payslip.CnssEmployee, StringFormat=N0}"/>
+                <TextBlock Text="CNSS employeur :" />
+                <TextBlock Text="{Binding Payslip.CnssEmployer, StringFormat=N0}"/>
+                <TextBlock Text="TPA :" />
+                <TextBlock Text="{Binding Payslip.ProfessionalTax, StringFormat=N0}"/>
+                <TextBlock Text="IUTS :" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding Payslip.IUTS, StringFormat=N0}"/>
+                <TextBlock Text="Net à payer :" FontWeight="Bold" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding Payslip.NetToPay, StringFormat=N0}"/>
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Imprimer" Command="{Binding PrintCommand}" Margin="0,0,10,0"/>
+            <Button Content="Exporter PDF" Command="{Binding ExportPdfCommand}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

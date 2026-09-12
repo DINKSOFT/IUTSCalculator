@@ -1,0 +1,77 @@
+<UserControl x:Class="IUTSCalculator.Views.BatchSalaryEstimationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600">
+    <!-- Le DataContext est affecté dans le code-behind -->
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Estimation en lot" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}">
+                    <Run Text="{Binding Employees.Count, Mode=OneWay}"/>
+                    <Run Text="salariés importés depuis le fichier CSV"/>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Export Excel" Tag="{StaticResource IconExcel}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ExportBatchToExcelCommand}"/>
+                <Button Content="Importer un fichier CSV" Tag="{StaticResource IconImport}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}"
+                        Command="{Binding ImportCsvAndBatchEstimateCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Résultats ═══════════ -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <DataGrid ItemsSource="{Binding Employees}"
+                      Style="{StaticResource FormDataGridStyle}"
+                      Margin="0" BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Nom" Binding="{Binding LastName}" Width="*"/>
+                    <DataGridTextColumn Header="Prénom" Binding="{Binding FirstName}" Width="*"/>
+                    <DataGridTextColumn Header="Catégorie" Binding="{Binding Category}" Width="130"/>
+                    <DataGridTextColumn Header="Salaire de base"
+                                        Binding="{Binding BaseSalary, StringFormat=N0}" Width="130"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    <DataGridTextColumn Header="Logement"
+                                        Binding="{Binding HousingAllowance, StringFormat=N0}" Width="110"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    <DataGridTextColumn Header="Transport"
+                                        Binding="{Binding TransportAllowance, StringFormat=N0}" Width="110"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    <DataGridTextColumn Header="Fonction"
+                                        Binding="{Binding FunctionAllowance, StringFormat=N0}" Width="110"
+                                        ElementStyle="{StaticResource MoneyTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    <DataGridTextColumn Header="Charges"
+                                        Binding="{Binding FamilyCharges}" Width="90"
+                                        ElementStyle="{StaticResource CenterTextStyle}"
+                                        HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- ═══════════ Pied ═══════════ -->
+        <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{StaticResource RuleBrush}"
+                Margin="0,14,0,0" Padding="0,10,0,0">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                       Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+        </Border>
+    </Grid>
+</UserControl>

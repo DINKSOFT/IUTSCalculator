@@ -10,6 +10,7 @@ namespace IUTSCalculator
     public partial class MainWindow : Window
     {
         private readonly MainViewModel _mainViewModel;
+        private bool _isChangingDossier;
 
         /// <summary>
         /// Constructeur de la fenêtre principale
@@ -18,8 +19,10 @@ namespace IUTSCalculator
         {
             InitializeComponent();
 
-            // Initialiser le ViewModel principal
+            // Initialiser le ViewModel principal (nécessite qu'un dossier ait déjà été
+            // ouvert via l'écran de sélection de dossier, voir App.xaml.cs)
             _mainViewModel = new MainViewModel();
+            _mainViewModel.DossierChangeRequested += MainViewModel_DossierChangeRequested;
 
             // Définir le DataContext de la fenêtre principale
             DataContext = _mainViewModel;
@@ -37,13 +40,48 @@ namespace IUTSCalculator
         }
 
         /// <summary>
+        /// Ouvre l'écran de sélection de dossier pour changer d'entreprise active,
+        /// sans avoir à relancer l'application.
+        /// </summary>
+        private void ChangeDossier_Click(object sender, RoutedEventArgs e)
+        {
+            RequestChangeDossier();
+        }
+
+        private void MainViewModel_DossierChangeRequested(object sender, EventArgs e)
+        {
+            RequestChangeDossier();
+        }
+
+        private void RequestChangeDossier()
+        {
+            var selectionWindow = new Views.DossierSelectionWindow
+            {
+                Owner = this
+            };
+            bool? result = selectionWindow.ShowDialog();
+
+            if (result == true && Services.DossierSession.Instance.HasOpenDossier)
+            {
+                // Un nouveau dossier a été ouvert : on ouvre une nouvelle fenêtre principale
+                // pointant vers ce dossier, puis on referme l'ancienne.
+                var newMainWindow = new MainWindow();
+                Application.Current.MainWindow = newMainWindow;
+                newMainWindow.Show();
+
+                _isChangingDossier = true;
+                Close();
+            }
+            // Si l'utilisateur annule, on conserve le dossier et la fenêtre actuels.
+        }
+
+        /// <summary>
         /// Ouvre les préférences d'affichage
         /// </summary>
         private void DisplayPreferences_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("Fonctionnalité à implémenter", "Information",
                 MessageBoxButton.OK, MessageBoxImage.Information);
-            // Le ViewModel peut exposer une propriété StatusMessage si besoin
         }
 
         /// <summary>
@@ -77,7 +115,16 @@ namespace IUTSCalculator
         private void MainWindow_Closed(object sender, EventArgs e)
         {
             Closed -= MainWindow_Closed;
+            if (_mainViewModel != null)
+                _mainViewModel.DossierChangeRequested -= MainViewModel_DossierChangeRequested;
             _mainViewModel?.Dispose();
+
+            // Si la fermeture ne correspond pas à un changement de dossier (nouvelle fenêtre
+            // déjà ouverte), il s'agit d'une fermeture normale de l'application.
+            if (!_isChangingDossier)
+            {
+                Application.Current.Shutdown();
+            }
         }
     }
 }

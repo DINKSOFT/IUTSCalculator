@@ -1,427 +1,520 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
-using System.IO.Compression;
-using System.Globalization;
-using IUTSCalculator.ViewModels;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
-using System.Collections.ObjectModel;
-
+using Microsoft.Win32; // Pour l'ouverture de fichier
 
 namespace IUTSCalculator.Services
 {
     /// <summary>
-    /// Service de gestion des données pour l'application IUTSCalculator
-    /// Permet la persistance des données d'employés et d'historique des calculs d'impôt 
+    /// Service de gestion des données pour l'application IUTSCalculator (version SQLite)
+    /// Gère la persistance des employés, des calculs d'impôts et des paramètres de l'application
     /// </summary>
-    
     public class DataService
     {
-        #region Constantes et champs privés
         public ObservableCollection<string> EmployeeCategories { get; }
-        private readonly string _appDataFolder;
-        private readonly string _employeesFilePath;
-        private readonly string _calculationsFilePath;
-        private readonly string _settingsFilePath;
 
-        private List<Employee> _cachedEmployees;
-        private List<TaxCalculation> _cachedCalculations;
-        private AppSettings _cachedSettings;
+        private readonly SQLiteService _sqliteService;
 
-        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        public DataService() : this("iuts_data.db")
         {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-
-        #endregion
-
-        #region Constructeur
-
-        public DataService()
-        {
-            // Création du dossier d'application dans AppData
-            _appDataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "IUTSCalculator");
-
-            Directory.CreateDirectory(_appDataFolder);
-
-            _employeesFilePath = Path.Combine(_appDataFolder, "employees.json");
-            _calculationsFilePath = Path.Combine(_appDataFolder, "calculations.json");
-            _settingsFilePath = Path.Combine(_appDataFolder, "settings.json");
-
-            // Initialisation des caches
-            _cachedEmployees = new List<Employee>();
-            _cachedCalculations = new List<TaxCalculation>();
-            _cachedSettings = new AppSettings();
-
-            EmployeeCategories = new ObservableCollection<string>
-        {
-            "Cadre Supérieur",
-            "Cadre Inférieur"
-        };
         }
 
-        #endregion
+        /// <summary>
+        /// Crée un service de données pointant vers la base de données du dossier
+        /// (entreprise) spécifié, afin d'isoler complètement ses employés et calculs
+        /// de ceux des autres dossiers.
+        /// </summary>
+        /// <param name="dbFileName">Nom (ou chemin relatif) du fichier SQLite du dossier concerné.</param>
+        public DataService(string dbFileName)
+        {
+            _sqliteService = new SQLiteService(dbFileName);
+
+            EmployeeCategories = new ObservableCollection<string>
+            {
+                "Cadre Supérieur",
+                "Cadre Inférieur"
+            };
+        }
 
         #region Gestion des employés
 
-
+        /// <summary>
+        /// Liste des colonnes de la table Employees, partagée par les lectures et les
+        /// écritures : c'est l'omission de quatre d'entre elles (indemnité de sujétion,
+        /// fonction, date d'entrée, situation matrimoniale) qui faisait silencieusement
+        /// perdre ces informations à chaque fermeture de l'application.
+        /// </summary>
+        private const string ColonnesEmploye =
+            "EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, " +
+            "FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, " +
+            "Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale";
 
         /// <summary>
-        /// Charge la liste des employés depuis le stockage persistant
+        /// Construit un employé à partir de la ligne courante du lecteur. Point de passage
+        /// unique pour toutes les lectures, afin qu'aucune colonne ne puisse être oubliée
+        /// dans l'une d'elles seulement.
         /// </summary>
+        private static Employee LireEmploye(SQLiteDataReader reader)
+        {
+            return new Employee
+            {
+                EmployeeId = DbValue.TextFromDb(reader["EmployeeId"]),
+                FirstName = DbValue.TextFromDb(reader["FirstName"]),
+                LastName = DbValue.TextFromDb(reader["LastName"]),
+                BaseSalary = DbValue.MoneyFromDb(reader["BaseSalary"]),
+                HousingAllowance = DbValue.MoneyFromDb(reader["HousingAllowance"]),
+                TransportAllowance = DbValue.MoneyFromDb(reader["TransportAllowance"]),
+                FunctionAllowance = DbValue.MoneyFromDb(reader["FunctionAllowance"]),
+                SujetionAllowance = DbValue.MoneyFromDb(reader["SujetionAllowance"]),
+                FamilyCharges = DbValue.IntFromDb(reader["FamilyCharges"]),
+                IsSpouseWorking = DbValue.IntFromDb(reader["IsSpouseWorking"]) == 1,
+                PensionContribution = DbValue.MoneyFromDb(reader["PensionContribution"]),
+                // Category doit être affectée en dernier parmi les champs dont elle dépend :
+                // son affectation recalcule IsHigherCategory, qui n'a pas d'accesseur public.
+                Category = DbValue.TextFromDb(reader["Category"]),
+                Fonction = DbValue.TextFromDb(reader["Fonction"]),
+                DateEntree = DbValue.DateFromDb(reader["DateEntree"], default(DateTime)),
+                SituationMatrimoniale = DbValue.TextFromDb(reader["SituationMatrimoniale"])
+            };
+        }
+
         public async Task<List<Employee>> LoadEmployeesAsync()
         {
-            try
+            var employees = new List<Employee>();
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
             {
-                if (File.Exists(_employeesFilePath))
+                cmd.CommandText = "SELECT " + ColonnesEmploye + " FROM Employees";
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
                 {
-                    // Utilisation de Task.Run pour exécuter la méthode synchrone File.ReadAllText de manière asynchrone
-                    string json = await Task.Run(() => File.ReadAllText(_employeesFilePath));
-                    _cachedEmployees = JsonSerializer.Deserialize<List<Employee>>(json, _jsonOptions) ?? new List<Employee>();
+                    while (await reader.ReadAsync())
+                        employees.Add(LireEmploye(reader));
                 }
-
-                return _cachedEmployees;
             }
-            catch (Exception ex)
-            {
-                // En cas d'erreur, on retourne la liste en cache ou une nouvelle liste
-                System.Diagnostics.Debug.WriteLine($"Erreur lors du chargement des employés: {ex.Message}");
-                return _cachedEmployees ?? new List<Employee>();
-            }
+            return employees;
         }
 
-        /// <summary>
-        /// Sauvegarde la liste des employés dans le stockage persistant
-        /// </summary>
+        public async Task ImportEmployeesFromFileAsync(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                throw new FileNotFoundException("Fichier d'import introuvable.");
+
+            // Exemple pour un fichier JSON (adaptez pour CSV si besoin)
+            var json = await Task.Run(() => File.ReadAllText(filePath));
+            var employees = JsonSerializer.Deserialize<List<Employee>>(json);
+
+            if (employees == null)
+                throw new InvalidOperationException("Aucun employé trouvé dans le fichier.");
+
+            await SaveEmployeesAsync(employees);
+        }
+
         public async Task SaveEmployeesAsync(List<Employee> employees)
         {
-            try
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
             {
-                _cachedEmployees = employees ?? new List<Employee>();
-                string json = JsonSerializer.Serialize(_cachedEmployees, _jsonOptions);
-
-                // Utilisation de Task.Run pour exécuter la méthode synchrone File.WriteAllText de manière asynchrone
-                await Task.Run(() => File.WriteAllText(_employeesFilePath, json));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde des employés: {ex.Message}");
-                throw; // Remonter l'exception pour informer l'appelant
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM Employees";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                foreach (var e in employees)
+                {
+                    await AddEmployeeAsync(e, conn, tx);
+                }
+                tx.Commit();
             }
         }
 
-        /// <summary>
-        /// Ajoute un nouvel employé et sauvegarde la liste mise à jour
-        /// </summary>
         public async Task AddEmployeeAsync(Employee employee)
+        {
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
+            {
+                await AddEmployeeAsync(employee, conn, tx);
+                tx.Commit();
+            }
+        }
+
+        private async Task AddEmployeeAsync(Employee employee, SQLiteConnection conn, SQLiteTransaction tx)
         {
             if (employee == null)
                 throw new ArgumentNullException(nameof(employee));
 
-            // Génération d'un ID s'il n'existe pas déjà
             if (string.IsNullOrEmpty(employee.EmployeeId))
                 employee.EmployeeId = Guid.NewGuid().ToString();
 
-            // Chargement de la liste actuelle
-            await LoadEmployeesAsync();
-
-            // Ajout du nouvel employé
-            _cachedEmployees.Add(employee);
-
-            // Sauvegarde de la liste mise à jour
-            await SaveEmployeesAsync(_cachedEmployees);
-        }
-
-        /// <summary>
-        /// Met à jour un employé existant
-        /// </summary>
-        public async Task UpdateEmployeeAsync(Employee employee)
-        {
-            if (employee == null || string.IsNullOrEmpty(employee.EmployeeId))
-                throw new ArgumentException("L'employé doit avoir un ID valide", nameof(employee));
-
-            // Chargement de la liste actuelle
-            await LoadEmployeesAsync();
-
-            // Recherche de l'employé à mettre à jour
-            int index = _cachedEmployees.FindIndex(e => e.EmployeeId == employee.EmployeeId);
-            if (index == -1)
-                throw new KeyNotFoundException($"Employé avec ID {employee.EmployeeId} non trouvé");
-
-            // Mise à jour de l'employé
-            _cachedEmployees[index] = employee;
-
-            // Sauvegarde de la liste mise à jour
-            await SaveEmployeesAsync(_cachedEmployees);
-        }
-
-        /// <summary>
-        /// Supprime un employé par son ID
-        /// </summary>
-        public async Task DeleteEmployeeAsync(string employeeId)
-        {
-            if (string.IsNullOrEmpty(employeeId))
-                throw new ArgumentException("L'ID de l'employé est requis", nameof(employeeId));
-
-            // Chargement de la liste actuelle
-            await LoadEmployeesAsync();
-
-            // Recherche et suppression de l'employé
-            Employee employeeToRemove = _cachedEmployees.FirstOrDefault(e => e.EmployeeId == employeeId);
-            if (employeeToRemove != null)
+            using (var cmd = conn.CreateCommand())
             {
-                _cachedEmployees.Remove(employeeToRemove);
-                await SaveEmployeesAsync(_cachedEmployees);
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
+                    INSERT OR REPLACE INTO Employees
+                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale)
+                    VALUES
+                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale);";
+
+                cmd.Parameters.AddWithValue("@EmployeeId", employee.EmployeeId);
+                cmd.Parameters.AddWithValue("@FirstName", employee.FirstName ?? "");
+                cmd.Parameters.AddWithValue("@LastName", employee.LastName ?? "");
+                cmd.Parameters.AddWithValue("@BaseSalary", DbValue.MoneyToDb(employee.BaseSalary));
+                cmd.Parameters.AddWithValue("@HousingAllowance", DbValue.MoneyToDb(employee.HousingAllowance));
+                cmd.Parameters.AddWithValue("@TransportAllowance", DbValue.MoneyToDb(employee.TransportAllowance));
+                cmd.Parameters.AddWithValue("@FunctionAllowance", DbValue.MoneyToDb(employee.FunctionAllowance));
+                cmd.Parameters.AddWithValue("@SujetionAllowance", DbValue.MoneyToDb(employee.SujetionAllowance));
+                cmd.Parameters.AddWithValue("@FamilyCharges", employee.FamilyCharges);
+                cmd.Parameters.AddWithValue("@IsSpouseWorking", employee.IsSpouseWorking ? 1 : 0);
+                cmd.Parameters.AddWithValue("@PensionContribution", DbValue.MoneyToDb(employee.PensionContribution));
+                cmd.Parameters.AddWithValue("@Category", employee.Category ?? "");
+                cmd.Parameters.AddWithValue("@IsHigherCategory", employee.IsHigherCategory ? 1 : 0);
+                cmd.Parameters.AddWithValue("@Fonction", employee.Fonction ?? "");
+                cmd.Parameters.AddWithValue("@DateEntree",
+                    employee.DateEntree == default(DateTime) ? string.Empty : DbValue.DateToDb(employee.DateEntree));
+                cmd.Parameters.AddWithValue("@SituationMatrimoniale", employee.SituationMatrimoniale ?? "");
+
+                await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        /// <summary>
-        /// Récupère un employé par son ID
-        /// </summary>
+        public async Task UpdateEmployeeAsync(Employee employee)
+        {
+            await AddEmployeeAsync(employee);
+        }
+
+        public async Task DeleteEmployeeAsync(string employeeId)
+        {
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM Employees WHERE EmployeeId = @EmployeeId";
+                cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
         public async Task<Employee> GetEmployeeByIdAsync(string employeeId)
         {
-            if (string.IsNullOrEmpty(employeeId))
-                throw new ArgumentException("L'ID de l'employé est requis", nameof(employeeId));
-
-            // Chargement de la liste actuelle
-            await LoadEmployeesAsync();
-
-            // Recherche et retour de l'employé
-            return _cachedEmployees.FirstOrDefault(e => e.EmployeeId == employeeId);
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT " + ColonnesEmploye + " FROM Employees WHERE EmployeeId = @EmployeeId";
+                cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                        return LireEmploye(reader);
+                }
+            }
+            return null;
         }
 
         #endregion
 
         #region Gestion de l'historique des calculs
 
-        /// <summary>
-        /// Charge l'historique des calculs depuis le stockage persistant
-        /// </summary>
         public async Task<List<TaxCalculation>> LoadCalculationsHistoryAsync()
         {
-            try
-            {
-                if (File.Exists(_calculationsFilePath))
-                {
-                    // Utilisation de Task.Run pour exécuter la méthode synchrone File.ReadAllText de manière asynchrone
-                    string json = await Task.Run(() => File.ReadAllText(_calculationsFilePath));
-                    _cachedCalculations = JsonSerializer.Deserialize<List<TaxCalculation>>(json, _jsonOptions) ?? new List<TaxCalculation>();
-                }
+            var calculations = new List<TaxCalculation>();
+            var employees = (await LoadEmployeesAsync()).ToDictionary(e => e.EmployeeId);
 
-                return _cachedCalculations;
-            }
-            catch (Exception ex)
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
             {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors du chargement de l'historique des calculs: {ex.Message}");
-                return _cachedCalculations ?? new List<TaxCalculation>();
+                cmd.CommandText = "SELECT * FROM TaxCalculations";
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var employeeId = DbValue.TextFromDb(reader["EmployeeId"]);
+                        Employee employee = null;
+                        if (!string.IsNullOrEmpty(employeeId))
+                            employees.TryGetValue(employeeId, out employee);
+
+                        calculations.Add(new TaxCalculation
+                        {
+                            Id = DbValue.TextFromDb(reader["Id"]),
+                            Employee = employee,
+                            CalculationDate = DbValue.DateFromDb(reader["CalculationDate"], DateTime.Now),
+                            SalaireBrut = DbValue.MoneyFromDb(reader["SalaireBrut"]),
+                            BaseIUTSHorsDeduction = DbValue.MoneyFromDb(reader["BaseIUTSHorsDeduction"]),
+                            IUTSNet = DbValue.MoneyFromDb(reader["IUTSNet"]),
+                            // TaxRate est un pourcentage, pas un montant : il est stocké tel quel.
+                            TaxRate = DbValue.DecimalFromDb(reader["TaxRate"]),
+                            FamilyChargeReduction = DbValue.MoneyFromDb(reader["FamilyChargeReduction"]),
+                            ExemptAmount = DbValue.MoneyFromDb(reader["ExemptAmount"]),
+                            CalculationDetails = DbValue.TextFromDb(reader["CalculationDetails"]),
+                            IsAnnual = DbValue.IntFromDb(reader["IsAnnual"]) == 1,
+                            IsRegularization = DbValue.IntFromDb(reader["IsRegularization"]) == 1,
+                            TaxDifference = DbValue.MoneyFromDb(reader["TaxDifference"]),
+                            CnssEmployee = DbValue.MoneyFromDb(reader["CnssEmployee"]),
+                            CnssPartPatronale = DbValue.MoneyFromDb(reader["CnssPartPatronale"]),
+                            TaxePatronale = DbValue.MoneyFromDb(reader["TaxePatronale"]),
+                            RetenueSpeciale = DbValue.MoneyFromDb(reader["RetenueSpeciale"]),
+                            MasseSalariale = DbValue.MoneyFromDb(reader["MasseSalariale"]),
+                            ChargesPatronales = DbValue.MoneyFromDb(reader["ChargesPatronales"]),
+                            NetSalaryAfterTaxPersisted = DbValue.MoneyFromDb(reader["NetSalaryAfterTax"]),
+                            SalaireNetaPayerPersisted = DbValue.MoneyFromDb(reader["SalaireNetaPayer"])
+                        });
+                    }
+                }
             }
+            return calculations;
         }
 
-        /// <summary>
-        /// Sauvegarde l'historique des calculs dans le stockage persistant
-        /// </summary>
         public async Task SaveCalculationsHistoryAsync(List<TaxCalculation> calculations)
         {
-            try
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
             {
-                _cachedCalculations = calculations ?? new List<TaxCalculation>();
-                string json = JsonSerializer.Serialize(_cachedCalculations, _jsonOptions);
-
-                // Utilisation de Task.Run pour exécuter la méthode synchrone File.WriteAllText de manière asynchrone
-                await Task.Run(() => File.WriteAllText(_calculationsFilePath, json));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde de l'historique des calculs: {ex.Message}");
-                throw;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM TaxCalculations";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                foreach (var c in calculations)
+                {
+                    await AddCalculationToHistoryAsync(c, conn, tx);
+                }
+                tx.Commit();
             }
         }
 
-        /// <summary>
-        /// Ajoute un nouveau calcul à l'historique
-        /// </summary>
         public async Task AddCalculationToHistoryAsync(TaxCalculation calculation)
+        {
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
+            {
+                await AddCalculationToHistoryAsync(calculation, conn, tx);
+                tx.Commit();
+            }
+        }
+
+        private async Task AddCalculationToHistoryAsync(TaxCalculation calculation, SQLiteConnection conn, SQLiteTransaction tx)
         {
             if (calculation == null)
                 throw new ArgumentNullException(nameof(calculation));
 
-            // Génération d'un ID s'il n'existe pas déjà
             if (string.IsNullOrEmpty(calculation.Id))
                 calculation.Id = Guid.NewGuid().ToString();
 
-            // Vérification que la date de calcul est définie
             if (calculation.CalculationDate == default)
                 calculation.CalculationDate = DateTime.Now;
 
-            // Chargement de l'historique actuel
-            await LoadCalculationsHistoryAsync();
+            // L'employé peut être absent (calcul libre, sans fiche associée) : la colonne
+            // EmployeeId accepte alors une chaîne vide, comme plus bas.
+            if (calculation.Employee != null)
+                await AddEmployeeAsync(calculation.Employee, conn, tx);
 
-            // Ajout du nouveau calcul
-            _cachedCalculations.Add(calculation);
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
+                    INSERT OR REPLACE INTO TaxCalculations
+                    (Id, EmployeeId, CalculationDate, SalaireBrut, BaseIUTSHorsDeduction, IUTSNet, TaxRate, FamilyChargeReduction, ExemptAmount, CalculationDetails, IsAnnual, IsRegularization, TaxDifference, CnssEmployee, CnssPartPatronale, TaxePatronale, RetenueSpeciale, MasseSalariale, ChargesPatronales, NetSalaryAfterTax, SalaireNetaPayer)
+                    VALUES
+                    (@Id, @EmployeeId, @CalculationDate, @SalaireBrut, @BaseIUTSHorsDeduction, @IUTSNet, @TaxRate, @FamilyChargeReduction, @ExemptAmount, @CalculationDetails, @IsAnnual, @IsRegularization, @TaxDifference, @CnssEmployee, @CnssPartPatronale, @TaxePatronale, @RetenueSpeciale, @MasseSalariale, @ChargesPatronales, @NetSalaryAfterTax, @SalaireNetaPayer);";
 
-            // Sauvegarde de l'historique mis à jour
-            await SaveCalculationsHistoryAsync(_cachedCalculations);
+                cmd.Parameters.AddWithValue("@Id", calculation.Id);
+                cmd.Parameters.AddWithValue("@EmployeeId", calculation.Employee?.EmployeeId ?? "");
+                cmd.Parameters.AddWithValue("@CalculationDate", DbValue.DateToDb(calculation.CalculationDate));
+                cmd.Parameters.AddWithValue("@SalaireBrut", DbValue.MoneyToDb(calculation.SalaireBrut));
+                cmd.Parameters.AddWithValue("@BaseIUTSHorsDeduction", DbValue.MoneyToDb(calculation.BaseIUTSHorsDeduction));
+                cmd.Parameters.AddWithValue("@IUTSNet", DbValue.MoneyToDb(calculation.IUTSNet));
+                // TaxRate est un pourcentage à nombreuses décimales : il ne doit surtout pas
+                // être arrondi au centime comme un montant.
+                cmd.Parameters.AddWithValue("@TaxRate", DbValue.DecimalToDb(calculation.TaxRate));
+                cmd.Parameters.AddWithValue("@FamilyChargeReduction", DbValue.MoneyToDb(calculation.FamilyChargeReduction));
+                cmd.Parameters.AddWithValue("@ExemptAmount", DbValue.MoneyToDb(calculation.ExemptAmount));
+                cmd.Parameters.AddWithValue("@CalculationDetails", calculation.CalculationDetails ?? "");
+                cmd.Parameters.AddWithValue("@IsAnnual", calculation.IsAnnual ? 1 : 0);
+                cmd.Parameters.AddWithValue("@IsRegularization", calculation.IsRegularization ? 1 : 0);
+                cmd.Parameters.AddWithValue("@TaxDifference", DbValue.MoneyToDb(calculation.TaxDifference));
+                cmd.Parameters.AddWithValue("@CnssEmployee", DbValue.MoneyToDb(calculation.CnssEmployee));
+                cmd.Parameters.AddWithValue("@CnssPartPatronale", DbValue.MoneyToDb(calculation.CnssPartPatronale));
+                cmd.Parameters.AddWithValue("@TaxePatronale", DbValue.MoneyToDb(calculation.TaxePatronale));
+                cmd.Parameters.AddWithValue("@RetenueSpeciale", DbValue.MoneyToDb(calculation.RetenueSpeciale));
+                cmd.Parameters.AddWithValue("@MasseSalariale", DbValue.MoneyToDb(calculation.MasseSalariale));
+                cmd.Parameters.AddWithValue("@ChargesPatronales", DbValue.MoneyToDb(calculation.ChargesPatronales));
+                cmd.Parameters.AddWithValue("@NetSalaryAfterTax", DbValue.MoneyToDb(calculation.NetSalaryAfterTaxPersisted));
+                cmd.Parameters.AddWithValue("@SalaireNetaPayer", DbValue.MoneyToDb(calculation.SalaireNetaPayerPersisted));
+
+                await cmd.ExecuteNonQueryAsync();
+            }
         }
 
-        /// <summary>
-        /// Supprime un calcul de l'historique par son ID
-        /// </summary>
         public async Task DeleteCalculationFromHistoryAsync(string calculationId)
         {
-            if (string.IsNullOrEmpty(calculationId))
-                throw new ArgumentException("L'ID du calcul est requis", nameof(calculationId));
-
-            // Chargement de l'historique actuel
-            await LoadCalculationsHistoryAsync();
-
-            // Recherche et suppression du calcul
-            TaxCalculation calculationToRemove = _cachedCalculations.FirstOrDefault(c => c.Id == calculationId);
-            if (calculationToRemove != null)
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
             {
-                _cachedCalculations.Remove(calculationToRemove);
-                await SaveCalculationsHistoryAsync(_cachedCalculations);
-            }
-            else
-            {
-                throw new KeyNotFoundException($"Calcul avec ID {calculationId} non trouvé");
+                cmd.CommandText = "DELETE FROM TaxCalculations WHERE Id = @Id";
+                cmd.Parameters.AddWithValue("@Id", calculationId);
+                await cmd.ExecuteNonQueryAsync();
             }
         }
 
         /// <summary>
-        /// Supprime un calcul de l'historique par son ID
+        /// Exporte la fiche de paie de l'employé concerné par le calcul au format Excel (XLSX).
         /// </summary>
+        /// <param name="calculation">Le calcul d'impôt à exporter (pour récupérer l'employé)</param>
         public async Task ExportToExcelAsync(TaxCalculation calculation)
         {
             if (calculation == null)
                 throw new ArgumentNullException(nameof(calculation));
 
-            // Récupérer le dossier Documents de l'utilisateur
-            string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                     
+            var employees = new List<Employee>();
+            if (calculation.Employee != null)
+                employees.Add(calculation.Employee);
 
-            // Générer un nom de fichier avec date et heure
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string fileName = $"DetailsCalcul_{timestamp}.xlsx";
-            string filePath = Path.Combine(documentsFolder, fileName);
-
-            // Appeler le service de données pour exporter le détail des calculs
-            await Task.Run(() => ExcelExportHelper.ExportCalculationDetailsToExcel(calculation, filePath));
+            await Task.Run(() =>
+            {
+                var helper = new ExcelExportHelper();
+                helper.ExportPayrollToExcel(employees);
+            });
         }
 
-        /// <summary>
-        /// Récupère l'historique des calculs pour un employé spécifique
-        /// </summary>
         public async Task<List<TaxCalculation>> GetCalculationHistoryForEmployeeAsync(string employeeId)
         {
-            if (string.IsNullOrEmpty(employeeId))
-                throw new ArgumentException("L'ID de l'employé est requis", nameof(employeeId));
-
-            // Chargement de l'historique actuel
-            await LoadCalculationsHistoryAsync();
-
-            // Filtrage et retour des calculs pour l'employé spécifié
-            return _cachedCalculations
-                .Where(c => c.Employee?.EmployeeId == employeeId)
-                .OrderByDescending(c => c.CalculationDate)
-                .ToList();
+            var all = await LoadCalculationsHistoryAsync();
+            return all.Where(c => c.Employee?.EmployeeId == employeeId)
+                      .OrderByDescending(c => c.CalculationDate)
+                      .ToList();
         }
 
-        /// <summary>
-        /// Récupère l'historique des calculs pour une période spécifique
-        /// </summary>
         public async Task<List<TaxCalculation>> GetCalculationHistoryForPeriodAsync(DateTime startDate, DateTime endDate)
         {
-            // Chargement de l'historique actuel
-            await LoadCalculationsHistoryAsync();
-
-            // Filtrage et retour des calculs pour la période spécifiée
-            return _cachedCalculations
-                .Where(c => c.CalculationDate >= startDate && c.CalculationDate <= endDate)
-                .OrderByDescending(c => c.CalculationDate)
-                .ToList();
+            var all = await LoadCalculationsHistoryAsync();
+            return all.Where(c => c.CalculationDate >= startDate && c.CalculationDate <= endDate)
+                      .OrderByDescending(c => c.CalculationDate)
+                      .ToList();
         }
 
         #endregion
 
         #region Gestion des paramètres de l'application
 
-        /// <summary>
-        /// Charge les paramètres de l'application depuis le stockage persistant
-        /// </summary>
         public async Task<AppSettings> LoadSettingsAsync()
         {
-            try
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
             {
-                if (File.Exists(_settingsFilePath))
+                cmd.CommandText = "SELECT * FROM AppSettings LIMIT 1";
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
                 {
-                    // Utilisation de Task.Run pour exécuter la méthode synchrone File.ReadAllText de manière asynchrone
-                    string json = await Task.Run(() => File.ReadAllText(_settingsFilePath));
-                    _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
-                }
-                else
-                {
-                    // Création des paramètres par défaut si le fichier n'existe pas
-                    _cachedSettings = new AppSettings
+                    if (await reader.ReadAsync())
                     {
-                        Theme = "Light",
-                        Language = "fr-FR",
-                        AutoSave = true,
-                        LastUpdated = DateTime.Now
-                    };
-                    await SaveSettingsAsync(_cachedSettings);
-                }
+                        var settings = new AppSettings
+                        {
+                            Theme = reader["Theme"].ToString(),
+                            Language = reader["Language"].ToString(),
+                            AutoSave = reader.GetInt32(reader.GetOrdinal("AutoSave")) == 1,
+                            LastUpdated = DbValue.DateFromDb(reader["LastUpdated"], DateTime.Now)
+                        };
 
-                return _cachedSettings;
+                        if (ColumnExists(reader, "ExportDirectory"))
+                            settings.ExportDirectory = reader["ExportDirectory"]?.ToString();
+
+                        if (ColumnExists(reader, "TaxBrackets"))
+                        {
+                            var json = reader["TaxBrackets"]?.ToString();
+                            if (!string.IsNullOrWhiteSpace(json))
+                            {
+                                try
+                                {
+                                    settings.TaxBrackets = JsonSerializer.Deserialize<List<TaxBracket>>(json);
+                                }
+                                catch { settings.TaxBrackets = null; }
+                            }
+                        }
+
+                        if (ColumnExists(reader, "FamilyCharges"))
+                        {
+                            var json = reader["FamilyCharges"]?.ToString();
+                            if (!string.IsNullOrWhiteSpace(json))
+                            {
+                                try
+                                {
+                                    settings.FamilyCharges = JsonSerializer.Deserialize<List<FamilyCharge>>(json);
+                                }
+                                catch { settings.FamilyCharges = null; }
+                            }
+                        }
+
+                        return settings;
+                    }
+                }
             }
-            catch (Exception ex)
+            var defaultSettings = new AppSettings
             {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors du chargement des paramètres: {ex.Message}");
-                return _cachedSettings ?? new AppSettings();
-            }
+                Theme = "Light",
+                Language = "fr-FR",
+                AutoSave = true,
+                LastUpdated = DateTime.Now
+            };
+            await SaveSettingsAsync(defaultSettings);
+            return defaultSettings;
         }
 
-        /// <summary>
-        /// Sauvegarde les paramètres de l'application dans le stockage persistant
-        /// </summary>
         public async Task SaveSettingsAsync(AppSettings settings)
         {
-            try
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
             {
-                _cachedSettings = settings ?? new AppSettings();
-                _cachedSettings.LastUpdated = DateTime.Now;
-
-                string json = JsonSerializer.Serialize(_cachedSettings, _jsonOptions);
-
-                // Utilisation de Task.Run pour exécuter la méthode synchrone File.WriteAllText de manière asynchrone
-                await Task.Run(() => File.WriteAllText(_settingsFilePath, json));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde des paramètres: {ex.Message}");
-                throw;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "DELETE FROM AppSettings";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+                        INSERT INTO AppSettings 
+                        (Theme, Language, AutoSave, LastUpdated, ExportDirectory, TaxBrackets, FamilyCharges)
+                        VALUES 
+                        (@Theme, @Language, @AutoSave, @LastUpdated, @ExportDirectory, @TaxBrackets, @FamilyCharges);";
+                    cmd.Parameters.AddWithValue("@Theme", settings.Theme ?? "Light");
+                    cmd.Parameters.AddWithValue("@Language", settings.Language ?? "fr-FR");
+                    cmd.Parameters.AddWithValue("@AutoSave", settings.AutoSave ? 1 : 0);
+                    cmd.Parameters.AddWithValue("@LastUpdated", DbValue.DateToDb(settings.LastUpdated));
+                    cmd.Parameters.AddWithValue("@ExportDirectory", settings.ExportDirectory ?? string.Empty);
+                    cmd.Parameters.AddWithValue("@TaxBrackets", settings.TaxBrackets != null ? JsonSerializer.Serialize(settings.TaxBrackets) : string.Empty);
+                    cmd.Parameters.AddWithValue("@FamilyCharges", settings.FamilyCharges != null ? JsonSerializer.Serialize(settings.FamilyCharges) : string.Empty);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                tx.Commit();
             }
         }
 
-        /// <summary>
-        /// Met à jour un paramètre spécifique de l'application
-        /// </summary>
+        private bool ColumnExists(SQLiteDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
         public async Task UpdateSettingAsync<T>(string settingName, T value)
         {
-            // Chargement des paramètres actuels
-            await LoadSettingsAsync();
+            var settings = await LoadSettingsAsync();
 
-            // Utilisation de la réflexion pour mettre à jour le paramètre
-            var property = typeof(AppSettings).GetProperty(settingName);
-            if (property != null && property.CanWrite)
+            var prop = typeof(AppSettings).GetProperty(settingName);
+            if (prop != null && prop.CanWrite)
             {
-                property.SetValue(_cachedSettings, value);
-                await SaveSettingsAsync(_cachedSettings);
+                prop.SetValue(settings, value);
+                await SaveSettingsAsync(settings);
             }
             else
             {
@@ -431,548 +524,55 @@ namespace IUTSCalculator.Services
 
         #endregion
 
-        #region Exportation des données
+        #region Export/Import JSON (compatibilité)
 
-        /// <summary>
-        /// Exporte toutes les données de l'application en JSON
-        /// </summary>
         public async Task<string> ExportAllDataAsync()
         {
-            try
-            {
-                // Chargement de toutes les données
-                await LoadEmployeesAsync();
-                await LoadCalculationsHistoryAsync();
-                await LoadSettingsAsync();
+            var employees = await LoadEmployeesAsync();
+            var calculations = await LoadCalculationsHistoryAsync();
+            var settings = await LoadSettingsAsync();
 
-                // Création d'un objet de données pour l'export
-                var exportData = new
-                {
-                    ExportDate = DateTime.Now,
-                    Version = "1.0",
-                    Employees = _cachedEmployees,
-                    Calculations = _cachedCalculations,
-                    Settings = _cachedSettings
-                };
-
-                // Conversion en JSON et retour
-                return JsonSerializer.Serialize(exportData, _jsonOptions);
-            }
-            catch (Exception ex)
+            var exportData = new
             {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'exportation des données: {ex.Message}");
-                throw;
-            }
+                ExportDate = DateTime.Now,
+                Version = "1.0",
+                Employees = employees,
+                Calculations = calculations,
+                Settings = settings
+            };
+
+            return JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
         }
 
-        /// <summary>
-        /// Importe toutes les données de l'application depuis un JSON
-        /// </summary>
         public async Task ImportAllDataAsync(string jsonData)
         {
-            try
+            using (var doc = JsonDocument.Parse(jsonData))
             {
-                using (JsonDocument document = JsonDocument.Parse(jsonData))
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("Employees", out var employeesElement))
                 {
-                    JsonElement root = document.RootElement;
-
-                    // Extraction et sauvegarde des employés
-                    if (root.TryGetProperty("Employees", out JsonElement employeesElement))
-                    {
-                        var employees = JsonSerializer.Deserialize<List<Employee>>(
-                            employeesElement.GetRawText(), _jsonOptions);
-
-                        if (employees != null)
-                            await SaveEmployeesAsync(employees);
-                    }
-
-                    // Extraction et sauvegarde de l'historique des calculs
-                    if (root.TryGetProperty("Calculations", out JsonElement calculationsElement))
-                    {
-                        var calculations = JsonSerializer.Deserialize<List<TaxCalculation>>(
-                            calculationsElement.GetRawText(), _jsonOptions);
-
-                        if (calculations != null)
-                            await SaveCalculationsHistoryAsync(calculations);
-                    }
-
-                    // Extraction et sauvegarde des paramètres
-                    if (root.TryGetProperty("Settings", out JsonElement settingsElement))
-                    {
-                        var settings = JsonSerializer.Deserialize<AppSettings>(
-                            settingsElement.GetRawText(), _jsonOptions);
-
-                        if (settings != null)
-                            await SaveSettingsAsync(settings);
-                    }
+                    var employees = JsonSerializer.Deserialize<List<Employee>>(employeesElement.GetRawText());
+                    if (employees != null)
+                        await SaveEmployeesAsync(employees);
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'importation des données: {ex.Message}");
-                throw;
+
+                if (root.TryGetProperty("Calculations", out var calculationsElement))
+                {
+                    var calculations = JsonSerializer.Deserialize<List<TaxCalculation>>(calculationsElement.GetRawText());
+                    if (calculations != null)
+                        await SaveCalculationsHistoryAsync(calculations);
+                }
+
+                if (root.TryGetProperty("Settings", out var settingsElement))
+                {
+                    var settings = JsonSerializer.Deserialize<AppSettings>(settingsElement.GetRawText());
+                    if (settings != null)
+                        await SaveSettingsAsync(settings);
+                }
             }
         }
 
         #endregion
-
-        #region Maintenance des données
-
-        /// <summary>
-        /// Effectue une sauvegarde des données dans un fichier ZIP
-        /// </summary>
-        public async Task<string> BackupDataAsync()
-        {
-            try
-            {
-                // Génération du nom de fichier de sauvegarde
-                string backupFileName = $"IUTSCalculator_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.zip";
-                string backupFilePath = Path.Combine(_appDataFolder, backupFileName);
-
-                // Création d'un fichier temporaire pour l'export JSON
-                string exportJson = await ExportAllDataAsync();
-                string tempJsonPath = Path.Combine(_appDataFolder, "export_temp.json");
-
-                // Utilisation de Task.Run pour exécuter la méthode synchrone File.WriteAllText de manière asynchrone
-                await Task.Run(() => File.WriteAllText(tempJsonPath, exportJson));
-
-                // Assurez-vous que les fichiers de données existent avant de créer l'archive
-                List<string> filesToArchive = new List<string>();
-                if (File.Exists(tempJsonPath)) filesToArchive.Add(tempJsonPath);
-                if (File.Exists(_employeesFilePath)) filesToArchive.Add(_employeesFilePath);
-                if (File.Exists(_calculationsFilePath)) filesToArchive.Add(_calculationsFilePath);
-                if (File.Exists(_settingsFilePath)) filesToArchive.Add(_settingsFilePath);
-
-                // Création de l'archive ZIP à partir des fichiers existants
-                if (filesToArchive.Count > 0)
-                {
-                    // Si un fichier de backup existe déjà, le supprimer
-                    if (File.Exists(backupFilePath))
-                        File.Delete(backupFilePath);
-
-                    // Utilisation de la méthode CreateFromDirectory pour créer l'archive
-                    // au lieu de ZipFile.Open qui peut poser des problèmes
-                    string tempFolder = Path.Combine(_appDataFolder, "temp_backup");
-                    Directory.CreateDirectory(tempFolder);
-
-                    foreach (var file in filesToArchive)
-                    {
-                        File.Copy(file, Path.Combine(tempFolder, Path.GetFileName(file)), true);
-                    }
-
-                    // Envelopper l'opération ZipFile.CreateFromDirectory dans une tâche asynchrone
-                    await Task.Run(() => ZipFile.CreateFromDirectory(tempFolder, backupFilePath));
-
-                    // Nettoyage du dossier temporaire
-                    if (Directory.Exists(tempFolder))
-                    {
-                        foreach (var file in Directory.GetFiles(tempFolder))
-                        {
-                            File.Delete(file);
-                        }
-                        Directory.Delete(tempFolder);
-                    }
-                }
-
-                // Suppression du fichier temporaire
-                if (File.Exists(tempJsonPath))
-                    File.Delete(tempJsonPath);
-
-                return backupFilePath;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde des données: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Efface toutes les données de l'application
-        /// </summary>
-        public async Task ClearAllDataAsync()
-        {
-            try
-            {
-                // Réinitialisation des données en mémoire
-                _cachedEmployees = new List<Employee>();
-                _cachedCalculations = new List<TaxCalculation>();
-                _cachedSettings = new AppSettings
-                {
-                    Theme = "Light",
-                    Language = "fr-FR",
-                    AutoSave = true,
-                    LastUpdated = DateTime.Now
-                };
-
-                // Sauvegarde des données vides
-                await SaveEmployeesAsync(_cachedEmployees);
-                await SaveCalculationsHistoryAsync(_cachedCalculations);
-                await SaveSettingsAsync(_cachedSettings);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'effacement des données: {ex.Message}");
-                throw;
-            }
-        }
-
-        #endregion
-        #region Gestion des tranches d'impôt et charges familiales
-
-        /// <summary>
-        /// Récupère la liste des tranches d'imposition
-        /// </summary>
-        /// <returns>Liste des tranches d'imposition</returns>
-        public List<TaxBracket> GetTaxBrackets()
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "taxBrackets.json");
-
-                if (File.Exists(filePath))
-                {
-                    string json = File.ReadAllText(filePath);
-                    return JsonSerializer.Deserialize<List<TaxBracket>>(json, _jsonOptions) ?? CreateDefaultTaxBrackets();
-                }
-
-                // Si le fichier n'existe pas, créer et retourner les tranches par défaut
-                var defaultBrackets = CreateDefaultTaxBrackets();
-                SaveTaxBrackets(defaultBrackets);
-                return defaultBrackets;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors du chargement des tranches d'imposition: {ex.Message}");
-                return CreateDefaultTaxBrackets();
-            }
-        }
-
-        /// <summary>
-        /// Sauvegarde la liste des tranches d'imposition
-        /// </summary>
-        /// <param name="brackets">Liste des tranches d'imposition à sauvegarder</param>
-        public void SaveTaxBrackets(List<TaxBracket> brackets)
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "taxBrackets.json");
-                string json = JsonSerializer.Serialize(brackets ?? CreateDefaultTaxBrackets(), _jsonOptions);
-                File.WriteAllText(filePath, json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde des tranches d'imposition: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Crée une liste de tranches d'imposition par défaut
-        /// </summary>
-        /// <returns>Liste des tranches d'imposition par défaut</returns>
-        private List<TaxBracket> CreateDefaultTaxBrackets()
-        {
-            return new List<TaxBracket>
-    {
-        new TaxBracket { LowerBound = 0, UpperBound = 25000, Rate = 0.0m },
-        new TaxBracket { LowerBound = 25001, UpperBound = 50000, Rate = 0.05m },
-        new TaxBracket { LowerBound = 50001, UpperBound = 150000, Rate = 0.10m },
-        new TaxBracket { LowerBound = 150001, UpperBound = 300000, Rate = 0.15m },
-        new TaxBracket { LowerBound = 300001, UpperBound = decimal.MaxValue, Rate = 0.20m }
-    };
-        }
-
-        /// <summary>
-        /// Récupère la liste des charges familiales
-        /// </summary>
-        /// <returns>Liste des charges familiales</returns>
-        public List<FamilyCharge> GetFamilyCharges()
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "familyCharges.json");
-
-                if (File.Exists(filePath))
-                {
-                    string json = File.ReadAllText(filePath);
-                    return JsonSerializer.Deserialize<List<FamilyCharge>>(json, _jsonOptions) ?? CreateDefaultFamilyCharges();
-                }
-
-                // Si le fichier n'existe pas, créer et retourner les charges par défaut
-                var defaultCharges = CreateDefaultFamilyCharges();
-                SaveFamilyCharges(defaultCharges);
-                return defaultCharges;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors du chargement des charges familiales: {ex.Message}");
-                return CreateDefaultFamilyCharges();
-            }
-        }
-
-        /// <summary>
-        /// Sauvegarde la liste des charges familiales
-        /// </summary>
-        /// <param name="charges">Liste des charges familiales à sauvegarder</param>
-        public void SaveFamilyCharges(List<FamilyCharge> charges)
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "familyCharges.json");
-                string json = JsonSerializer.Serialize(charges ?? CreateDefaultFamilyCharges(), _jsonOptions);
-                File.WriteAllText(filePath, json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde des charges familiales: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Crée une liste de charges familiales par défaut
-        /// </summary>
-        /// <returns>Liste des charges familiales par défaut</returns>
-        private List<FamilyCharge> CreateDefaultFamilyCharges()
-        {
-            return new List<FamilyCharge>
-    {
-        new FamilyCharge { ChargeCount = 0, AbatementPercentage = 0.0m },
-        new FamilyCharge { ChargeCount = 1, AbatementPercentage = 0.05m },
-        new FamilyCharge { ChargeCount = 2, AbatementPercentage = 0.10m },
-        new FamilyCharge { ChargeCount = 3, AbatementPercentage = 0.15m },
-        new FamilyCharge { ChargeCount = 4, AbatementPercentage = 0.20m },
-        new FamilyCharge { ChargeCount = 5, AbatementPercentage = 0.25m }
-    };
-        }
-
-        #endregion
-
-        #region Gestion des paramètres spécifiques de l'application
-
-        /// <summary>
-        /// Récupère un paramètre spécifique de l'application
-        /// </summary>
-        /// <typeparam name="T">Type du paramètre à récupérer</typeparam>
-        /// <param name="settingName">Nom du paramètre</param>
-        /// <returns>Valeur du paramètre ou valeur par défaut si le paramètre n'existe pas</returns>
-        public T GetAppSetting<T>(string settingName)
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "appSettings.json");
-
-                if (File.Exists(filePath))
-                {
-                    string json = File.ReadAllText(filePath);
-                    using (JsonDocument document = JsonDocument.Parse(json))
-                    {
-                        if (document.RootElement.TryGetProperty(settingName, out JsonElement element))
-                        {
-                            // Convertir la valeur JSON en type T
-                            return JsonSerializer.Deserialize<T>(element.GetRawText(), _jsonOptions);
-                        }
-                    }
-                }
-
-                // Si le paramètre n'existe pas, retourner la valeur par défaut du type
-                return default;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la récupération du paramètre {settingName}: {ex.Message}");
-                return default;
-            }
-        }
-
-        /// <summary>
-        /// Sauvegarde un paramètre spécifique de l'application
-        /// </summary>
-        /// <typeparam name="T">Type du paramètre à sauvegarder</typeparam>
-        /// <param name="settingName">Nom du paramètre</param>
-        /// <param name="value">Valeur du paramètre</param>
-        public void SaveAppSetting<T>(string settingName, T value)
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "appSettings.json");
-                Dictionary<string, object> settings;
-
-                // Charger les paramètres existants ou créer un nouveau dictionnaire
-                if (File.Exists(filePath))
-                {
-                    string json = File.ReadAllText(filePath);
-                    settings = JsonSerializer.Deserialize<Dictionary<string, object>>(json, _jsonOptions)
-                        ?? new Dictionary<string, object>();
-                }
-                else
-                {
-                    settings = new Dictionary<string, object>();
-                }
-
-                // Mettre à jour ou ajouter le paramètre
-                settings[settingName] = value;
-
-                // Sauvegarder les paramètres
-                string updatedJson = JsonSerializer.Serialize(settings, _jsonOptions);
-                File.WriteAllText(filePath, updatedJson);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde du paramètre {settingName}: {ex.Message}");
-                throw;
-            }
-        }
-
-        #endregion
-
-        #region Importation et exportation des paramètres
-
-        /// <summary>
-        /// Exporte les paramètres de l'application vers un fichier JSON
-        /// </summary>
-        /// <param name="filePath">Chemin du fichier de destination</param>
-        public void ExportSettings(string filePath)
-        {
-            try
-            {
-                // Création d'un objet contenant tous les paramètres à exporter
-                var exportData = new
-                {
-                    ExportDate = DateTime.Now,
-                    Version = "1.0",
-                    Settings = _cachedSettings ?? LoadSettingsAsync().Result,
-                    TaxBrackets = GetTaxBrackets(),
-                    FamilyCharges = GetFamilyCharges(),
-                    CustomSettings = LoadCustomSettingsAsync().Result
-                };
-
-                // Conversion en JSON et écriture dans le fichier
-                string json = JsonSerializer.Serialize(exportData, _jsonOptions);
-                File.WriteAllText(filePath, json);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'exportation des paramètres: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Importe les paramètres de l'application depuis un fichier JSON
-        /// </summary>
-        /// <param name="filePath">Chemin du fichier source</param>
-        public void ImportSettings(string filePath)
-        {
-            try
-            {
-                // Lecture du contenu du fichier
-                string json = File.ReadAllText(filePath);
-
-                using (JsonDocument document = JsonDocument.Parse(json))
-                {
-                    JsonElement root = document.RootElement;
-
-                    // Importation des paramètres généraux
-                    if (root.TryGetProperty("Settings", out JsonElement settingsElement))
-                    {
-                        var settings = JsonSerializer.Deserialize<AppSettings>(
-                            settingsElement.GetRawText(), _jsonOptions);
-
-                        if (settings != null)
-                            SaveSettingsAsync(settings).Wait();
-                    }
-
-                    // Importation des tranches d'imposition
-                    if (root.TryGetProperty("TaxBrackets", out JsonElement bracketsElement))
-                    {
-                        var brackets = JsonSerializer.Deserialize<List<TaxBracket>>(
-                            bracketsElement.GetRawText(), _jsonOptions);
-
-                        if (brackets != null)
-                            SaveTaxBrackets(brackets);
-                    }
-
-                    // Importation des charges familiales
-                    if (root.TryGetProperty("FamilyCharges", out JsonElement chargesElement))
-                    {
-                        var charges = JsonSerializer.Deserialize<List<FamilyCharge>>(
-                            chargesElement.GetRawText(), _jsonOptions);
-
-                        if (charges != null)
-                            SaveFamilyCharges(charges);
-                    }
-
-                    // Importation des paramètres personnalisés
-                    if (root.TryGetProperty("CustomSettings", out JsonElement customSettingsElement))
-                    {
-                        var customSettings = JsonSerializer.Deserialize<Dictionary<string, object>>(
-                            customSettingsElement.GetRawText(), _jsonOptions);
-
-                        if (customSettings != null)
-                            SaveCustomSettingsAsync(customSettings).Wait();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'importation des paramètres: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Charge les paramètres personnalisés de l'application
-        /// </summary>
-        /// <returns>Dictionnaire des paramètres personnalisés</returns>
-        private async Task<Dictionary<string, object>> LoadCustomSettingsAsync()
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "appSettings.json");
-
-                if (File.Exists(filePath))
-                {
-                    // Utilisation de Task.Run pour exécuter la méthode synchrone File.ReadAllText de manière asynchrone
-                    string json = await Task.Run(() => File.ReadAllText(filePath));
-                    return JsonSerializer.Deserialize<Dictionary<string, object>>(json, _jsonOptions)
-                        ?? new Dictionary<string, object>();
-                }
-
-                return new Dictionary<string, object>();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors du chargement des paramètres personnalisés: {ex.Message}");
-                return new Dictionary<string, object>();
-            }
-        }
-
-        /// <summary>
-        /// Sauvegarde les paramètres personnalisés de l'application
-        /// </summary>
-        /// <param name="settings">Dictionnaire des paramètres personnalisés</param>
-        private async Task SaveCustomSettingsAsync(Dictionary<string, object> settings)
-        {
-            try
-            {
-                string filePath = Path.Combine(_appDataFolder, "appSettings.json");
-                string json = JsonSerializer.Serialize(settings ?? new Dictionary<string, object>(), _jsonOptions);
-
-                // Utilisation de Task.Run pour exécuter la méthode synchrone File.WriteAllText de manière asynchrone
-                await Task.Run(() => File.WriteAllText(filePath, json));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde des paramètres personnalisés: {ex.Message}");
-                throw;
-            }
-        }
-
-        #endregion
-       
-
-       
-}
+    }
 }

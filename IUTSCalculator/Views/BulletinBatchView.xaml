@@ -1,0 +1,222 @@
+<UserControl x:Class="IUTSCalculator.Views.BulletinBatchView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:BulletinBatchViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1050" d:DesignHeight="700">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Bulletins en masse" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}">
+                    <Run Text="{Binding SelectedCount, Mode=OneWay}"/>
+                    <Run Text="salarié(s) sélectionné(s) sur"/>
+                    <Run Text="{Binding Employees.Count, Mode=OneWay}"/>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Ouvrir le dossier" Tag="{StaticResource IconView}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding OuvrirDossierCommand}"/>
+                <Button Content="Registre de paie..." Tag="{StaticResource IconExcel}" Margin="0"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ExporterRegistreCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Paramètres de génération ═══════════ -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="PARAMÈTRES DE GÉNÉRATION" Style="{StaticResource SectionLabelStyle}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock  Grid.Row="0" Grid.Column="0" Text="Période" Style="{StaticResource FieldLabel}"/>
+                    <DatePicker Grid.Row="1" Grid.Column="0" Width="150" Margin="0"
+                                Style="{StaticResource FormDatePickerStyle}"
+                                SelectedDate="{Binding Periode, Mode=TwoWay}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Congés pris (j)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox   Grid.Row="1" Grid.Column="2" Width="96" Margin="0" TextAlignment="Right"
+                               Style="{StaticResource FormTextBoxStyle}"
+                               Text="{Binding CongesPrisJours, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Mode de règlement" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox  Grid.Row="1" Grid.Column="4" Width="170" Margin="0"
+                               Style="{StaticResource FormComboBoxStyle}"
+                               ItemsSource="{Binding ModesReglement}"
+                               SelectedItem="{Binding ModeReglement, Mode=TwoWay}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="6" Text="Modèle de bulletin" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox  Grid.Row="1" Grid.Column="6" Width="200" Margin="0"
+                               Style="{StaticResource FormComboBoxStyle}"
+                               ItemsSource="{Binding Templates}"
+                               DisplayMemberPath="Label"
+                               SelectedItem="{Binding SelectedTemplateOption, Mode=TwoWay}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="8" Text="Dossier de destination des PDF" Style="{StaticResource FieldLabel}"/>
+                    <Grid Grid.Row="1" Grid.Column="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" IsReadOnly="True" Margin="0"
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 Text="{Binding OutputFolder, Mode=OneWay}"/>
+                        <Button Grid.Column="1" Content="Parcourir..." Margin="8,0,0,0" MinWidth="0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ChoisirDossierCommand}"/>
+                    </Grid>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════ Sélection des salariés ═══════════ -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <DockPanel>
+
+                <Border DockPanel.Dock="Top"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                        Padding="12,8">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button Content="Tout sélectionner" MinWidth="0" Height="28"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding SelectionnerToutCommand}"/>
+                            <Button Content="Tout désélectionner" MinWidth="0" Height="28" Margin="0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding DeselectionnerToutCommand}"/>
+                        </StackPanel>
+                        <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
+                                   Text="{Binding SelectedCount, StringFormat='{}{0} sélectionné(s)'}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Grille MODIFIABLE (colonne à cocher) : pas de FormDataGridStyle,
+                     qui la rendrait non modifiable. -->
+                <DataGrid ItemsSource="{Binding Employees}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          CanUserSortColumns="True"
+                          HeadersVisibility="Column"
+                          SelectionMode="Extended"
+                          RowHeight="32" FontSize="13"
+                          Background="{StaticResource SurfaceBrush}"
+                          RowBackground="{StaticResource SurfaceBrush}"
+                          AlternatingRowBackground="{StaticResource SurfaceAltBrush}"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{StaticResource RuleFaintBrush}"
+                          BorderThickness="0"
+                          ColumnHeaderStyle="{StaticResource GridColumnHeaderStyle}">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="" Width="46" IsReadOnly="False"
+                                                Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="Employé" Binding="{Binding NomComplet}" IsReadOnly="True" Width="2*"/>
+                        <DataGridTextColumn Header="Emploi" Binding="{Binding Fonction}" IsReadOnly="True" Width="*"/>
+                        <DataGridTextColumn Header="Catégorie" Binding="{Binding Categorie}" IsReadOnly="True" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══════════ Progression et journal ═══════════ -->
+        <Grid Grid.Row="3" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="360"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <Grid Margin="0,0,0,8">
+                    <TextBlock HorizontalAlignment="Left" FontSize="11"
+                               Foreground="{StaticResource InkSubtleBrush}" Text="Progression"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock FontSize="11" FontWeight="SemiBold"
+                                   Typography.NumeralAlignment="Tabular"
+                                   Foreground="{StaticResource InkBrush}">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} / {1}">
+                                    <Binding Path="ProgressCurrent"/>
+                                    <Binding Path="ProgressTotal"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                        <TextBlock FontSize="11" Margin="16,0,0,0"
+                                   Foreground="{StaticResource SuccessBrush}"
+                                   Text="{Binding TotalGeneres, StringFormat='Réussis : {0}'}"/>
+                        <TextBlock FontSize="11" Margin="16,0,0,0"
+                                   Foreground="{StaticResource DangerBrush}"
+                                   Text="{Binding TotalEchecs, StringFormat='Échecs : {0}'}"/>
+                    </StackPanel>
+                </Grid>
+
+                <ProgressBar Height="6" Minimum="0"
+                             Maximum="{Binding ProgressTotal}" Value="{Binding ProgressCurrent}"
+                             Foreground="{StaticResource AccentBrush2}"
+                             Background="{StaticResource RuleBrush}"
+                             BorderThickness="0"/>
+
+                <TextBlock Text="{Binding StatusMessage}" FontSize="11" Margin="0,10,0,0"
+                           Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="0" Height="132">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top"
+                            Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Padding="12,6">
+                        <TextBlock Text="JOURNAL DE GÉNÉRATION" Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                    </Border>
+                    <ListBox ItemsSource="{Binding Journal}"
+                             FontFamily="Consolas" FontSize="11"
+                             BorderThickness="0" Background="{StaticResource SurfaceBrush}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ Action principale ═══════════ -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Générer et exporter en PDF" Tag="{StaticResource IconPdf}" Margin="0"
+                    Style="{StaticResource MenuButtonStyle}"
+                    Command="{Binding GenererEtExporterCommand}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

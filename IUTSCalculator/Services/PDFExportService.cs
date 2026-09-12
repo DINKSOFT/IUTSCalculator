@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using IUTSCalculator.Models;
@@ -110,8 +111,12 @@ namespace IUTSCalculator.Services
                 // Ajouter les détails du calcul
                 AddCalculationDetails(document, calculation);
 
-                // Ajouter le pied de page
-                AddFooter(document);
+                // Ajouter le pied de page, avec le numéro de contrôle unique de ce document
+                // (protection contre les faux documents : permet à un tiers de vérifier
+                // l'authenticité en recalculant ce numéro à partir des mêmes données).
+                string numeroControle = QrCodeService.GenererNumeroControle(
+                    $"{calculation.Employee?.EmployeeId}|{calculation.Id}|{calculation.SalaireNetaPayer}|{calculation.CalculationDate:yyyyMMddHHmmss}");
+                AddFooter(document, numeroControle);
 
                 document.Close();
                 return true;
@@ -230,8 +235,11 @@ namespace IUTSCalculator.Services
                     isFirstCalculation = false;
                 }
 
-                // Ajouter le pied de page
-                AddFooter(document);
+                // Ajouter le pied de page, avec un numéro de contrôle unique pour ce document
+                // regroupant plusieurs calculs (protection contre les faux documents).
+                string numeroControle = QrCodeService.GenererNumeroControle(
+                    $"MULTI|{string.Join(",", calculations.Select(c => c.Id))}|{DateTime.Now:yyyyMMddHHmmss}");
+                AddFooter(document, numeroControle);
 
                 document.Close();
                 return true;
@@ -554,9 +562,11 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
-        /// Ajoute le pied de page au document PDF
+        /// Ajoute le pied de page au document PDF, avec le numéro de contrôle unique de ce
+        /// document (protection contre les faux documents : permet à l'employé ou à un tiers
+        /// de vérifier son authenticité auprès de l'employeur).
         /// </summary>
-        private void AddFooter(Document document)
+        private void AddFooter(Document document, string numeroControle = null)
         {
             if (document == null)
                 return;
@@ -566,6 +576,15 @@ namespace IUTSCalculator.Services
             footer.Alignment = Element.ALIGN_CENTER;
             footer.SpacingBefore = 20f;
             document.Add(footer);
+
+            if (!string.IsNullOrWhiteSpace(numeroControle))
+            {
+                iTextSharp.text.Paragraph controle = new iTextSharp.text.Paragraph($"N° de contrôle : {numeroControle}",
+                    new Font(Font.FontFamily.HELVETICA, 8, Font.BOLD));
+                controle.Alignment = Element.ALIGN_CENTER;
+                controle.SpacingBefore = 4f;
+                document.Add(controle);
+            }
         }
 
         /// <summary>

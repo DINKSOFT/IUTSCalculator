@@ -29,6 +29,11 @@ namespace IUTSCalculator.Models
         private decimal _retenuespeciale;
         private decimal _massesalariale;
         private decimal _chargespatronales;
+        private decimal _professionalDeduction;
+
+        // Champs pour la persistance (base de données, JSON)
+        private decimal _netSalaryAfterTax;
+        private decimal _salaireNetaPayer;
 
         /// <summary>
         /// Identifiant unique du calcul
@@ -142,6 +147,8 @@ namespace IUTSCalculator.Models
             }
         }
 
+        public decimal TotalRetenue => CnssEmployee + IUTSNet + RetenueSpeciale;
+
 
         /// <summary>
         /// Charges patronales (cotisations sociales, TPA, etc.)
@@ -159,9 +166,8 @@ namespace IUTSCalculator.Models
             }
         }
 
-
         /// <summary>
-        /// Cotisation CNSS suportée par l'employé
+        /// Cotisation CNSS suportée par l'employeur (part patronale)
         /// </summary>
         public decimal CnssPartPatronale
         {
@@ -177,7 +183,7 @@ namespace IUTSCalculator.Models
         }
 
         /// <summary>
-        /// 
+        /// Retenue spéciale
         /// </summary>
         public decimal RetenueSpeciale
         {
@@ -273,6 +279,23 @@ namespace IUTSCalculator.Models
         }
 
         /// <summary>
+        /// Abattement forfaitaire pour frais et charges professionnels
+        /// (20% ou 25% du salaire de base selon la catégorie, Art.111 CGI)
+        /// </summary>
+        public decimal ProfessionalDeduction
+        {
+            get => _professionalDeduction;
+            set
+            {
+                if (_professionalDeduction != value)
+                {
+                    _professionalDeduction = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
         /// Détails du calcul étape par étape
         /// </summary>
         public string CalculationDetails
@@ -337,14 +360,46 @@ namespace IUTSCalculator.Models
         }
 
         /// <summary>
-        /// Salaire net après impôt
+        /// Salaire net après impôt (pour la persistance)
         /// </summary>
-        public decimal NetSalaryAfterTax => SalaireBrut - IUTSNet;        
+        public decimal NetSalaryAfterTaxPersisted
+        {
+            get => _netSalaryAfterTax;
+            set
+            {
+                if (_netSalaryAfterTax != value)
+                {
+                    _netSalaryAfterTax = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         /// <summary>
-        /// Salaire net à payer à l'employée
+        /// Salaire net à payer à l'employé (pour la persistance)
         /// </summary>
-        public decimal SalaireNetaPayer => NetSalaryAfterTax-CnssEmployee-RetenueSpeciale;
+        public decimal SalaireNetaPayerPersisted
+        {
+            get => _salaireNetaPayer;
+            set
+            {
+                if (_salaireNetaPayer != value)
+                {
+                    _salaireNetaPayer = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Salaire net après impôt (calculé dynamiquement)
+        /// </summary>
+        public decimal NetSalaryAfterTax => SalaireBrut - IUTSNet;
+
+        /// <summary>
+        /// Salaire net à payer à l'employé (calculé dynamiquement)
+        /// </summary>
+        public decimal SalaireNetaPayer => NetSalaryAfterTax - CnssEmployee - RetenueSpeciale;
 
         /// <summary>
         /// Constructeur par défaut

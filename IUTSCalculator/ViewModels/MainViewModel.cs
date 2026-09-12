@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using IUTSCalculator.Models;
@@ -16,20 +15,26 @@ namespace IUTSCalculator.ViewModels
         public bool CanEditData => UserSession.Instance.CanEdit;
         public bool IsAdmin => UserSession.Instance.IsAdmin;
         public bool IsReadOnly => UserSession.Instance.IsReadOnly;
+
         private BaseViewModel _currentViewModel;
         private readonly CalculationViewModel _calculationViewModel;
         private readonly HistoryViewModel _historyViewModel;
         private readonly SettingsViewModel _settingsViewModel;
-        private readonly BaseSalaryEstimatorViewModel _baseSalaryEstimatorViewModel; // Ajout du ViewModel pour l'estimation du salaire
+        private readonly BaseSalaryEstimatorViewModel _baseSalaryEstimatorViewModel;
+        private readonly BatchSalaryCalculationViewModel _batchSalaryCalculationViewModel;
+        private readonly BatchSalaryEstimationViewModel _batchSalaryEstimationViewModel;
         private readonly DataService _dataService;
         private readonly TaxDataService _taxDataService;
         private readonly TaxCalculatorService _taxCalculatorService;
         private readonly PDFExportService _pdfExportService;
+        private readonly Dossier _currentDossier;
         private string _applicationTitle;
 
-        /// <summary>
-        /// ViewModel actuellement affiché
-        /// </summary>
+        // Bulletin de paie (écran de consultation + export PDF/Excel)
+        private readonly BulletinViewModel _bulletinViewModel;
+        // Bulletins de paie en masse (sélection multi-employés + export PDF en lot)
+        private readonly BulletinBatchViewModel _bulletinBatchViewModel;
+
         public BaseViewModel CurrentViewModel
         {
             get => _currentViewModel;
@@ -37,7 +42,6 @@ namespace IUTSCalculator.ViewModels
             {
                 if (SetProperty(ref _currentViewModel, value))
                 {
-                    // Désactiver l'ancien ViewModel (déjà géré par SetProperty)
                     if (_currentViewModel != null)
                         _currentViewModel.IsActive = true;
                     else if (value != null)
@@ -46,9 +50,6 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Titre de l'application
-        /// </summary>
         public string ApplicationTitle
         {
             get => _applicationTitle;
@@ -56,75 +57,75 @@ namespace IUTSCalculator.ViewModels
         }
 
         /// <summary>
-        /// Commande pour naviguer vers la vue de calcul
+        /// Raison sociale du dossier (entreprise) actuellement ouvert
         /// </summary>
+        public string CurrentDossierName => _currentDossier?.RaisonSociale;
+
+        /// <summary>
+        /// Déclenché lorsque l'utilisateur demande à changer de dossier (entreprise) actif
+        /// </summary>
+        public event EventHandler DossierChangeRequested;
+
         public ICommand NavigateToCalculationCommand { get; private set; }
-
-        /// <summary>
-        /// Commande pour naviguer vers la vue d'historique
-        /// </summary>
         public ICommand NavigateToHistoryCommand { get; private set; }
-
-        /// <summary>
-        /// Commande pour naviguer vers la vue des paramètres
-        /// </summary>
         public ICommand NavigateToSettingsCommand { get; private set; }
-
-        /// <summary>
-        /// Commande pour naviguer vers l'estimateur de salaire de base
-        /// </summary>
         public ICommand NavigateToBaseSalaryEstimatorCommand { get; private set; }
-
-        /// <summary>
-        /// Commande pour exporter le calcul actuel en PDF
-        /// </summary>
+        public ICommand NavigateToBatchSalaryCalculationCommand { get; private set; }
+        public ICommand NavigateToBatchSalaryEstimationCommand { get; private set; }
         public ICommand ExportToPdfCommand { get; private set; }
-
-        /// <summary>
-        /// Commande pour sauvegarder les données actuelles
-        /// </summary>
         public ICommand SaveDataCommand { get; private set; }
-
-        /// <summary>
-        /// Commande pour créer un nouveau calcul d'IUTS
-        /// </summary>
         public ICommand NewCalculationCommand { get; private set; }
+        public ICommand NavigateToEmployeeManagementCommand { get; private set; }
+        public ICommand NavigateToBulletinCommand { get; private set; }
+        public ICommand NavigateToBulletinBatchCommand { get; private set; }
+        public ICommand ChangeDossierCommand { get; private set; }
 
-        /// <summary>
-        /// Constructeur 
-        /// </summary>
         public MainViewModel()
         {
-            ApplicationTitle = "IUTS Calculator - Calculatrice d'Impôt Unifié sur les Traitements et Salaires";
+            // Le dossier (entreprise) à ouvrir doit avoir été sélectionné au préalable
+            // via l'écran de sélection de dossier (voir App.xaml.cs).
+            _currentDossier = DossierSession.Instance.CurrentDossier
+                ?? throw new InvalidOperationException("Aucun dossier n'est ouvert. Sélectionnez un dossier avant de démarrer l'application.");
 
-            // Initialiser les services
-            _dataService = new DataService();
-            _taxDataService = new TaxDataService("path/to/data");  // Ajout du chemin de données
+            ApplicationTitle = $"IUTS Calculator - Calculatrice d'Impôt Unifié sur les Traitements et Salaires — Dossier : {_currentDossier.RaisonSociale}";
+
+            // Initialisation des services (la base de données utilisée est celle du dossier ouvert,
+            // ce qui garantit qu'aucun employé n'est mélangé entre deux entreprises différentes)
+            _dataService = new DataService(_currentDossier.DbFileName);
+            _taxDataService = new TaxDataService("path/to/data");
             _taxCalculatorService = new TaxCalculatorService(_taxDataService);
             _pdfExportService = new PDFExportService();
 
-            // Initialiser les ViewModels
+            // Initialisation des ViewModels
             _calculationViewModel = new CalculationViewModel(_taxCalculatorService, _dataService);
             _historyViewModel = new HistoryViewModel(_dataService, _taxCalculatorService);
             _settingsViewModel = new SettingsViewModel(_dataService);
-            _baseSalaryEstimatorViewModel = new BaseSalaryEstimatorViewModel(_dataService,_taxCalculatorService);
+            _baseSalaryEstimatorViewModel = new BaseSalaryEstimatorViewModel(_dataService, _taxCalculatorService);
+            _batchSalaryCalculationViewModel = new BatchSalaryCalculationViewModel(_dataService, _taxCalculatorService);
+            _batchSalaryEstimationViewModel = new BatchSalaryEstimationViewModel(_taxCalculatorService);
 
-            // Configurer la navigation par défaut
+            // Initialisation du ViewModel pour le bulletin de paie
+            _bulletinViewModel = new BulletinViewModel(
+                _dataService,
+                new BulletinService(_taxCalculatorService),
+                new BulletinExportService());
+
+            // Initialisation du ViewModel pour les bulletins de paie en masse
+            _bulletinBatchViewModel = new BulletinBatchViewModel(
+                _dataService,
+                new BulletinService(_taxCalculatorService),
+                new BulletinExportService());
+
+            // Navigation par défaut
             CurrentViewModel = _calculationViewModel;
 
-            // Initialiser les commandes
             InitializeCommands();
-
-            // S'abonner aux événements des ViewModels
             SubscribeToViewModelEvents();
 
-            // Charger les données initiales
+            // Chargement initial des données
             _ = LoadInitialDataAsync();
         }
 
-        /// <summary>
-        /// Initialise les commandes de l'application
-        /// </summary>
         private void InitializeCommands()
         {
             NavigateToCalculationCommand = new RelayCommand(
@@ -143,22 +144,41 @@ namespace IUTSCalculator.ViewModels
                 execute: () => NavigateTo(_baseSalaryEstimatorViewModel),
                 canExecute: () => !IsBusy);
 
+            NavigateToBatchSalaryCalculationCommand = new RelayCommand(
+                execute: () => NavigateTo(_batchSalaryCalculationViewModel),
+                canExecute: () => !IsBusy);
+
+            NavigateToBatchSalaryEstimationCommand = new RelayCommand(
+                execute: () => NavigateTo(_batchSalaryEstimationViewModel),
+                canExecute: () => !IsBusy);
+
             ExportToPdfCommand = new RelayCommand(
-                execute: async () => await ExportCurrentCalculationToPdfAsync(),
-                canExecute: () => !IsBusy && _calculationViewModel.HasCalculation);
+                async () => await ExportCurrentCalculationToPdfAsync(),
+                () => !IsBusy && _calculationViewModel.CurrentCalculation != null);
 
             SaveDataCommand = new RelayCommand(
-                execute: async () => await SaveAllDataAsync(),
-                canExecute: () => !IsBusy);
+                async () => await SaveAllDataAsync(),
+                () => !IsBusy);
 
             NewCalculationCommand = new RelayCommand(
                 execute: CreateNewCalculation,
                 canExecute: () => !IsBusy);
+
+            NavigateToEmployeeManagementCommand = new RelayCommand(NavigateToEmployeeManagement);
+
+            NavigateToBulletinCommand = new RelayCommand(
+                execute: () => NavigateTo(_bulletinViewModel),
+                canExecute: () => !IsBusy);
+
+            NavigateToBulletinBatchCommand = new RelayCommand(
+                execute: () => NavigateTo(_bulletinBatchViewModel),
+                canExecute: () => !IsBusy);
+
+            ChangeDossierCommand = new RelayCommand(
+                execute: () => DossierChangeRequested?.Invoke(this, EventArgs.Empty),
+                canExecute: () => !IsBusy);
         }
 
-        /// <summary>
-        /// S'abonne aux événements déclenchés par les ViewModels
-        /// </summary>
         private void SubscribeToViewModelEvents()
         {
             _calculationViewModel.CalculationCompleted += (sender, e) =>
@@ -177,17 +197,11 @@ namespace IUTSCalculator.ViewModels
             _settingsViewModel.SettingsSaved += (sender, e) =>
             {
                 StatusMessage = $"Paramètres enregistrés le {DateTime.Now:g}";
-                // Rafraîchir les données des autres viewmodels si nécessaire
                 _calculationViewModel.RefreshSettings();
                 _historyViewModel.RefreshSettings();
             };
-
-            // Si besoin d'écouter des événements du BaseSalaryEstimatorViewModel, ajoutez-les ici
         }
 
-        /// <summary>
-        /// Charge les données initiales pour l'application de manière asynchrone
-        /// </summary>
         private async Task LoadInitialDataAsync()
         {
             try
@@ -195,14 +209,7 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 StatusMessage = "Chargement des données...";
 
-                // Charger les tranches d'imposition et autres données de référence
-                await Task.Run(() => {
-                    // Remplacer l'appel à LoadTaxBrackets() et LoadFamilyCharges() 
-                    // par un appel à la méthode disponible dans TaxDataService
-                    _taxDataService.ReloadTaxDataAsync().Wait();
-                });
-
-                // Charger l'historique des calculs
+                await _taxDataService.ReloadTaxDataAsync();
                 await _dataService.LoadCalculationsHistoryAsync();
 
                 StatusMessage = "Données chargées avec succès";
@@ -217,16 +224,11 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Navigue vers le ViewModel spécifié
-        /// </summary>
-        /// <param name="viewModel">ViewModel de destination</param>
         private void NavigateTo(BaseViewModel viewModel)
         {
             if (viewModel == null)
                 throw new ArgumentNullException(nameof(viewModel));
 
-            // Désactiver l'ancien ViewModel s'il existe
             if (CurrentViewModel != null)
                 CurrentViewModel.IsActive = false;
 
@@ -235,9 +237,6 @@ namespace IUTSCalculator.ViewModels
             StatusMessage = $"Module {viewModel.Title} chargé";
         }
 
-        /// <summary>
-        /// Exporte le calcul actuel au format PDF de manière asynchrone
-        /// </summary>
         private async Task ExportCurrentCalculationToPdfAsync()
         {
             try
@@ -248,7 +247,6 @@ namespace IUTSCalculator.ViewModels
                 var currentCalculation = _calculationViewModel.CurrentCalculation;
                 if (currentCalculation != null)
                 {
-                    // Utiliser la méthode ExportTaxCalculationToPdfAsync au lieu d'ExportCalculation
                     string fileName = $"IUTS_{currentCalculation.Employee.LastName}_{DateTime.Now:yyyyMMdd}.pdf";
                     string filePath = GetSaveFilePath(fileName);
 
@@ -277,23 +275,14 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Obtient le chemin pour sauvegarder le fichier PDF
-        /// </summary>
-        /// <param name="defaultFileName">Nom de fichier par défaut</param>
-        /// <returns>Chemin complet du fichier ou null si annulé</returns>
         private string GetSaveFilePath(string defaultFileName)
         {
-            // Dans une application réelle, ceci utiliserait un dialog de sauvegarde de fichier
-            // Ici on retourne simplement un chemin par défaut pour l'exemple
+            // Dans une application réelle, utilisez un SaveFileDialog
             return System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                 defaultFileName);
         }
 
-        /// <summary>
-        /// Sauvegarde toutes les données de l'application de manière asynchrone
-        /// </summary>
         private async Task SaveAllDataAsync()
         {
             try
@@ -301,11 +290,11 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 StatusMessage = "Sauvegarde des données...";
 
-                await Task.Run(() => {
-                    // Utilisez les méthodes asynchrones correctes du DataService
-                    _dataService.SaveCalculationsHistoryAsync(_dataService.LoadCalculationsHistoryAsync().Result).Wait();
-                    _dataService.SaveSettingsAsync(_dataService.LoadSettingsAsync().Result).Wait();
-                });
+                var calculations = await _dataService.LoadCalculationsHistoryAsync();
+                await _dataService.SaveCalculationsHistoryAsync(calculations);
+
+                var settings = await _dataService.LoadSettingsAsync();
+                await _dataService.SaveSettingsAsync(settings);
 
                 StatusMessage = $"Données sauvegardées avec succès le {DateTime.Now:g}";
             }
@@ -319,9 +308,6 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Crée un nouveau calcul d'IUTS
-        /// </summary>
         private void CreateNewCalculation()
         {
             _calculationViewModel.CreateNewCalculation();
@@ -329,9 +315,11 @@ namespace IUTSCalculator.ViewModels
             StatusMessage = "Nouveau calcul créé";
         }
 
-        /// <summary>
-        /// Libère les ressources utilisées par le ViewModel
-        /// </summary>
+        private void NavigateToEmployeeManagement()
+        {
+            CurrentViewModel = new EmployeeManagementViewModel(_dataService);
+        }
+
         public void Dispose()
         {
             // Libérer les ressources si nécessaire

@@ -1,0 +1,386 @@
+﻿<UserControl x:Class="BulletinPaie.Views.BulletinPaieView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="800" d:DesignWidth="600">
+
+    <UserControl.Resources>
+        <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+
+        <Style x:Key="TitleStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,10,0,5"/>
+        </Style>
+
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ValueStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0"/>
+        </Style>
+
+        <Style x:Key="TableHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+
+        <Style x:Key="TableCellStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+
+        <Style x:Key="NumberCellStyle" TargetType="TextBlock" BasedOn="{StaticResource TableCellStyle}">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Border BorderBrush="Black" BorderThickness="2" Margin="10" Padding="15" Background="White">
+            <StackPanel>
+                <!-- En-tête de l'entreprise -->
+                <StackPanel Margin="0,0,0,20">
+                    <TextBlock Text="EMERAUDE/ FC SARL" Style="{StaticResource HeaderTextStyle}"/>
+                    <TextBlock Text="01 BP 4603 OUAGA 01" HorizontalAlignment="Center"/>
+                    <TextBlock Text="+226 25 47 04 91" HorizontalAlignment="Center"/>
+                    <TextBlock Text="BULLETIN DE PAYE SESSION NORMALE" Style="{StaticResource TitleStyle}"/>
+                </StackPanel>
+
+                <!-- Informations de session -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="SESSION :" Style="{StaticResource LabelStyle}"/>
+                        <TextBlock Text="Octobre 2024" Style="{StaticResource ValueStyle}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Text="N° CNSS Employer :" Style="{StaticResource LabelStyle}"/>
+                        <TextBlock Text="217854Y" Style="{StaticResource ValueStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                    <TextBlock Text="ETABLISSEMENT :" Style="{StaticResource LabelStyle}"/>
+                    <TextBlock Text="A1" Style="{StaticResource ValueStyle}"/>
+                </StackPanel>
+
+                <!-- Informations employé -->
+                <Border BorderBrush="Black" BorderThickness="1" Padding="10" Margin="0,0,0,15">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="NOM ET PRENOMS :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="Mme OUEDRAOGO Rabiatou / BAYOR" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="QUALIFICATION :" Style="{StaticResource LabelStyle}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="MATRICULE :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="0002" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="HORAIRE :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="17" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <TextBlock Text="ANC :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="333" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                <TextBlock Text="CHARGE :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="0" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="N° SECURITE SOCIALE :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="0" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="MODE PAIEMENT :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="ESPECE" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="NUMERO COMPTE :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="000000" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="DEPARTEMENT / SERVICE :" Style="{StaticResource LabelStyle}"/>
+                                <TextBlock Text="DIRECTION GENERAL" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Tableau des salaires -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="100"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- En-têtes -->
+                    <Border Grid.Row="0" Grid.Column="0" BorderBrush="Black" BorderThickness="1" Background="LightGray">
+                        <TextBlock Text="CODE" Style="{StaticResource TableHeaderStyle}"/>
+                    </Border>
+                    <Border Grid.Row="0" Grid.Column="1" BorderBrush="Black" BorderThickness="1" Background="LightGray">
+                        <TextBlock Text="DESIGNATION DE L'ELEMENT DE SALAIRE" Style="{StaticResource TableHeaderStyle}"/>
+                    </Border>
+                    <Border Grid.Row="0" Grid.Column="2" BorderBrush="Black" BorderThickness="1" Background="LightGray">
+                        <TextBlock Text="GAINS" Style="{StaticResource TableHeaderStyle}"/>
+                    </Border>
+                    <Border Grid.Row="0" Grid.Column="3" BorderBrush="Black" BorderThickness="1" Background="LightGray">
+                        <TextBlock Text="RETENUES" Style="{StaticResource TableHeaderStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 1 - Salaire de Base -->
+                    <Border Grid.Row="1" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="1" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Salaire de Base" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="135 522" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="1" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 2 - Indemnité de logement -->
+                    <Border Grid.Row="2" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="201" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="2" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Indemnité de logement" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="2" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="45 000" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="2" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 3 - Indemnité de Transport -->
+                    <Border Grid.Row="3" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="202" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="3" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Indemnité de Transport" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="3" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="11 000" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="3" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 4 - Indemnité de Fonction -->
+                    <Border Grid.Row="4" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="203" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="4" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Indemnité de Fonction" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="4" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="10 500" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="4" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 5 - Indemnité de Sujetion -->
+                    <Border Grid.Row="5" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="204" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="5" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Indemnité de Sujetion" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="5" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="10 000" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="5" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 6 - Assurance Vieillesse -->
+                    <Border Grid.Row="6" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="501" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="6" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Assurance Vieillesse" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="6" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="6" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="0" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 7 - Part Ouvrière IUTS -->
+                    <Border Grid.Row="7" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="551" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="7" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Part Ouvrière IUTS" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="7" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="7" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="12 022" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+
+                    <!-- Ligne 8 - Retenue obligatoire -->
+                    <Border Grid.Row="8" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="552" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="8" Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="Retenue obligatoire sur salaire" Style="{StaticResource TableCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="8" Grid.Column="2" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                    <Border Grid.Row="8" Grid.Column="3" BorderBrush="Black" BorderThickness="1">
+                        <TextBlock Text="2 000" Style="{StaticResource NumberCellStyle}"/>
+                    </Border>
+                </Grid>
+
+                <!-- Totaux -->
+                <Border BorderBrush="Black" BorderThickness="1" Padding="10" Margin="0,0,0,15">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="TOTAUX" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="212 022" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="14 022" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- Informations supplémentaires -->
+                <Border BorderBrush="Black" BorderThickness="1" Padding="10" Margin="0,0,0,15">
+                    <StackPanel>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="SESSION"/>
+                            <TextBlock Grid.Column="1" Text="783" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="TAUX HORAIRE"/>
+                            <TextBlock Grid.Column="1" Text="0" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="HEURES SUP"/>
+                            <TextBlock Grid.Column="1" Text="" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="SALAIRE BRUT"/>
+                            <TextBlock Grid.Column="1" Text="212 022" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="IMPOSABLE"/>
+                            <TextBlock Grid.Column="1" Text="114 600" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="BASE IMPOSABLE"/>
+                            <TextBlock Grid.Column="1" Text="200 000" HorizontalAlignment="Right"/>
+                        </Grid>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="SALAIRE NET"/>
+                            <TextBlock Grid.Column="1" Text="198 000" HorizontalAlignment="Right"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Net à payer -->
+                <Border BorderBrush="Black" BorderThickness="2" Padding="10" Background="LightGray">
+                    <TextBlock Text="NET A PAYER : 198 000" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

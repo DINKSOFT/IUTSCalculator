@@ -183,7 +183,7 @@ namespace IUTSCalculator.Helpers
         /// <summary>
         /// Titre de l'application
         /// </summary>
-        public const string AppTitle = "Calculateur IUTS";
+        public const string AppTitle = "Sigma Paie et RH";
 
         /// <summary>
         /// Nom d'affichage pour l'onglet de calcul

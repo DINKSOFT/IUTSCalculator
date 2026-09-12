@@ -111,29 +111,42 @@ namespace IUTSCalculator.Services
             ConstantValues = new TaxConstants
             {
                 MaxHousingAllowanceRate = 0.20m,
-                MaxHousingAllowanceAmount = 50000m,
+                MaxHousingAllowanceAmount = 75000m,
                 MaxFunctionAllowanceRate = 0.05m,
-                MaxFunctionAllowanceAmount = 30000m,
+                MaxFunctionAllowanceAmount = 50000m,
                 MaxTransportAllowanceRate = 0.05m,
-                MaxTransportAllowanceAmount = 20000m,
+                MaxTransportAllowanceAmount = 30000m,
                 MaxPensionContributionRate = 0.08m,
                 ProfessionalDeductionHigherCategories = 0.20m,
                 ProfessionalDeductionOtherCategories = 0.25m
             };
 
-            // Valeurs par défaut pour les tranches d'imposition
+            // Valeurs par défaut pour les tranches d'imposition (Art.112 CGI).
+            // IMPORTANT : le texte de loi publie les tranches comme "0 à 30.000 : 0%",
+            // "30.100 à 50.000 : 12,10%", etc. — mais ce "30.100" n'est qu'un repère informel
+            // (la plus petite valeur possible dans cette tranche une fois la base imposable
+            // arrondie à la centaine inférieure). Pour le calcul cumulatif de l'impôt, chaque
+            // tranche doit être CONTIGÜE à la précédente (borne inférieure = borne supérieure
+            // de la tranche précédente), sans quoi 100 FCFA de largeur sont perdus à chaque
+            // changement de tranche. Ceci est confirmé par la formule cumulative du bulletin de
+            // référence (onglet "Option 4", cellule D36 : H4+(D34-F4)*G6, qui utilise bien F4 =
+            // 30 000, la borne supérieure de la tranche précédente, comme point de départ).
             TaxBrackets = new List<TaxBracket>
             {
                 new TaxBracket(0m, 30000m, 0m),
-                new TaxBracket(30100m, 50000m, 12.10m),
-                new TaxBracket(50100m, 80000m, 13.90m),
-                new TaxBracket(80100m, 120000m, 15.70m),
-                new TaxBracket(120100m, 170000m, 18.40m),
-                new TaxBracket(170100m, 250000m, 21.70m),
-                new TaxBracket(250100m, decimal.MaxValue, 25.00m)
+                new TaxBracket(30000m, 50000m, 12.10m),
+                new TaxBracket(50000m, 80000m, 13.90m),
+                new TaxBracket(80000m, 120000m, 15.70m),
+                new TaxBracket(120000m, 170000m, 18.40m),
+                new TaxBracket(170000m, 250000m, 21.70m),
+                new TaxBracket(250000m, decimal.MaxValue, 25.00m)
             };
 
             // Valeurs par défaut pour les abattements pour charges de famille
+            // Art.113 du CGI ne détaille explicitement que 1 à 4 charges (8/10/12/14 %) ;
+            // au-delà, la progression de +2 %/charge est poursuivie jusqu'à 7 charges (20 %),
+            // conformément au modèle de bulletin de paie de référence (onglet "Option 4",
+            // cellule D38) qui plafonne la réduction à 20 % à partir de 7 charges.
             FamilyChargeRates = new Dictionary<int, decimal>
             {
                 { 0, 0m },

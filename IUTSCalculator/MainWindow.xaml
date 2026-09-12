@@ -1,4 +1,4 @@
-﻿<Window x:Class="IUTSCalculator.MainWindow"
+<Window x:Class="IUTSCalculator.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -7,16 +7,19 @@
         xmlns:views="clr-namespace:IUTSCalculator.Views"
         xmlns:viewModels="clr-namespace:IUTSCalculator.ViewModels"
         mc:Ignorable="d"
-        Title="Calculateur d'Impôts IUTS" 
-        Height="650" 
-        Width="850"
-        MinHeight="500"
-        MinWidth="800" WindowState="Maximized" WindowStartupLocation="CenterScreen">
+        Title="Sigma Paie &amp; RH"
+        Height="700"
+        Width="1200"
+        MinHeight="560"
+        MinWidth="980"
+        FontFamily="Segoe UI"
+        Background="{StaticResource GroundBrush}"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
         <ResourceDictionary>
-
-            <!-- DataTemplates pour les ViewModels -->
+            <!-- Association ViewModel → Vue -->
             <DataTemplate DataType="{x:Type viewModels:CalculationViewModel}">
                 <views:CalculationView />
             </DataTemplate>
@@ -29,71 +32,277 @@
             <DataTemplate DataType="{x:Type viewModels:BaseSalaryEstimatorViewModel}">
                 <views:BaseSalaryEstimatorView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:BatchSalaryCalculationViewModel}">
+                <views:BatchSalaryCalculationView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:BatchSalaryEstimationViewModel}">
+                <views:BatchSalaryEstimationView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:BulletinViewModel}">
+                <views:BulletinView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:BulletinBatchViewModel}">
+                <views:BulletinBatchView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:EmployeeManagementViewModel}">
+                <views:EmployeeManagementView />
+            </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="234"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Barre de menu -->
-        <Menu Grid.Row="0" FontSize="14">
-            <MenuItem Header="Fichier">
-                <MenuItem Header="Nouveau calcul" Command="{Binding NewCalculationCommand}"/>
-                <MenuItem Header="Historique" Command="{Binding NavigateToHistoryCommand}"/>
-                <MenuItem Header="Exporter" Command="{Binding ExportToPdfCommand}"/>
-                <Separator/>
-                <MenuItem Header="Quitter" Click="Exit_Click"/>
-            </MenuItem>
-            <MenuItem Header="Options">
-                <MenuItem Header="Paramètres" Command="{Binding NavigateToSettingsCommand}"/>
-                <MenuItem Header="Préférences d'affichage" Click="DisplayPreferences_Click"/>
-            </MenuItem>
-            <MenuItem Header="Aide">
-                <MenuItem Header="Documentation" Click="OpenDocumentation_Click"/>
-                <MenuItem Header="À propos" Click="About_Click"/>
-            </MenuItem>
-        </Menu>
+        <!-- ═══════════════════════════════════════════════════════════════════
+             RAIL DE NAVIGATION
+             Les neuf boutons de l'ancienne barre d'outils, regroupés par
+             domaine. L'écran courant se signale tout seul : chaque bouton se
+             compare au titre du ViewModel affiché.
+             ═══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Column="0" Background="{StaticResource RailBrush}">
+            <DockPanel>
 
-        <!-- Zone de contenu principal -->
-        <Grid Grid.Row="1" Margin="10">
+                <!-- Marque -->
+                <Border DockPanel.Dock="Top" Height="64"
+                        BorderBrush="{StaticResource RailBorderBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel VerticalAlignment="Center" Margin="18,0">
+                        <TextBlock Text="Sigma" FontSize="17" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="PAIE &amp; RH" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource RailTextDimBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Paramètres, détaché du reste -->
+                <Border DockPanel.Dock="Bottom"
+                        BorderBrush="{StaticResource RailBorderBrush}" BorderThickness="0,1,0,0"
+                        Padding="10,8,10,12">
+                    <Button Tag="{StaticResource IconSettings}" Content="Paramètres"
+                            Command="{Binding NavigateToSettingsCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Paramètres">
+                                        <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Border>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,4,10,12">
+
+                        <!-- ───── PAIE ───── -->
+                        <TextBlock Text="PAIE" Style="{StaticResource NavGroupHeaderStyle}"/>
+
+                        <Button Tag="{StaticResource IconPdf}" Content="Bulletin de paie"
+                                Command="{Binding NavigateToBulletinCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Bulletin de paie">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconBatch}" Content="Bulletins en masse"
+                                Command="{Binding NavigateToBulletinBatchCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Bulletins de paie en masse">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- ───── CALCUL ───── -->
+                        <TextBlock Text="CALCUL" Style="{StaticResource NavGroupHeaderStyle}"/>
+
+                        <Button Tag="{StaticResource IconCalculator}" Content="Calcul d'IUTS"
+                                Command="{Binding NavigateToCalculationCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Calcul d'IUTS">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconExcel}" Content="Calcul en lot"
+                                Command="{Binding NavigateToBatchSalaryCalculationCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Calcul de salaires en lot">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEstimate}" Content="Estimation du salaire"
+                                Command="{Binding NavigateToBaseSalaryEstimatorCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Estimation du salaire de base">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEstimate}" Content="Estimation en lot"
+                                Command="{Binding NavigateToBatchSalaryEstimationCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Estimation de salaires en lot">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- ───── DONNÉES ───── -->
+                        <TextBlock Text="DONNÉES" Style="{StaticResource NavGroupHeaderStyle}"/>
+
+                        <Button Tag="{StaticResource IconEmploye}" Content="Employés"
+                                Command="{Binding NavigateToEmployeeManagementCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Gestion des employés">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconHistory}" Content="Historique"
+                                Command="{Binding NavigateToHistoryCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Historique">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             COLONNE PRINCIPALE
+             ═══════════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Column="1" Background="{StaticResource GroundBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="56"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Barre d'outils pour accès rapide -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                <Button Style="{StaticResource MenuButtonStyle}" 
-                        Tag="{StaticResource IconNew}"
-                        Content="Nouveau calcul" Command="{Binding NewCalculationCommand}" Width="143"/>
-                <Button Style="{StaticResource MenuButtonStyle}" 
-                        Tag="{StaticResource IconHistory}"
-                        Content="Historique" Command="{Binding NavigateToHistoryCommand}"/>
-                <Button Style="{StaticResource MenuButtonStyle}" 
-                        Tag="{StaticResource IconSettings}"
-                        Content="Paramètres" Command="{Binding NavigateToSettingsCommand}"/>
-                <Button Style="{StaticResource MenuButtonStyle}" 
-                        Tag="{StaticResource IconEstimate}"
-                        Content="Estimation Salaire Base" Command="{Binding NavigateToBaseSalaryEstimatorCommand}" Width="194"/>                
-            </StackPanel>
+            <!-- Bandeau : le dossier courant, remonté de la barre d'état.
+                 C'est l'information qu'il ne faut jamais confondre quand on
+                 gère plusieurs sociétés. -->
+            <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1">
+                <Grid Margin="20,0">
+
+                    <Button HorizontalAlignment="Left" VerticalAlignment="Center"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Tag="{StaticResource IconRefresh}"
+                            Content="{Binding CurrentDossierName}"
+                            ToolTip="Changer de dossier"
+                            Click="ChangeDossier_Click"/>
+
+                    <Menu HorizontalAlignment="Right" VerticalAlignment="Center"
+                          Background="Transparent" BorderThickness="0" Padding="0">
+                        <MenuItem Padding="8,4">
+                            <MenuItem.Header>
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           Text="{StaticResource IconMore}"
+                                           FontSize="16"
+                                           Foreground="{StaticResource InkMutedBrush}"/>
+                            </MenuItem.Header>
+
+                            <MenuItem Header="Nouveau calcul" Command="{Binding NewCalculationCommand}"/>
+                            <MenuItem Header="Enregistrer" Command="{Binding SaveDataCommand}"/>
+                            <MenuItem Header="Exporter en PDF" Command="{Binding ExportToPdfCommand}"/>
+                            <Separator/>
+                            <MenuItem Header="Changer de dossier..." Click="ChangeDossier_Click"/>
+                            <MenuItem Header="Préférences d'affichage" Click="DisplayPreferences_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Documentation" Click="OpenDocumentation_Click"/>
+                            <MenuItem Header="À propos" Click="About_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Quitter" Click="Exit_Click"/>
+                        </MenuItem>
+                    </Menu>
+                </Grid>
+            </Border>
 
             <!-- Vue dynamique selon le ViewModel courant -->
-            <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />
-        </Grid>
+            <ContentControl Grid.Row="1" Margin="20,18,20,18"
+                            Content="{Binding CurrentViewModel}"/>
 
-        <!-- Barre de statut -->
-        <StatusBar Grid.Row="2" Background="#f0f0f0">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}" FontSize="12"/>
-            </StatusBarItem>
-            <Separator/>
-            <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding ApplicationTitle}" FontSize="12"/>
-            </StatusBarItem>
-        </StatusBar>
+            <!-- Barre d'état -->
+            <Border Grid.Row="2" Height="28" Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0">
+                <Grid Margin="20,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessBrush}"
+                                 VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                                   Foreground="{StaticResource InkSubtleBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                               FontSize="11" Foreground="{StaticResource InkSubtleBrush}">
+                        <Run Text="Dossier : "/>
+                        <Run Text="{Binding CurrentDossierName, Mode=OneWay}"/>
+                    </TextBlock>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

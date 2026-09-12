@@ -1,11 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using IUTSCalculator.ViewModels;
 using System.Globalization;
-using IUTSCalculator.Services;
-using System.Windows.Media; // Ajouté pour accéder aux services
+using System.Windows.Media;
 
 namespace IUTSCalculator.Views
 {
@@ -14,41 +12,32 @@ namespace IUTSCalculator.Views
     /// </summary>
     public partial class CalculationView : UserControl
     {
-        private readonly CalculationViewModel _viewModel;
+        private CalculationViewModel _viewModel;
 
         /// <summary>
-        /// Constructeur par défaut
+        /// Constructeur par défaut.
+        /// Le DataContext (CalculationViewModel) est fourni par le DataTemplate de
+        /// MainWindow.xaml, construit avec le DataService du dossier actif : on ne le
+        /// recrée pas ici, sous peine de charger employés/calculs depuis la mauvaise base
+        /// de données. On s'abonne à CalculationCompleted dès que le DataContext est connu.
         /// </summary>
         public CalculationView()
         {
             InitializeComponent();
 
-            // Créer et initialiser le ViewModel avec les services nécessaires
-            // Note: Idéalement, ces services devraient être injectés via un 
-            // conteneur d'injection de dépendances. Ceci est une solution simple.
-
-            // Pour l'instant, nous créons une instance directe des services
-            // Dans une application réelle, utilisez votre système d'injection de dépendances
-            // Définir le répertoire des données fiscales (par exemple, un sous-répertoire "Data" dans le répertoire de l'application)
-            string dataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
-
-            // S'assurer que le répertoire existe
-            if (!Directory.Exists(dataDirectory))
-            {
-                Directory.CreateDirectory(dataDirectory);
-            }
-            var taxDataService = new TaxDataService(dataDirectory);
-            var taxCalculatorService = new TaxCalculatorService(taxDataService);
-            var dataService = new DataService();
-
-            _viewModel = new CalculationViewModel(taxCalculatorService, dataService);
-            DataContext = _viewModel;
-
-            // S'abonner à l'événement de complétion du calcul
-            _viewModel.CalculationCompleted += OnCalculationCompleted;
-
-            // S'abonner aux événements de déchargement de la vue
+            DataContextChanged += CalculationView_DataContextChanged;
             Unloaded += CalculationView_Unloaded;
+        }
+
+        private void CalculationView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (_viewModel != null)
+                _viewModel.CalculationCompleted -= OnCalculationCompleted;
+
+            _viewModel = DataContext as CalculationViewModel;
+
+            if (_viewModel != null)
+                _viewModel.CalculationCompleted += OnCalculationCompleted;
         }
 
         /// <summary>
@@ -59,14 +48,12 @@ namespace IUTSCalculator.Views
         {
             InitializeComponent();
 
-            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-            DataContext = _viewModel;
-
-            // S'abonner à l'événement de complétion du calcul
-            _viewModel.CalculationCompleted += OnCalculationCompleted;
-
-            // S'abonner aux événements de déchargement de la vue
+            DataContextChanged += CalculationView_DataContextChanged;
             Unloaded += CalculationView_Unloaded;
+
+            if (viewModel == null)
+                throw new ArgumentNullException(nameof(viewModel));
+            DataContext = viewModel;
         }
 
         /// <summary>
