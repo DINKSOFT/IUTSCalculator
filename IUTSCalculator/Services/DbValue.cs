@@ -130,6 +130,34 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>Valeur lue en base → chaîne (null si la colonne est NULL).</summary>
+        /// <summary>
+        /// Écrit une date qui peut être absente. La chaîne vide est retenue plutôt que
+        /// NULL pour rester homogène avec les autres colonnes TEXT de la base, dont
+        /// aucune n'est nullable.
+        /// </summary>
+        public static string DateNullableToDb(DateTime? date)
+        {
+            return date.HasValue ? DateToDb(date.Value) : "";
+        }
+
+        /// <summary>
+        /// Relit une date qui peut être absente. Une colonne vide, NULL ou illisible
+        /// redonne null : une date de naissance inconnue ne doit surtout pas se
+        /// matérialiser en 01/01/0001, qui serait ensuite affichée et imprimée.
+        /// </summary>
+        public static DateTime? DateNullableFromDb(object valeur)
+        {
+            if (valeur == null || valeur == DBNull.Value)
+                return null;
+
+            string texte = TextFromDb(valeur);
+            if (string.IsNullOrWhiteSpace(texte))
+                return null;
+
+            var date = DateFromDb(valeur, default(DateTime));
+            return date == default(DateTime) ? (DateTime?)null : date;
+        }
+
         public static string TextFromDb(object valeur)
         {
             return (valeur == null || valeur == DBNull.Value) ? null : valeur.ToString();
@@ -148,6 +176,22 @@ namespace IUTSCalculator.Services
             catch
             {
                 return 0;
+            }
+        }
+
+        /// <summary>Valeur lue en base → entier long, 0 si la colonne est NULL ou illisible.</summary>
+        public static long LongFromDb(object valeur)
+        {
+            if (valeur == null || valeur == DBNull.Value)
+                return 0L;
+
+            try
+            {
+                return Convert.ToInt64(valeur, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return 0L;
             }
         }
     }

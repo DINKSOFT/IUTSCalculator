@@ -33,7 +33,8 @@
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="*" MinHeight="360"/>
+            <RowDefinition Height="260"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -71,11 +72,24 @@
                 <Border DockPanel.Dock="Bottom"
                         BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
                         Padding="16,12">
-                    <Button Content="Générer le bulletin"
-                            Tag="{StaticResource IconCheck}"
-                            HorizontalAlignment="Stretch" Margin="0"
-                            Style="{StaticResource MenuButtonStyle}"
-                            Command="{Binding GenererCommand}"/>
+                    <!-- Générer établit le bulletin à partir de la fiche ACTUELLE du salarié
+                         et l'enregistre. Rappeler réaffiche celui qui est déjà enregistré
+                         pour ce mois, tel qu'il a été édité : c'est le document remis au
+                         salarié, qui ne doit pas changer parce qu'un salaire a été revu
+                         depuis. -->
+                    <StackPanel>
+                        <Button Content="Générer le bulletin"
+                                Tag="{StaticResource IconCheck}"
+                                HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                                Style="{StaticResource MenuButtonStyle}"
+                                Command="{Binding GenererCommand}"/>
+                        <Button Content="Rappeler le bulletin enregistré"
+                                Tag="{StaticResource IconHistory}"
+                                HorizontalAlignment="Stretch" Margin="0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="Réaffiche le bulletin déjà enregistré pour ce salarié et ce mois, sans le recalculer."
+                                Command="{Binding RappelerCommand}"/>
+                    </StackPanel>
                 </Border>
 
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14">
@@ -85,6 +99,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -103,24 +118,48 @@
                                   SelectedItem="{Binding SelectedTemplateOption, Mode=TwoWay}"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Employé"
-                                   Style="{StaticResource FormTextBlockLabelStyle}" Margin="0" VerticalAlignment="Center"/>
-                        <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"
-                                  Style="{StaticResource FormComboBoxStyle}"
-                                  ItemsSource="{Binding Employees}"
-                                  SelectedItem="{Binding SelectedEmployee, Mode=TwoWay}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock>
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}{0} {1}">
-                                                <Binding Path="LastName"/>
-                                                <Binding Path="FirstName"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+                                   Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,4,0,0" VerticalAlignment="Top"/>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,10">
+                            <!-- Barre de recherche rapide du salarié -->
+                            <Grid Margin="0,0,0,4">
+                                <TextBox Text="{Binding FiltreSalarie, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}"
+                                         Height="28" Padding="24,2,22,2" Margin="0"
+                                         VerticalContentAlignment="Center"
+                                         ToolTip="Filtrer par nom, prénom, matricule ou emploi..."/>
+                                <TextBlock Text="{StaticResource IconSearch}"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                           Foreground="{StaticResource InkSubtleBrush}"
+                                           HorizontalAlignment="Left" VerticalAlignment="Center"
+                                           Margin="6,0,0,0" IsHitTestVisible="False"/>
+                                <Button Command="{Binding ClearFiltreSalarieCommand}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,4,0" Width="16" Height="16"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        ToolTip="Effacer la recherche"
+                                        Visibility="{Binding HasFiltreSalarie, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                               Foreground="{StaticResource InkSubtleBrush}"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Sélecteur de salarié filtré -->
+                            <ComboBox Style="{StaticResource FormComboBoxStyle}"
+                                      Height="32" Margin="0"
+                                      ItemsSource="{Binding EmployeesFiltres}"
+                                      SelectedItem="{Binding SelectedEmployee, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                            <Run Text="{Binding LastName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                            <Run Text="{Binding FirstName, Mode=OneWay}"/>
+                                            <Run Text="·" Foreground="{StaticResource InkSubtleBrush}"/>
+                                            <Run Text="{Binding Fonction, Mode=OneWay}" Foreground="{StaticResource InkSubtleBrush}" FontSize="11"/>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Période"
                                    Style="{StaticResource FormTextBlockLabelStyle}" Margin="0" VerticalAlignment="Center"/>
@@ -153,6 +192,14 @@
                         <TextBox Grid.Row="6" Grid.Column="1" Margin="0"
                                  Style="{StaticResource FormTextBoxStyle}"
                                  Text="{Binding NumeroCompte, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <!-- Affichage de la devise : réglage du dossier, retenu d'un export
+                             à l'autre. Il ne touche que les documents exportés. -->
+                        <CheckBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,12,0,0"
+                                  Style="{StaticResource FormCheckBoxStyle}"
+                                  Content="Écrire « FCFA » après les montants"
+                                  ToolTip="Décochez pour n'imprimer que les nombres, par exemple si votre papier à en-tête mentionne déjà la devise."
+                                  IsChecked="{Binding AfficherDevise, Mode=TwoWay}"/>
                     </Grid>
                 </ScrollViewer>
             </DockPanel>
@@ -187,6 +234,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <Grid Margin="20" Visibility="{Binding HasBulletin, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -271,34 +319,90 @@
 
                     <!-- Gains -->
                     <TextBlock Grid.Row="3" Text="GAINS" Background="#4F6228" Style="{StaticResource BulletinSectionHeaderStyle}"/>
+                    <!-- Le bloc des gains n'est plus une grille à lignes figées : les variables
+                         du mois (PAI-02) s'intercalent entre les rubriques permanentes et le
+                         salaire brut, en nombre variable. -->
                     <Border Grid.Row="4" BorderBrush="#CCCCCC" BorderThickness="1,0,1,1" Margin="0,0,0,12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="180"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
-                            </Grid.RowDefinitions>
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                                </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Salaire de base" Style="{StaticResource BulletinLabelStyle}"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentBulletin.SalaireDeBase, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Salaire de base" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentBulletin.SalaireDeBase, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Indemnité de logement" Style="{StaticResource BulletinLabelStyle}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteLogement, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Indemnité de logement" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteLogement, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Indemnité de transport" Style="{StaticResource BulletinLabelStyle}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteTransport, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Indemnité de transport" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteTransport, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
 
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Indemnité de fonction" Style="{StaticResource BulletinLabelStyle}"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteFonction, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Indemnité de fonction" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteFonction, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
 
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Indemnité de sujétion" Style="{StaticResource BulletinLabelStyle}"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteSujetion, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Indemnité de sujétion" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding CurrentBulletin.IndemniteSujetion, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                            </Grid>
 
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="SALAIRE BRUT" FontWeight="Bold" Background="#DCEBDC" Style="{StaticResource BulletinLabelStyle}"/>
-                            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding CurrentBulletin.SalaireBrut, StringFormat=N0}" FontWeight="Bold" Background="#DCEBDC" Style="{StaticResource BulletinValueStyle}"/>
-                        </Grid>
+                            <!-- Variables du mois : heures supplémentaires, primes, gratifications… -->
+                            <StackPanel Visibility="{Binding CurrentBulletin.ADesGainsVariables, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <ItemsControl ItemsSource="{Binding CurrentBulletin.GainsVariables}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="180"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Libelle}" Style="{StaticResource BulletinLabelStyle}"/>
+                                                    <TextBlock Text="{Binding Traitement, StringFormat='({0})'}"
+                                                               FontSize="10" Foreground="#888888"
+                                                               VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding Montant, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="180"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Total des gains variables" FontStyle="Italic" Style="{StaticResource BulletinLabelStyle}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding CurrentBulletin.TotalGainsVariables, StringFormat=N0}" FontStyle="Italic" Style="{StaticResource BulletinValueStyle}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Absence non rémunérée : elle réduit le brut, donc elle s'affiche
+                                 avant lui et en négatif. -->
+                            <Grid Visibility="{Binding CurrentBulletin.ADesAbsencesRetenues, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding CurrentBulletin.LibelleRetenueAbsences}"
+                                           Foreground="#A33" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentBulletin.RetenueAbsences, StringFormat='-{0:N0}'}"
+                                           Foreground="#A33" Style="{StaticResource BulletinValueStyle}"/>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="SALAIRE BRUT" FontWeight="Bold" Background="#DCEBDC" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentBulletin.SalaireBrut, StringFormat=N0}" FontWeight="Bold" Background="#DCEBDC" Style="{StaticResource BulletinValueStyle}"/>
+                            </Grid>
+                        </StackPanel>
                     </Border>
 
                     <!-- Cotisations et impôt -->
@@ -343,8 +447,39 @@
                         </Grid>
                     </Border>
 
+                    <!-- Retenues diverses du mois (acompte, prêt, opposition…), déduites du net -->
+                    <Border Grid.Row="7" Margin="0,0,0,12"
+                            BorderBrush="#CCCCCC" BorderThickness="1,0,1,1"
+                            Visibility="{Binding CurrentBulletin.ADesRetenuesVariables, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="RETENUES DIVERSES" Background="#7F5F28" Style="{StaticResource BulletinSectionHeaderStyle}"/>
+                            <ItemsControl ItemsSource="{Binding CurrentBulletin.RetenuesVariables}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="180"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Libelle}" Style="{StaticResource BulletinLabelStyle}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Montant, StringFormat=N0}" Style="{StaticResource BulletinValueStyle}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="180"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Total des retenues diverses" FontWeight="Bold" Style="{StaticResource BulletinLabelStyle}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentBulletin.TotalRetenuesDiverses, StringFormat=N0}" FontWeight="Bold" Style="{StaticResource BulletinValueStyle}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Net à payer -->
-                    <Border Grid.Row="7" Background="#DCEBDC" BorderBrush="#4F6228" BorderThickness="1" Margin="0,0,0,15">
+                    <Border Grid.Row="8" Background="#DCEBDC" BorderBrush="#4F6228" BorderThickness="1" Margin="0,0,0,15">
                         <Grid Margin="8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -356,7 +491,7 @@
                     </Border>
 
                     <!-- Numéro de contrôle (authenticité) -->
-                    <TextBlock Grid.Row="8" Text="{Binding CurrentBulletin.NumeroControle, StringFormat='N° de contrôle : {0}'}"
+                    <TextBlock Grid.Row="9" Text="{Binding CurrentBulletin.NumeroControle, StringFormat='N° de contrôle : {0}'}"
                                FontSize="10" FontStyle="Italic" Foreground="Gray" HorizontalAlignment="Center"/>
                 </Grid>
                 </ScrollViewer>
@@ -378,8 +513,146 @@
                        TextWrapping="Wrap" MaxWidth="280" TextAlignment="Center"/>
         </StackPanel>
 
+        <!-- ═══════════ Génération sur plusieurs mois ═══════════
+             Écran distinct de « Générer le bulletin » ci-dessus : celui-ci affiche un
+             document à l'écran, celui-ci exporte directement en PDF, un fichier par mois,
+             dans un sous-dossier portant le nom du salarié sélectionné plus haut. -->
+        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Style="{StaticResource CardBorderStyle}" Margin="0,14,0,0" Padding="0">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14">
+            <StackPanel>
+                <TextBlock Text="GÉNÉRATION SUR PLUSIEURS MOIS" Style="{StaticResource SectionLabelStyle}"/>
+                <TextBlock FontSize="11" Margin="0,2,0,10" TextWrapping="Wrap"
+                           Foreground="{StaticResource InkSubtleBrush}"
+                           Text="Établit et exporte en PDF le bulletin de l'employé sélectionné ci-dessus, pour chaque mois coché, dans un sous-dossier à son nom. Un mois déjà clôturé est rappelé tel qu'il a été archivé, jamais recalculé."/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock  Grid.Row="0" Grid.Column="0" Text="Du" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                    <DatePicker Grid.Row="1" Grid.Column="0" Width="140" Margin="0"
+                                Style="{StaticResource FormDatePickerStyle}"
+                                SelectedDate="{Binding PeriodeDebutPlage, Mode=TwoWay}"/>
+
+                    <TextBlock  Grid.Row="0" Grid.Column="2" Text="Au" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                    <DatePicker Grid.Row="1" Grid.Column="2" Width="140" Margin="0"
+                                Style="{StaticResource FormDatePickerStyle}"
+                                SelectedDate="{Binding PeriodeFinPlage, Mode=TwoWay}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Dossier de destination des PDF" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                    <Grid Grid.Row="1" Grid.Column="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" IsReadOnly="True" Margin="0"
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 Text="{Binding OutputFolderPlage, Mode=OneWay}"/>
+                        <Button Grid.Column="1" Content="Parcourir..." Margin="8,0,0,0" MinWidth="0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ChoisirDossierPlageCommand}"/>
+                    </Grid>
+
+                    <Button Grid.Row="1" Grid.Column="6" Content="Générer sur la période"
+                            Tag="{StaticResource IconCheck}" Margin="0" VerticalAlignment="Bottom"
+                            Style="{StaticResource MenuButtonStyle}"
+                            Command="{Binding GenererPlageCommand}"/>
+                </Grid>
+
+                <!-- Mois de la plage à cocher : toujours visible dès qu'un mois est défini,
+                     y compris un seul, pour que la sélection individuelle reste repérable. -->
+                <Border Margin="0,10,0,0" Padding="10,8"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                        Visibility="{Binding AfficherSelectionMois, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl ItemsSource="{Binding MoisPlage}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Margin="0,0,18,4"
+                                          Style="{StaticResource FormCheckBoxStyle}"
+                                          Content="{Binding Libelle}"
+                                          IsChecked="{Binding EstSelectionne, Mode=TwoWay}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <!-- Progression et journal -->
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="320"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock HorizontalAlignment="Left" FontSize="11"
+                                       Foreground="{StaticResource InkSubtleBrush}" Text="Progression"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock FontSize="11" FontWeight="SemiBold"
+                                           Typography.NumeralAlignment="Tabular"
+                                           Foreground="{StaticResource InkBrush}">
+                                    <TextBlock.Text>
+                                        <MultiBinding StringFormat="{}{0} / {1}">
+                                            <Binding Path="ProgressCurrentPlage"/>
+                                            <Binding Path="ProgressTotalPlage"/>
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                                <TextBlock FontSize="11" Margin="16,0,0,0"
+                                           Foreground="{StaticResource SuccessBrush}"
+                                           Text="{Binding TotalGeneresPlage, StringFormat='Réussis : {0}'}"/>
+                                <TextBlock FontSize="11" Margin="16,0,0,0"
+                                           Foreground="{StaticResource DangerBrush}"
+                                           Text="{Binding TotalEchecsPlage, StringFormat='Échecs : {0}'}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ProgressBar Height="6" Minimum="0"
+                                     Maximum="{Binding ProgressTotalPlage}" Value="{Binding ProgressCurrentPlage}"
+                                     Foreground="{StaticResource AccentBrush2}"
+                                     Background="{StaticResource RuleBrush}"
+                                     BorderThickness="0"/>
+                    </StackPanel>
+
+                    <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="0" Height="96">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Top"
+                                    Background="{StaticResource SurfaceAltBrush}"
+                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                                    Padding="12,6">
+                                <TextBlock Text="JOURNAL" Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                            </Border>
+                            <ListBox ItemsSource="{Binding JournalPlage}"
+                                     FontFamily="Consolas" FontSize="11"
+                                     BorderThickness="0" Background="{StaticResource SurfaceBrush}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
         <!-- Message d'état de l'écran -->
-        <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
+        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
                    Text="{Binding StatusMessage}" FontSize="11"
                    Foreground="{StaticResource InkSubtleBrush}" Margin="0,12,0,0"/>
     </Grid>

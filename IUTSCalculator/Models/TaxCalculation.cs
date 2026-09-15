@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -25,7 +25,15 @@ namespace IUTSCalculator.Models
         private decimal _taxDifference;
         private decimal _cnssemployee;
         private decimal _cnsspartpatronale;
+        private decimal _retenuesDiverses;
+        private decimal _gainsVariables;
+        private decimal _retenueAbsences;
+        private decimal _assietteCnss;
+        private decimal _cnssPrestationsFamiliales;
+        private decimal _cnssRisquesProfessionnels;
+        private decimal _cnssPensionsPatronal;
         private decimal _taxepatronale;
+        private decimal _assietteTPA;
         private decimal _retenuespeciale;
         private decimal _massesalariale;
         private decimal _chargespatronales;
@@ -132,6 +140,25 @@ namespace IUTSCalculator.Models
         }
 
         /// <summary>
+        /// Assiette réellement soumise à la TPA (module DEC-02) : le salaire brut, diminué
+        /// des rubriques que le plan de paie en exonère explicitement. Stockée pour que la
+        /// déclaration (module DEC-03) reprenne l'assiette qui a réellement servi, au lieu
+        /// de la reconstituer et de risquer un écart.
+        /// </summary>
+        public decimal AssietteTPA
+        {
+            get => _assietteTPA;
+            set
+            {
+                if (_assietteTPA != value)
+                {
+                    _assietteTPA = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
         /// Charge salarial de l'employé (salaire brut + charges patronales)
         /// </summary>
         public decimal MasseSalariale
@@ -147,7 +174,7 @@ namespace IUTSCalculator.Models
             }
         }
 
-        public decimal TotalRetenue => CnssEmployee + IUTSNet + RetenueSpeciale;
+        public decimal TotalRetenue => CnssEmployee + IUTSNet + RetenueSpeciale + RetenuesDiverses;
 
 
         /// <summary>
@@ -177,6 +204,130 @@ namespace IUTSCalculator.Models
                 if (_cnsspartpatronale != value)
                 {
                     _cnsspartpatronale = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retenues diverses issues des variables du mois (branchement PAI-02).
+        ///
+        /// Elles se déduisent du net à payer APRÈS l'impôt et les cotisations : une
+        /// retenue de prêt ou une opposition ne diminue ni la base imposable ni
+        /// l'assiette CNSS. Zéro par défaut, donc sans effet sur un calcul sans variables.
+        /// </summary>
+        public decimal RetenuesDiverses
+        {
+            get => _retenuesDiverses;
+            set
+            {
+                if (_retenuesDiverses != value)
+                {
+                    _retenuesDiverses = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(SalaireNetaPayer));
+                    OnPropertyChanged(nameof(TotalRetenue));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Total des gains apportés par les variables du mois, tous traitements confondus.
+        /// Conservé pour que le bulletin puisse distinguer le salaire permanent de ce que
+        /// le mois a ajouté — sans quoi un brut inhabituel resterait inexpliqué.
+        /// </summary>
+        public decimal GainsVariables
+        {
+            get => _gainsVariables;
+            set
+            {
+                if (_gainsVariables != value)
+                {
+                    _gainsVariables = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retenue opérée sur le brut au titre des absences non rémunérées (module PAI-04).
+        ///
+        /// À la différence des retenues diverses, celle-ci s'impute AVANT l'impôt et les
+        /// cotisations : le salarié n'a pas perçu ce salaire, il n'a donc pas à en être
+        /// imposé. Conservée ici pour que le bulletin puisse afficher la ligne qui
+        /// explique un brut inférieur au salaire contractuel.
+        /// </summary>
+        public decimal RetenueAbsences
+        {
+            get => _retenueAbsences;
+            set
+            {
+                if (_retenueAbsences != value)
+                {
+                    _retenueAbsences = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Assiette réellement soumise à cotisation : le salaire brut, ramené au plafond
+        /// mensuel de la CNSS s'il le dépasse (module DEC-01).
+        ///
+        /// Elle était jusqu'ici implicite, recalculée à chaque besoin. La stocker permet à
+        /// la déclaration de reprendre l'assiette qui a réellement servi, au lieu de la
+        /// reconstituer et de risquer un écart.
+        /// </summary>
+        public decimal AssietteCnss
+        {
+            get => _assietteCnss;
+            set
+            {
+                if (_assietteCnss != value)
+                {
+                    _assietteCnss = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>Part patronale — branche prestations familiales (module DEC-01).</summary>
+        public decimal CnssPrestationsFamiliales
+        {
+            get => _cnssPrestationsFamiliales;
+            set
+            {
+                if (_cnssPrestationsFamiliales != value)
+                {
+                    _cnssPrestationsFamiliales = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>Part patronale — branche risques professionnels (module DEC-01).</summary>
+        public decimal CnssRisquesProfessionnels
+        {
+            get => _cnssRisquesProfessionnels;
+            set
+            {
+                if (_cnssRisquesProfessionnels != value)
+                {
+                    _cnssRisquesProfessionnels = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>Part patronale — branche pensions (module DEC-01).</summary>
+        public decimal CnssPensionsPatronal
+        {
+            get => _cnssPensionsPatronal;
+            set
+            {
+                if (_cnssPensionsPatronal != value)
+                {
+                    _cnssPensionsPatronal = value;
                     OnPropertyChanged();
                 }
             }
@@ -399,7 +550,7 @@ namespace IUTSCalculator.Models
         /// <summary>
         /// Salaire net à payer à l'employé (calculé dynamiquement)
         /// </summary>
-        public decimal SalaireNetaPayer => NetSalaryAfterTax - CnssEmployee - RetenueSpeciale;
+        public decimal SalaireNetaPayer => NetSalaryAfterTax - CnssEmployee - RetenueSpeciale - RetenuesDiverses;
 
         /// <summary>
         /// Constructeur par défaut

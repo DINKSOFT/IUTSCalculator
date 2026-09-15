@@ -71,12 +71,75 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="400"/>
             </Grid.ColumnDefinitions>
 
             <!-- ───── Liste ───── -->
             <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="0">
                 <DockPanel>
+
+                    <!-- ── Barre de recherche et filtres ── -->
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Background="{StaticResource SurfaceAltBrush}" Padding="12,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="135"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Recherche textuelle rapide -->
+                            <Grid Grid.Column="0">
+                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}"
+                                         Height="32" Padding="28,4,26,4" Margin="0"
+                                         VerticalContentAlignment="Center"
+                                         ToolTip="Rechercher par nom, prénom, matricule, emploi, CNSS, IFU..."/>
+                                <TextBlock Text="{StaticResource IconSearch}"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                           Foreground="{StaticResource InkSubtleBrush}"
+                                           HorizontalAlignment="Left" VerticalAlignment="Center"
+                                           Margin="8,0,0,0" IsHitTestVisible="False"/>
+                                <Button Command="{Binding ClearSearchCommand}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,6,0" Width="20" Height="20"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        ToolTip="Effacer la recherche"
+                                        Visibility="{Binding HasSearchText, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                               Foreground="{StaticResource InkSubtleBrush}"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Filtre Statut -->
+                            <ComboBox Grid.Column="2" Height="32" Margin="0"
+                                      Style="{StaticResource FormComboBoxStyle}"
+                                      ItemsSource="{Binding StatutsFiltreOptions}"
+                                      SelectedValue="{Binding SelectedStatutFilter, Mode=TwoWay}"
+                                      SelectedValuePath="Key"
+                                      DisplayMemberPath="Value"
+                                      ToolTip="Filtrer par statut"/>
+
+                            <!-- Filtre Catégorie -->
+                            <ComboBox Grid.Column="4" Height="32" Margin="0"
+                                      Style="{StaticResource FormComboBoxStyle}"
+                                      ItemsSource="{Binding CategoriesFiltreOptions}"
+                                      SelectedItem="{Binding SelectedCategoryFilter, Mode=TwoWay}"
+                                      ToolTip="Filtrer par catégorie professionnelle"/>
+
+                            <!-- Réinitialiser les filtres -->
+                            <Button Grid.Column="5" Content="Effacer filtres" Tag="{StaticResource IconClear}"
+                                    MinWidth="0" Padding="10,0" Height="32" Margin="8,0,0,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    ToolTip="Réinitialiser tous les critères de recherche et filtres"
+                                    Command="{Binding ResetFiltersCommand}"
+                                    Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                    </Border>
 
                     <Border DockPanel.Dock="Bottom"
                             BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
@@ -84,20 +147,22 @@
                         <Grid>
                             <TextBlock HorizontalAlignment="Left" FontSize="11"
                                        Foreground="{StaticResource InkSubtleBrush}">
+                                <Run Text="{Binding NombreSalariesAffiches, Mode=OneWay}"/>
+                                <Run Text="sur"/>
                                 <Run Text="{Binding Employees.Count, Mode=OneWay}"/>
-                                <Run Text="salariés"/>
+                                <Run Text="salarié(s)"/>
                             </TextBlock>
                             <TextBlock HorizontalAlignment="Right" FontSize="11"
                                        Foreground="{StaticResource InkSubtleBrush}">
-                                <Run Text="Total base"/>
-                                <Run Text="{Binding TotalSalaireBase, Mode=OneWay, ConverterCulture=fr-FR, StringFormat={}{0:N0}}"
+                                <Run Text="Total base filtré"/>
+                                <Run Text="{Binding TotalSalaireBaseAffiche, Mode=OneWay, ConverterCulture=fr-FR, StringFormat={}{0:N0}}"
                                      FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
                                 <Run Text="FCFA"/>
                             </TextBlock>
                         </Grid>
                     </Border>
 
-                    <DataGrid ItemsSource="{Binding Employees}"
+                    <DataGrid ItemsSource="{Binding EmployeesView}"
                               SelectedItem="{Binding SelectedEmployee}"
                               Style="{StaticResource FormDataGridStyle}"
                               Margin="0"
@@ -146,6 +211,44 @@
                                                 Width="80" MinWidth="70"
                                                 ElementStyle="{StaticResource CenterTextStyle}"
                                                 HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+
+                            <DataGridTemplateColumn Header="Statut" Width="85" MinWidth="75"
+                                                    SortMemberPath="StatutSalarie">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="3" Padding="6,2" HorizontalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{StaticResource AccentTintBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding StatutSalarie}" Value="1">
+                                                            <Setter Property="Background" Value="#FEE2E2"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatutSalarie}" Value="2">
+                                                            <Setter Property="Background" Value="{StaticResource WarningTintBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding StatutLibelle, Mode=OneWay}" FontSize="11" FontWeight="SemiBold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentDarkBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding StatutSalarie}" Value="1">
+                                                                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding StatutSalarie}" Value="2">
+                                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
@@ -178,35 +281,33 @@
                         </Grid>
                     </Border>
 
-                    <!-- Boutons, épinglés en bas -->
+                    <!-- Boutons Enregistrer / Supprimer (bas de fiche) -->
                     <Border DockPanel.Dock="Bottom"
                             BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
                             Padding="16,12">
                         <Grid>
-                            <!-- Mode création -->
-                            <StackPanel Orientation="Horizontal">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Visible"/>
+                            <!-- Mode ajout : seul Enregistrer apparaît -->
+                            <Button Content="Enregistrer le salarié"
+                                    Tag="{StaticResource IconSave}"
+                                    Margin="0"
+                                    HorizontalAlignment="Right"
+                                    Command="{Binding AddEmployeeCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource MenuButtonStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding EstEnEdition}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            <DataTrigger Binding="{Binding EstEnEdition}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </StackPanel.Style>
-                                <Button Content="Ajouter" Width="150"
-                                        Style="{StaticResource MenuButtonStyle}"
-                                        Command="{Binding AddEmployeeCommand}"/>
-                                <Button Content="Effacer" Margin="0"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding ClearNewEmployeeCommand}"/>
-                            </StackPanel>
+                                </Button.Style>
+                            </Button>
 
-                            <!-- Mode modification -->
-                            <StackPanel Orientation="Horizontal">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
+                            <!-- Mode modification : Enregistrer + Supprimer -->
+                            <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding EstEnEdition}" Value="True">
@@ -214,25 +315,51 @@
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </StackPanel.Style>
-                                <Button Content="Enregistrer" Width="150"
-                                        Style="{StaticResource MenuButtonStyle}"
-                                        Command="{Binding EditEmployeeCommand}"/>
-                                <Button Content="Annuler"
+                                </Grid.Style>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                        Content="Supprimer"
+                                        Tag="{StaticResource IconDelete}"
                                         Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding NouveauSalarieCommand}"/>
-                                <Button Content="Supprimer" Margin="0"
-                                        Style="{StaticResource DangerButtonStyle}"
+                                        Foreground="{StaticResource DangerBrush}"
+                                        ToolTip="Supprimer définitivement la fiche de ce salarié"
+                                        HorizontalAlignment="Left"
                                         Command="{Binding DeleteEmployeeCommand}"/>
-                            </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="Enregistrer"
+                                        Tag="{StaticResource IconSave}"
+                                        Style="{StaticResource MenuButtonStyle}"
+                                        ToolTip="Enregistrer les modifications de la fiche"
+                                        Margin="0"
+                                        HorizontalAlignment="Right"
+                                        Command="{Binding EditEmployeeCommand}"/>
+                            </Grid>
                         </Grid>
                     </Border>
 
-                    <!-- Champs -->
+                    <!-- Contenu défilant de la fiche -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14">
                         <StackPanel DataContext="{Binding FicheCourante}">
 
-                            <TextBlock Text="IDENTITÉ" Style="{StaticResource SectionLabelStyle}"
+                            <!-- Alerte de sous-rémunération conventionnelle (module SOC-05) -->
+                            <Border CornerRadius="4" Padding="10,8" Margin="0,0,0,14"
+                                    Background="{StaticResource WarningTintBrush}"
+                                    BorderBrush="{StaticResource WarningBrush}"
+                                    BorderThickness="1"
+                                    Visibility="{Binding DataContext.EstNonConformeSalaireMinimum, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                        <TextBlock Text="⚠ Conformité conventionnelle :" FontWeight="Bold" Foreground="{StaticResource WarningBrush}" FontSize="11.5"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding DataContext.MessageConformiteSalaireMinimum, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               Foreground="{StaticResource InkBrush}" FontSize="11" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="IDENTIFICATION &amp; CONTRAT" Style="{StaticResource SectionLabelStyle}"
                                        Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
 
                             <Grid>
@@ -241,6 +368,12 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -266,20 +399,269 @@
                                            ItemsSource="{Binding DataContext.EmployeeCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedItem="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Date d'entrée" Style="{StaticResource FieldLabel}"/>
-                                <DatePicker Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Échelon" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                           ItemsSource="{Binding DataContext.EchelonsDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           SelectedItem="{Binding Echelon, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Convention" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                           ItemsSource="{Binding DataContext.ConventionsDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           SelectedValue="{Binding ConventionId, UpdateSourceTrigger=PropertyChanged}"
+                                           SelectedValuePath="Id"
+                                           DisplayMemberPath="Libelle"/>
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Date d'entrée" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
                                             SelectedDate="{Binding DateEntreeNullable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Situation" Style="{StaticResource FieldLabel}"/>
-                                <ComboBox  Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                <TextBlock Grid.Row="7" Grid.Column="0" Text="Situation" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
                                            ItemsSource="{Binding DataContext.SituationsMatrimoniales, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedItem="{Binding SituationMatrimoniale, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="Statut" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="8" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                           ItemsSource="{Binding DataContext.StatutsSalarieDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           SelectedValue="{Binding StatutSalarie, UpdateSourceTrigger=PropertyChanged}"
+                                           SelectedValuePath="Key"
+                                           DisplayMemberPath="Value"/>
+
+                                <TextBlock Grid.Row="9" Grid.Column="0" Text="Matricule CNSS" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="9" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           ToolTip="Numéro d'assuré à la CNSS. Sans lui, la ligne du salarié ne peut pas être rattachée sur la déclaration."
+                                           Text="{Binding NumeroCnss, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="10" Grid.Column="0" Text="Date sortie" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="10" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                            SelectedDate="{Binding DateSortie, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="11" Grid.Column="0" Text="Motif départ" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="11" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding MotifDepart, UpdateSourceTrigger=PropertyChanged}"/>
                             </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,8,0,14"/>
+
+                            <TextBlock Text="ÉTAT CIVIL" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="104"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Né(e) le" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="0" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                            SelectedDate="{Binding DateNaissance, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="À" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding LieuNaissance, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Sexe" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                           IsEditable="True"
+                                           Text="{Binding Sexe, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBoxItem Content="Masculin"/>
+                                    <ComboBoxItem Content="Féminin"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Nationalité" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding Nationalite, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="CNIB n°" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding NumeroCnib, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Délivrée le" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                            SelectedDate="{Binding DateDelivranceCnib, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="À" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding LieuDelivranceCnib, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,8,0,14"/>
+
+                            <TextBlock Text="COORDONNÉES ET RÈGLEMENT" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="104"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Adresse" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding Adresse, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Téléphone" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding Telephone, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Courriel" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="IFU" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding NumeroIfu, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Règlement" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                           IsEditable="True"
+                                           Text="{Binding ModeReglement, UpdateSourceTrigger=PropertyChanged}">
+                                    <ComboBoxItem Content="Virement"/>
+                                    <ComboBoxItem Content="Espèces"/>
+                                    <ComboBoxItem Content="Chèque"/>
+                                    <ComboBoxItem Content="Mobile money"/>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Banque" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding Banque, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="N° de compte" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           Text="{Binding NumeroCompte, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <Border Padding="10,8" Margin="0,0,0,6" CornerRadius="3"
+                                    Background="{StaticResource WarningTintBrush}"
+                                    BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+                                    Visibility="{Binding CoordonneesBancairesCompletes, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                                <TextBlock Text="Règlement par virement sans numéro de compte : la paie de ce salarié ne pourra pas partir."
+                                           TextWrapping="Wrap" FontSize="11.5"
+                                           Foreground="{StaticResource InkBrush}"/>
+                            </Border>
+
+                            <!-- ══ Personnes à charge (SAL-01) ══ -->
+                            <StackPanel Visibility="{Binding DataContext.GereLesPersonnesACharge, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+                                <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,8,0,14"/>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="PERSONNES À CHARGE" VerticalAlignment="Center"
+                                               Style="{StaticResource SectionLabelStyle}"
+                                               Foreground="{StaticResource AccentBrush2}" Margin="0"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Button Content="Ajouter" MinWidth="0" Padding="10,0" Height="28" Margin="0,0,6,0"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                ToolTip="Ajouter une personne à charge"
+                                                Command="{Binding DataContext.AjouterPersonneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                        <Button Content="Retirer" MinWidth="0" Padding="10,0" Height="28" Margin="0"
+                                                Style="{StaticResource DangerButtonStyle}"
+                                                ToolTip="Retirer la personne sélectionnée"
+                                                Command="{Binding DataContext.SupprimerPersonneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <DataGrid ItemsSource="{Binding DataContext.PersonnesACharge, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          SelectedItem="{Binding DataContext.PersonneSelectionnee, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          Style="{StaticResource FormDataGridStyle}"
+                                          IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                          MaxHeight="220" Margin="0,0,0,8">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Nom" Binding="{Binding Nom}"
+                                                            Width="*" MinWidth="90"/>
+                                        <DataGridTextColumn Header="Prénom" Binding="{Binding Prenom}"
+                                                            Width="*" MinWidth="90"/>
+                                        <DataGridComboBoxColumn Header="Lien"
+                                                                SelectedItemBinding="{Binding Lien}"
+                                                                Width="100" MinWidth="90">
+                                            <DataGridComboBoxColumn.ElementStyle>
+                                                <Style TargetType="ComboBox">
+                                                    <Setter Property="ItemsSource"
+                                                            Value="{Binding DataContext.LiensDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                                </Style>
+                                            </DataGridComboBoxColumn.ElementStyle>
+                                            <DataGridComboBoxColumn.EditingElementStyle>
+                                                <Style TargetType="ComboBox">
+                                                    <Setter Property="ItemsSource"
+                                                            Value="{Binding DataContext.LiensDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                                </Style>
+                                            </DataGridComboBoxColumn.EditingElementStyle>
+                                        </DataGridComboBoxColumn>
+                                        <DataGridTextColumn Header="Né(e) le"
+                                                            Binding="{Binding DateNaissance, StringFormat=dd/MM/yyyy}"
+                                                            Width="100" MinWidth="90"/>
+                                        <DataGridTextColumn Header="Âge" Binding="{Binding AgeLibelle}"
+                                                            IsReadOnly="True" Width="70" MinWidth="60"
+                                                            ElementStyle="{StaticResource CenterTextStyle}"
+                                                            HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                                        <DataGridCheckBoxColumn Header="Études" Binding="{Binding PoursuitDesEtudes}"
+                                                                Width="70"/>
+                                        <DataGridCheckBoxColumn Header="Handicap" Binding="{Binding SituationDeHandicap}"
+                                                                Width="80"/>
+                                        <DataGridCheckBoxColumn Header="Compte" Binding="{Binding CompteCommeCharge}"
+                                                                Width="70"/>
+                                        <DataGridTextColumn Header="Situation" Binding="{Binding Situation}"
+                                                            IsReadOnly="True" Width="2*" MinWidth="150"
+                                                            ElementStyle="{StaticResource CellTextStyle}"/>
+                                    </DataGrid.Columns>
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow" BasedOn="{StaticResource GridRowStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ASignaler}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                </DataGrid>
+
+                                <TextBlock Text="{Binding DataContext.DecompteLibelle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           TextWrapping="Wrap" FontSize="11.5" Margin="0,0,0,8"
+                                           Foreground="{StaticResource InkMutedBrush}"/>
+
+                                <Button Content="Reprendre ce décompte sur la fiche" HorizontalAlignment="Left" Margin="0,0,0,4"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        ToolTip="Recopie le décompte dans le nombre de charges qui commande la réduction d'IUTS. Rien n'est modifié sans ce geste."
+                                        Visibility="{Binding DataContext.DecompteDiffere, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        Command="{Binding DataContext.ReprendreDecompteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                            </StackPanel>
 
                             <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,8,0,14"/>
 
                             <TextBlock Text="RÉMUNÉRATION" Style="{StaticResource SectionLabelStyle}"
                                        Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <!-- Alerte non-conformité salaire minimum conventionnel -->
+                            <Border Background="#FEF2F2" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="3"
+                                    Padding="10,6" Margin="0,0,0,10"
+                                    Visibility="{Binding DataContext.EstNonConformeSalaireMinimum, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="{Binding DataContext.MessageConformiteSalaireMinimum, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           TextWrapping="Wrap" FontSize="11.5" Foreground="#B91C1C"/>
+                            </Border>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>

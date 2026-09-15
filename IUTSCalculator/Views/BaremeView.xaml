@@ -1,0 +1,436 @@
+<UserControl x:Class="IUTSCalculator.Views.BaremeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:BaremeViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,0,0,10"/>
+        </Style>
+        <Style x:Key="RateBox" TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Barèmes légaux" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}">
+                    <Run Text="{Binding NombreBaremes, Mode=OneWay}"/>
+                    <Run Text="jeu(x) de paramètres datés — un bulletin se recalcule toujours avec le barème en vigueur à sa période"/>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Recharger" Tag="{StaticResource IconRefresh}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding RechargerCommand}"/>
+                <Button Content="Nouveau barème" Tag="{StaticResource IconAdd}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}"
+                        ToolTip="Duplique le barème sélectionné vers une nouvelle date d'effet."
+                        Command="{Binding DupliquerCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="360"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- ───── Liste datée des barèmes ───── -->
+            <Border Grid.Column="0" Grid.Row="0" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Padding="16,12">
+                        <TextBlock Text="HISTORIQUE DES BARÈMES" HorizontalAlignment="Left"
+                                   Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                    </Border>
+
+                    <DataGrid ItemsSource="{Binding Baremes}"
+                              SelectedItem="{Binding BaremeSelectionne}"
+                              Style="{StaticResource FormDataGridStyle}"
+                              Margin="0" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Date d'effet"
+                                                Binding="{Binding DateEffet, StringFormat=dd/MM/yyyy}"
+                                                Width="100" MinWidth="90"
+                                                ElementStyle="{StaticResource CenterTextStyle}"
+                                                HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Libellé" Binding="{Binding Libelle}"
+                                                Width="*" MinWidth="120"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="CNSS sal."
+                                                Binding="{Binding TauxCnssSalarie, Converter={StaticResource PourcentageConverter}, Mode=OneWay}"
+                                                Width="80" MinWidth="75"
+                                                ElementStyle="{StaticResource CenterTextStyle}"
+                                                HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Tranches" Binding="{Binding NombreTranches}"
+                                                Width="70" MinWidth="65"
+                                                ElementStyle="{StaticResource CenterTextStyle}"
+                                                HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <!-- ───── Vérification : quel barème pour quelle période ? ───── -->
+            <Border Grid.Column="0" Grid.Row="1" Style="{StaticResource CardBorderStyle}"
+                    Margin="0,16,0,0" Padding="16,14">
+                <StackPanel>
+                    <TextBlock Text="BARÈME APPLIQUÉ À UNE PÉRIODE"
+                               Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,10"/>
+                    <DatePicker Style="{StaticResource FormDatePickerStyle}" Margin="0,0,0,8"
+                                SelectedDate="{Binding PeriodeTest, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="{Binding BaremeApplicableLibelle}" TextWrapping="Wrap"
+                               FontSize="12" Foreground="{StaticResource InkMutedBrush}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ───── Fiche du barème ───── -->
+            <Border Grid.Column="2" Grid.Row="0" Grid.RowSpan="2"
+                    Style="{StaticResource CardBorderStyle}" Padding="0">
+                <DockPanel>
+
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Padding="16,12">
+                        <Grid>
+                            <TextBlock Text="BARÈME" HorizontalAlignment="Left"
+                                       Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                            <TextBlock HorizontalAlignment="Right" FontSize="11"
+                                       Foreground="{StaticResource WarningBrush}"
+                                       Text="Barème livré : préférez la duplication à la correction"
+                                       Visibility="{Binding EstBaremeSysteme, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                    </Border>
+
+                    <Border DockPanel.Dock="Bottom"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
+                            Padding="16,12"
+                            Visibility="{Binding ALaFiche, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Enregistrer" Width="140"
+                                    Style="{StaticResource MenuButtonStyle}"
+                                    Command="{Binding EnregistrerCommand}"/>
+                            <Button Content="Annuler"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding AnnulerCommand}"/>
+                            <Button Content="Supprimer" Margin="0"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Command="{Binding SupprimerCommand}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- État vide -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                                Visibility="{Binding ALaFiche, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                        <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                                   Foreground="{StaticResource RuleStrongBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Aucun barème sélectionné" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkMutedBrush}"
+                                   HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                        <TextBlock Text="Choisissez un barème dans l'historique, ou dupliquez-en un vers une nouvelle date d'effet."
+                                   FontSize="12" Foreground="{StaticResource InkSubtleBrush}"
+                                   HorizontalAlignment="Center" Margin="0,4,0,0"
+                                   TextWrapping="Wrap" MaxWidth="280" TextAlignment="Center"/>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14"
+                                  Visibility="{Binding ALaFiche, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel DataContext="{Binding FicheCourante}">
+
+                            <!-- ══ Identification ══ -->
+                            <TextBlock Text="IDENTIFICATION" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Date d'effet" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="0" Grid.Column="1" Margin="0,0,0,10" HorizontalAlignment="Left" Width="180"
+                                            Style="{StaticResource FormDatePickerStyle}"
+                                            ToolTip="Premier jour à partir duquel ces paramètres s'appliquent."
+                                            SelectedDate="{Binding DateEffet, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Libellé" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding Libelle, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Référence légale" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           ToolTip="Loi de finances, arrêté ou décret dont ces valeurs sont tirées."
+                                           Text="{Binding Reference, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Commentaire" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Top" Margin="0,6,0,0"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           AcceptsReturn="True" TextWrapping="Wrap" Height="54"
+                                           VerticalScrollBarVisibility="Auto"
+                                           Text="{Binding Commentaire, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,10,0,14"/>
+
+                            <!-- ══ Tranches de l'IUTS ══ -->
+                            <Grid Margin="0,0,0,10">
+                                <TextBlock Text="TRANCHES DE L'IUTS" HorizontalAlignment="Left"
+                                           Style="{StaticResource SectionLabelStyle}"
+                                           Foreground="{StaticResource AccentBrush2}" Margin="0"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Ajouter une tranche"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding DataContext.AjouterTrancheCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    <Button Content="Supprimer" Margin="0"
+                                            Style="{StaticResource DangerButtonStyle}"
+                                            Command="{Binding DataContext.SupprimerTrancheCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8"
+                                       Foreground="{StaticResource InkSubtleBrush}"
+                                       Text="Les bornes doivent se toucher : la borne inférieure d'une tranche est exactement la borne supérieure de la précédente. Laisser la borne supérieure vide signifie « et au-delà »."/>
+
+                            <DataGrid ItemsSource="{Binding Tranches}"
+                                      SelectedItem="{Binding DataContext.TrancheSelectionnee, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                      Style="{StaticResource FormDataGridStyle}"
+                                      IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                      MaxHeight="260" Margin="0,0,0,4">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="#" Binding="{Binding Ordre}"
+                                                        IsReadOnly="True" Width="44"
+                                                        ElementStyle="{StaticResource CenterTextStyle}"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                                    <DataGridTextColumn Header="De (FCFA)"
+                                                        Binding="{Binding BorneInferieure, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                                        IsReadOnly="True" Width="*" MinWidth="110"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                                    <DataGridTextColumn Header="À (FCFA)"
+                                                        Binding="{Binding BorneSuperieureSaisie, UpdateSourceTrigger=LostFocus}"
+                                                        Width="*" MinWidth="110"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                                    <DataGridTextColumn Header="Taux (%)"
+                                                        Binding="{Binding Taux, StringFormat=N2, ConverterCulture=fr-FR, UpdateSourceTrigger=LostFocus}"
+                                                        Width="100" MinWidth="90"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,14,0,14"/>
+
+                            <!-- ══ Cotisations sociales ══ -->
+                            <TextBlock Text="COTISATIONS SOCIALES (CNSS)" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Part salariale — pensions" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxCnssSalarie, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Part patronale — prestations familiales" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxCnssPrestationsFamiliales, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Part patronale — risques professionnels" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxCnssRisquesProfessionnels, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Part patronale — pensions" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxCnssPensionsPatronal, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Total patronal" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,10"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"
+                                           Text="{Binding TauxCnssEmployeurTotal, Converter={StaticResource PourcentageConverter}, Mode=OneWay}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource Hint}">
+                                    <Run Text="soit"/>
+                                    <Run Text="{Binding TauxCnssGlobal, Converter={StaticResource PourcentageConverter}, Mode=OneWay}"/>
+                                    <Run Text="au total, parts salariale et patronale réunies"/>
+                                </TextBlock>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Plafond mensuel de l'assiette" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="5" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding PlafondCnssMensuel, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="5" Grid.Column="2" Text="FCFA" Style="{StaticResource Hint}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,10,0,14"/>
+
+                            <!-- ══ Exonérations d'indemnités ══ -->
+                            <TextBlock Text="EXONÉRATIONS D'INDEMNITÉS (ART. 106 DU CGI)" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="% DU BRUT" HorizontalAlignment="Right"
+                                           Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6"/>
+                                <TextBlock Grid.Row="0" Grid.Column="3" Text="PLAFOND FCFA" HorizontalAlignment="Right"
+                                           Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Indemnité de logement" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxMaxIndemniteLogement, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="3" Style="{StaticResource RateBox}"
+                                           Text="{Binding PlafondIndemniteLogement, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Indemnité de transport" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxMaxIndemniteTransport, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBox   Grid.Row="2" Grid.Column="3" Style="{StaticResource RateBox}"
+                                           Text="{Binding PlafondIndemniteTransport, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Indemnité de fonction" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxMaxIndemniteFonction, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="3" Style="{StaticResource RateBox}"
+                                           Text="{Binding PlafondIndemniteFonction, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,10,0,14"/>
+
+                            <!-- ══ Abattements, TPA et charges de famille ══ -->
+                            <TextBlock Text="ABATTEMENTS ET AUTRES TAUX" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Abattement — catégories supérieures" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding AbattementCategoriesSuperieures, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Abattement — autres catégories" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding AbattementAutresCategories, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Cotisation retraite déductible" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxMaxCotisationRetraiteDeductible, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="part maximale déductible de la base imposable"
+                                           Style="{StaticResource Hint}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Taxe patronale d'apprentissage" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Style="{StaticResource RateBox}"
+                                           Text="{Binding TauxTaxePatronaleApprentissage, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="assise sur la masse salariale"
+                                           Style="{StaticResource Hint}"/>
+                            </Grid>
+
+                            <TextBlock Text="RÉDUCTIONS POUR CHARGES DE FAMILLE (ART. 113 DU CGI)"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,6,0,10"/>
+
+                            <DataGrid ItemsSource="{Binding ChargesFamille}"
+                                      Style="{StaticResource FormDataGridStyle}"
+                                      IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                      MaxHeight="240" Margin="0,0,0,4">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Personnes à charge" Binding="{Binding NombreCharges}"
+                                                        IsReadOnly="True" Width="*" MinWidth="140"
+                                                        ElementStyle="{StaticResource CenterTextStyle}"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                                    <DataGridTextColumn Header="Réduction de l'IUTS"
+                                                        Binding="{Binding Taux, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"
+                                                        Width="*" MinWidth="140"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{StaticResource RuleBrush}"
+                Margin="0,14,0,0" Padding="0,10,0,0">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                       Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+        </Border>
+    </Grid>
+</UserControl>

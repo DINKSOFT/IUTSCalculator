@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using IUTSCalculator.Models;
@@ -23,6 +24,15 @@ namespace IUTSCalculator.ViewModels
         private readonly TaxCalculatorService _taxCalculatorService;
         public ObservableCollection<string> EmployeeCategories => _dataService.EmployeeCategories;
         private readonly DataService _dataService;
+
+        // Variables du mois (PAI-02), absences (PAI-04) et prêts (PAI-05). Facultatifs :
+        // sans eux, le calcul mensuel est celui d'avant ces modules.
+        private readonly VariablePaieService _variablePaieService;
+        private readonly RubriqueService _rubriqueService;
+        private readonly AbsenceService _absenceService;
+        private readonly PretService _pretService;
+        private readonly ProfilPaieService _profilPaieService;
+        private readonly BaremeService _baremeService;
         private Employee _currentEmployee;
         private TaxCalculation _currentCalculation;
         private string _resultMessage;
@@ -35,6 +45,49 @@ namespace IUTSCalculator.ViewModels
         /// Événement déclenché lorsqu'un calcul est terminé
         /// </summary>
         public event EventHandler CalculationCompleted;
+
+        /// <summary>
+        /// Période traitée. Un calcul de paie appartient à un mois : c'est de lui que
+        /// dépendent les variables et les absences prises en compte, et c'est sous lui
+        /// que le calcul est enregistré. Le moteur datait jusqu'ici du jour où il
+        /// tournait, si bien qu'un calcul de septembre fait en octobre était déclaré
+        /// en octobre.
+        /// </summary>
+        private int _annee = DateTime.Today.Year;
+        public int Annee
+        {
+            get => _annee;
+            set
+            {
+                if (SetProperty(ref _annee, value))
+                    OnPropertyChanged(nameof(PeriodeLibelle));
+            }
+        }
+
+        private MoisOption _moisSelectionne =
+            MoisOption.Tous.FirstOrDefault(m => m.Numero == DateTime.Today.Month);
+        public MoisOption MoisSelectionne
+        {
+            get => _moisSelectionne;
+            set
+            {
+                if (SetProperty(ref _moisSelectionne, value))
+                    OnPropertyChanged(nameof(PeriodeLibelle));
+            }
+        }
+
+        public System.Collections.Generic.IEnumerable<MoisOption> MoisDisponibles => MoisOption.Tous;
+
+        public System.Collections.Generic.IEnumerable<int> AnneesDisponibles =>
+            Enumerable.Range(DateTime.Today.Year - 5, 7).ToList();
+
+        public int Mois => MoisSelectionne != null ? MoisSelectionne.Numero : DateTime.Today.Month;
+
+        /// <summary>Dernier jour du mois traité : la date sous laquelle le calcul est enregistré.</summary>
+        public DateTime PeriodeDate => new DateTime(Annee, Mois, 1).AddMonths(1).AddDays(-1);
+
+        public string PeriodeLibelle =>
+            new DateTime(Annee, Mois, 1).ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"));
 
         /// <summary>
         /// Employé actuellement sélectionné ou créé
@@ -146,10 +199,24 @@ namespace IUTSCalculator.ViewModels
         /// </summary>
         /// <param name="taxCalculatorService">Service de calcul d'impôt</param>
         /// <param name="dataService">Service de données</param>
-        public CalculationViewModel(TaxCalculatorService taxCalculatorService, DataService dataService)
+        public CalculationViewModel(
+            TaxCalculatorService taxCalculatorService,
+            DataService dataService,
+            VariablePaieService variablePaieService = null,
+            RubriqueService rubriqueService = null,
+            AbsenceService absenceService = null,
+            PretService pretService = null,
+            ProfilPaieService profilPaieService = null,
+            BaremeService baremeService = null)
         {
             _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
+            _variablePaieService = variablePaieService;
+            _rubriqueService = rubriqueService;
+            _absenceService = absenceService;
+            _pretService = pretService;
+            _profilPaieService = profilPaieService;
+            _baremeService = baremeService;
 
             Title = "Calcul d'IUTS";
 
@@ -217,7 +284,7 @@ namespace IUTSCalculator.ViewModels
             {
                 Id = Guid.NewGuid().ToString(),
                 Employee = CurrentEmployee,
-                CalculationDate = DateTime.Now,
+                CalculationDate = PeriodeDate,
                 IsAnnual = IsAnnual,
                 IsRegularization = IsRegularization
             };
@@ -369,24 +436,52 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 ResultMessage = "Calcul en cours...";
 
-                // Calculer l'impôt via le service
-                var result = _taxCalculatorService.CalculateTax(CurrentEmployee, IsAnnual, IsRegularization, PreviousTaxPaid);
+                TaxCalculation result;
+                string mentionApport = string.Empty;
 
-                // Mettre à jour le calcul courant avec les résultats
-                CurrentCalculation.SalaireBrut = result.SalaireBrut;
-                CurrentCalculation.BaseIUTSHorsDeduction = result.BaseIUTSHorsDeduction;
-                CurrentCalculation.IUTSNet = result.IUTSNet;
-                CurrentCalculation.TaxRate = result.TaxRate;
-                CurrentCalculation.FamilyChargeReduction = result.FamilyChargeReduction;
-                CurrentCalculation.ExemptAmount = result.ExemptAmount;
-                CurrentCalculation.CalculationDetails = result.CalculationDetails;
+                if (IsAnnual || IsRegularization)
+                {
+                    // Calcul annuel ou régularisation : ce n'est pas la paie d'un mois,
+                    // les variables et absences mensuelles n'y ont pas leur place.
+                    result = _taxCalculatorService.CalculateTax(
+                        CurrentEmployee, IsAnnual, IsRegularization, PreviousTaxPaid);
+                }
+                else
+                {
+                    // Paie du mois : mêmes entrées que le bulletin — variables saisies et
+                    // absences de la période. Sans cet apport, cet écran et le bulletin
+                    // donnaient deux résultats différents pour le même salarié.
+                    var apport = await ChargerApportDuMoisAsync(CurrentEmployee);
+                    result = _taxCalculatorService.CalculateMonthlyTax(CurrentEmployee, apport);
+
+                    if (!apport.EstVide)
+                    {
+                        mentionApport = apport.RetenueSurBrut > 0m
+                            ? " (variables et absences du mois prises en compte)"
+                            : " (variables du mois prises en compte)";
+                    }
+                }
+
+                // Le résultat complet REMPLACE le calcul courant. Recopier sept champs sur
+                // vingt-cinq laissait les cotisations CNSS, l'assiette et la taxe patronale
+                // à zéro : le calcul partait ainsi vide dans l'historique, et la déclaration
+                // CNSS n'avait rien à déclarer.
+                result.Id = CurrentCalculation != null && !string.IsNullOrEmpty(CurrentCalculation.Id)
+                    ? CurrentCalculation.Id
+                    : Guid.NewGuid().ToString();
+                result.Employee = CurrentEmployee;
+                result.IsAnnual = IsAnnual;
+                result.IsRegularization = IsRegularization;
+                result.CalculationDate = PeriodeDate;
 
                 if (IsRegularization)
                 {
-                    CurrentCalculation.TaxDifference = result.IUTSNet - PreviousTaxPaid;
+                    result.TaxDifference = result.IUTSNet - PreviousTaxPaid;
                 }
 
-                ResultMessage = $"Impôt calculé: {result.IUTSNet:N0} FCFA";
+                CurrentCalculation = result;
+
+                ResultMessage = $"Impôt calculé pour {PeriodeLibelle} : {result.IUTSNet:N0} FCFA{mentionApport}";
 
                 // Déclencher l'événement de calcul terminé
                 CalculationCompleted?.Invoke(this, EventArgs.Empty);
@@ -414,13 +509,21 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 ResultMessage = "Sauvegarde du calcul...";
 
-                // Mettre à jour la date de calcul
-                CurrentCalculation.CalculationDate = DateTime.Now;
-
-                // Sauvegarder via le service de données
-                await _dataService.AddCalculationToHistoryAsync(CurrentCalculation);
-
-                ResultMessage = "Calcul sauvegardé avec succès";
+                if (IsAnnual || IsRegularization)
+                {
+                    // Un calcul annuel ou une régularisation n'est pas la paie d'un mois :
+                    // il s'ajoute à l'historique sans en remplacer aucun.
+                    CurrentCalculation.CalculationDate = PeriodeDate;
+                    await _dataService.AddCalculationToHistoryAsync(CurrentCalculation);
+                    ResultMessage = $"Calcul enregistré sous {PeriodeLibelle}.";
+                }
+                else
+                {
+                    // Paie du mois : elle remplace celle du même salarié pour le même mois.
+                    // Sans ce remplacement, enregistrer deux fois déclarerait deux salaires.
+                    await _dataService.EnregistrerBulletinDuMoisAsync(CurrentCalculation, PeriodeDate);
+                    ResultMessage = $"Paie de {PeriodeLibelle} enregistrée pour ce salarié.";
+                }
             }
             catch (Exception ex)
             {
@@ -430,6 +533,103 @@ namespace IUTSCalculator.ViewModels
             {
                 IsBusy = false;
             }
+        }
+
+        /// <summary>
+        /// Variables et absences du mois pour ce salarié, réunies en un seul apport.
+        /// Silencieux en cas d'échec : un calcul sans ses variables vaut mieux qu'un
+        /// écran qui refuse de calculer, et le message le signale.
+        /// </summary>
+        private async Task<ApportVariables> ChargerApportDuMoisAsync(Employee salarie)
+        {
+            // Barème daté applicable à la période (module DEC-02 sur le socle SOC-02) :
+            // les taux CNSS et TPA du moteur suivent désormais la période calculée, plutôt
+            // que de rester figés aux valeurs historiques. Un dossier qui n'a jamais créé
+            // de barème personnalisé n'y voit aucun changement.
+            if (_baremeService != null)
+            {
+                try
+                {
+                    var bareme = await _baremeService.BaremeApplicableAsync(new DateTime(Annee, Mois, 1));
+                    _taxCalculatorService.AppliquerBareme(bareme);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Barème illisible, calcul avec les valeurs historiques : " + ex.Message;
+                    _taxCalculatorService.AppliquerBareme(null);
+                }
+            }
+
+            var apport = ApportVariables.Aucun();
+
+            if (salarie == null || string.IsNullOrWhiteSpace(salarie.EmployeeId))
+                return apport;
+
+            if (_variablePaieService != null && _rubriqueService != null)
+            {
+                try
+                {
+                    var plan = await _rubriqueService.ChargerAsync();
+                    apport = await _variablePaieService.ApportAsync(Annee, Mois, salarie.EmployeeId, plan);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Variables du mois illisibles, calcul sans elles : " + ex.Message;
+                }
+            }
+
+            if (_absenceService != null)
+            {
+                try
+                {
+                    var reglages = await _dataService.LoadSettingsAsync();
+                    var baseRetenue = reglages != null
+                        ? reglages.BaseRetenueAbsence
+                        : BaseRetenueAbsence.TrentiemeMensuel;
+
+                    var absences = await _absenceService.ApportAsync(salarie, Annee, Mois, baseRetenue);
+                    apport = apport.AvecAbsences(absences);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Absences illisibles, calcul sans elles : " + ex.Message;
+                }
+            }
+
+            // Prêts, avances et acomptes (PAI-05) : retenue sur le net, comme sur le
+            // bulletin. Les quatre écrans qui produisent la paie prennent les mêmes
+            // entrées — sans quoi deux d'entre eux donneraient deux nets pour le même
+            // salarié et le même mois.
+            if (_pretService != null)
+            {
+                try
+                {
+                    var prets = await _pretService.ApportAsync(salarie.EmployeeId, Annee, Mois);
+                    apport = apport.AvecPrets(prets);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Prêts illisibles, calcul sans retenue de remboursement : " + ex.Message;
+                }
+            }
+
+            // Profil de paie (SOC-03), appliqué en dernier : une rubrique déjà saisie dans
+            // les variables du mois écarte celle du profil.
+            if (_profilPaieService != null && _rubriqueService != null)
+            {
+                try
+                {
+                    var plan = await _rubriqueService.ChargerAsync();
+                    var profil = await _profilPaieService.ApportAsync(salarie, Annee, Mois, plan);
+                    apport = apport.AvecProfil(profil);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Profil de paie illisible, calcul sans lui : " + ex.Message;
+                }
+            }
+
+            return apport;
         }
 
         /// <summary>
@@ -461,7 +661,7 @@ namespace IUTSCalculator.ViewModels
                 {
                     Id = Guid.NewGuid().ToString(),
                     Employee = CurrentEmployee,
-                    CalculationDate = DateTime.Now,
+                    CalculationDate = PeriodeDate,
                     IsAnnual = IsAnnual,
                     IsRegularization = IsRegularization
                 };
@@ -493,7 +693,7 @@ namespace IUTSCalculator.ViewModels
                     {
                         Id = Guid.NewGuid().ToString(),
                         Employee = CurrentEmployee,
-                        CalculationDate = DateTime.Now,
+                        CalculationDate = PeriodeDate,
                         IsAnnual = IsAnnual,
                         IsRegularization = IsRegularization
                     };

@@ -1,0 +1,296 @@
+<UserControl x:Class="IUTSCalculator.Views.PeriodePaieView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:PeriodePaieViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="TotalLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource InkMutedBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="TotalValeur" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Périodes de paie" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}">
+                    <Run Text="{Binding NombrePeriodesOuvertes, Mode=OneWay}"/>
+                    <Run Text="ouverte(s) ·"/>
+                    <Run Text="{Binding NombrePeriodesCloturees, Mode=OneWay}"/>
+                    <Run Text="clôturée(s) — clôturer un mois fige ses totaux et verrouille ses bulletins"/>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <ComboBox Width="120" Margin="0,0,8,0" VerticalAlignment="Center"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding MoisDisponibles}"
+                          DisplayMemberPath="Nom"
+                          SelectedItem="{Binding MoisAOuvrir}"/>
+                <ComboBox Width="84" Margin="0,0,8,0" VerticalAlignment="Center"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding AnneesDisponibles}"
+                          SelectedItem="{Binding AnneeAOuvrir}"/>
+                <Button Content="Recharger" Tag="{StaticResource IconRefresh}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding RechargerCommand}"/>
+                <Button Content="Ouvrir la période" Tag="{StaticResource IconAdd}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}"
+                        Command="{Binding OuvrirPeriodeCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="420"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ───── Historique des périodes ───── -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <DataGrid ItemsSource="{Binding Periodes}"
+                          SelectedItem="{Binding PeriodeSelectionnee}"
+                          Style="{StaticResource FormDataGridStyle}"
+                          Margin="0" BorderThickness="0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Période" Binding="{Binding Designation}"
+                                            Width="140" MinWidth="120"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+                        <DataGridTextColumn Header="Statut" Binding="{Binding StatutLibelle}"
+                                            Width="100" MinWidth="90"
+                                            ElementStyle="{StaticResource CenterTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                        <DataGridTextColumn Header="Bulletins" Binding="{Binding NombreBulletins}"
+                                            Width="85" MinWidth="80"
+                                            ElementStyle="{StaticResource CenterTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                        <DataGridTextColumn Header="Brut"
+                                            Binding="{Binding TotalBrut, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                            Width="*" MinWidth="110"
+                                            ElementStyle="{StaticResource MoneyTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                        <DataGridTextColumn Header="IUTS"
+                                            Binding="{Binding TotalIuts, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                            Width="*" MinWidth="110"
+                                            ElementStyle="{StaticResource MoneyTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                        <DataGridTextColumn Header="CNSS totale"
+                                            Binding="{Binding TotalCnss, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                            Width="*" MinWidth="110"
+                                            ElementStyle="{StaticResource MoneyTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                        <DataGridTextColumn Header="Net à payer"
+                                            Binding="{Binding TotalNetAPayer, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                            Width="*" MinWidth="110"
+                                            ElementStyle="{StaticResource MoneyTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                        <DataGridTextColumn Header="Clôturée le" Binding="{Binding DateCloture, StringFormat=dd/MM/yyyy}"
+                                            Width="110" MinWidth="100"
+                                            ElementStyle="{StaticResource CenterTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- ───── Fiche de la période ───── -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <DockPanel>
+
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Padding="16,12">
+                        <Grid>
+                            <TextBlock Text="PÉRIODE" HorizontalAlignment="Left"
+                                       Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                            <TextBlock HorizontalAlignment="Right" FontSize="11" FontWeight="SemiBold"
+                                       Text="{Binding PeriodeSelectionnee.StatutLibelle}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding PeriodeSelectionnee.EstCloturee}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+
+                    <!-- État vide -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                                Visibility="{Binding ALaFiche, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                        <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                                   Foreground="{StaticResource RuleStrongBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Aucune période sélectionnée" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkMutedBrush}"
+                                   HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                        <TextBlock Text="Choisissez un mois dans l'historique, ou ouvrez une nouvelle période en haut à droite."
+                                   FontSize="12" Foreground="{StaticResource InkSubtleBrush}"
+                                   HorizontalAlignment="Center" Margin="0,4,0,0"
+                                   TextWrapping="Wrap" MaxWidth="280" TextAlignment="Center"/>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14"
+                                  Visibility="{Binding ALaFiche, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+
+                            <TextBlock Text="{Binding PeriodeSelectionnee.Designation}"
+                                       FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkBrush}" Margin="0,0,0,2"/>
+                            <TextBlock Text="{Binding PeriodeSelectionnee.DateClotureLibelle}"
+                                       FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
+                                       Margin="0,0,0,14"/>
+
+                            <!-- ══ Totaux ══ -->
+                            <TextBlock Text="TOTAUX DE LA PÉRIODE" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Bulletins calculés" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.NombreBulletins}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Salaire brut" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.TotalBrut, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="IUTS retenu" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.TotalIuts, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="CNSS part salariale" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.TotalCnssSalarie, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="CNSS part patronale" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.TotalCnssPatronal, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Taxe patronale" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.TotalTaxePatronale, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Net à payer" Style="{StaticResource TotalLabel}"/>
+                                <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Text="{Binding PeriodeSelectionnee.TotalNetAPayer, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+
+                                <TextBlock Grid.Row="7" Grid.Column="0" Text="Coût total employeur" Style="{StaticResource TotalLabel}"
+                                           FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
+                                <TextBlock Grid.Row="7" Grid.Column="1" Style="{StaticResource TotalValeur}"
+                                           Foreground="{StaticResource AccentBrush2}"
+                                           Text="{Binding PeriodeSelectionnee.CoutTotalEmployeur, Converter={StaticResource MontantConverter}, Mode=OneWay}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,8,0,14"/>
+
+                            <!-- ══ Actions ══ -->
+                            <TextBlock Text="CLÔTURE" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <!-- Période ouverte -->
+                            <StackPanel Visibility="{Binding PeriodeSelectionnee.EstOuverte, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,10"
+                                           Foreground="{StaticResource InkSubtleBrush}"
+                                           Text="Clôturer arrête les totaux ci-dessus et les fige. Aucun bulletin de ce mois ne pourra plus être enregistré tant que la période n'est pas rouverte."/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button Content="Recalculer les totaux"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding RafraichirTotauxCommand}"/>
+                                    <Button Content="Clôturer la période" Margin="0"
+                                            Style="{StaticResource MenuButtonStyle}"
+                                            Command="{Binding CloturerCommand}"/>
+                                </StackPanel>
+                                <Button Content="Supprimer cette période" HorizontalAlignment="Left" Margin="0"
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        Command="{Binding SupprimerCommand}"/>
+                            </StackPanel>
+
+                            <!-- Période clôturée -->
+                            <StackPanel Visibility="{Binding ConfirmationDemandee, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,6"
+                                           Foreground="{StaticResource InkSubtleBrush}">
+                                    <Run Text="Clôturée par"/>
+                                    <Run Text="{Binding PeriodeSelectionnee.ClotureePar, Mode=OneWay}" FontWeight="SemiBold"/>
+                                    <Run Text=". Rouvrir la période déverrouille ses bulletins : indiquez le motif, il restera dans l'historique de la période."/>
+                                </TextBlock>
+                                <TextBox Margin="0,0,0,8"
+                                         Style="{StaticResource FormTextBoxStyle}"
+                                         Text="{Binding MotifReouverture, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Motif de la réouverture — obligatoire."/>
+                                <Button Content="Rouvrir la période" HorizontalAlignment="Left" Margin="0"
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        Command="{Binding RouvrirCommand}"/>
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,14,0,14"/>
+
+                            <!-- ══ Commentaire ══ -->
+                            <TextBlock Text="HISTORIQUE DE LA PÉRIODE" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <TextBox Margin="0,0,0,8" Height="90"
+                                     Style="{StaticResource FormTextBoxStyle}"
+                                     AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Text="{Binding PeriodeSelectionnee.Commentaire, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Button Content="Enregistrer le commentaire" HorizontalAlignment="Left" Margin="0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding EnregistrerCommentaireCommand}"/>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{StaticResource RuleBrush}"
+                Margin="0,14,0,0" Padding="0,10,0,0">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                       Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+        </Border>
+    </Grid>
+</UserControl>

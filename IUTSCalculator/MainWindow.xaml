@@ -17,6 +17,10 @@
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen">
 
+    <Window.InputBindings>
+        <KeyBinding Modifiers="Control" Key="B" Command="{Binding ToggleNavRailCommand}"/>
+    </Window.InputBindings>
+
     <Window.Resources>
         <ResourceDictionary>
             <!-- Association ViewModel → Vue -->
@@ -47,38 +51,232 @@
             <DataTemplate DataType="{x:Type viewModels:EmployeeManagementViewModel}">
                 <views:EmployeeManagementView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type viewModels:RubriqueViewModel}">
+                <views:RubriqueView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:BaremeViewModel}">
+                <views:BaremeView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:PeriodePaieViewModel}">
+                <views:PeriodePaieView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:DeclarationCnssViewModel}">
+                <views:DeclarationCnssView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:DeclarationIutsTpaViewModel}">
+                <views:DeclarationIutsTpaView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:LivrePaieViewModel}">
+                <views:LivrePaieView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:EcriturePaieViewModel}">
+                <views:EcriturePaieView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:OrdreVirementViewModel}">
+                <views:OrdreVirementView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:ControleEquivalenceViewModel}">
+                <views:ControleEquivalenceView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:AbsenceViewModel}">
+                <views:AbsenceView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:PretViewModel}">
+                <views:PretView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:ProfilPaieViewModel}">
+                <views:ProfilPaieView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:VariablePaieViewModel}">
+                <views:VariablePaieView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:AuditViewModel}">
+                <views:AuditView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:HeuresSupplementairesViewModel}">
+                <views:HeuresSupplementairesView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:ConventionCollectiveViewModel}">
+                <views:ConventionCollectiveView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:SoldeToutCompteViewModel}">
+                <views:SoldeToutCompteView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:SaisieOppositionViewModel}">
+                <views:SaisieOppositionView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:RappelPaieViewModel}">
+                <views:RappelPaieView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:AvantageNatureViewModel}">
+                <views:AvantageNatureView />
+            </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="234"/>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- ═══════════════════════════════════════════════════════════════════
              RAIL DE NAVIGATION
-             Les neuf boutons de l'ancienne barre d'outils, regroupés par
-             domaine. L'écran courant se signale tout seul : chaque bouton se
-             compare au titre du ViewModel affiché.
+             Les boutons du menu latéral, regroupés par domaine.
+             Peut être masqué pour libérer de l'espace sur petits écrans.
              ═══════════════════════════════════════════════════════════════════ -->
-        <Border Grid.Column="0" Background="{StaticResource RailBrush}">
+        <Border Grid.Column="0"
+                Width="234"
+                Background="{StaticResource RailBrush}"
+                Visibility="{Binding IsNavRailVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <DockPanel>
 
-                <!-- Marque -->
+                <!-- Marque et bouton de masquage -->
                 <Border DockPanel.Dock="Top" Height="64"
                         BorderBrush="{StaticResource RailBorderBrush}" BorderThickness="0,0,0,1">
-                    <StackPanel VerticalAlignment="Center" Margin="18,0">
-                        <TextBlock Text="Sigma" FontSize="17" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="PAIE &amp; RH" FontSize="10" FontWeight="SemiBold"
+                    <Grid Margin="18,0,12,0">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left">
+                            <TextBlock Text="Sigma" FontSize="17" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="PAIE &amp; RH" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{StaticResource RailTextDimBrush}" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <Button Style="{StaticResource RailIconButtonStyle}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Tag="{StaticResource IconCollapseLeft}"
+                                ToolTip="Masquer le menu latéral (Ctrl+B)"
+                                Command="{Binding ToggleNavRailCommand}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Barre de recherche du menu latéral -->
+                <Border DockPanel.Dock="Top"
+                        Margin="10,10,10,6">
+                    <StackPanel>
+                        <!-- Champ de recherche stylé aux couleurs du rail -->
+                        <Border Background="#141D1F"
+                                BorderBrush="{StaticResource RailBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Height="32">
+                            <Grid Margin="8,0,6,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Icône loupe -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{StaticResource IconSearch}"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="12"
+                                           Foreground="{StaticResource RailTextDimBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,6,0"/>
+
+                                <!-- Placeholder / Hint -->
+                                <TextBlock Grid.Column="1"
+                                           Text="Rechercher... (Ctrl+F)"
+                                           Foreground="{StaticResource RailTextDimBrush}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="2,0,0,0"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasNavMenuSearchText}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Zone de saisie -->
+                                <TextBox x:Name="NavMenuSearchBox"
+                                         Grid.Column="1"
+                                         Text="{Binding NavMenuSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="Transparent"
+                                         Foreground="White"
+                                         BorderThickness="0"
+                                         FontSize="12"
+                                         VerticalAlignment="Center"
+                                         CaretBrush="White">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding NavigateToFirstNavMatchCommand}"/>
+                                        <KeyBinding Key="Escape" Command="{Binding ClearNavMenuSearchCommand}"/>
+                                    </TextBox.InputBindings>
+                                </TextBox>
+
+                                <!-- Bouton Effacer (X) -->
+                                <Button Grid.Column="2"
+                                        Command="{Binding ClearNavMenuSearchCommand}"
+                                        Tag="{StaticResource IconClear}"
+                                        Width="22" Height="22"
+                                        ToolTip="Effacer la recherche (Échap)"
+                                        Margin="2,0,0,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource RailIconButtonStyle}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasNavMenuSearchText}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- Indicateur du nombre de résultats trouvés quand une recherche est active -->
+                        <TextBlock Text="{Binding NavMenuMatchCountText}"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource RailTextDimBrush}"
+                                   Margin="6,4,6,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasNavMenuSearchText}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </Border>
 
                 <!-- Paramètres, détaché du reste -->
                 <Border DockPanel.Dock="Bottom"
                         BorderBrush="{StaticResource RailBorderBrush}" BorderThickness="0,1,0,0"
-                        Padding="10,8,10,12">
+                        Padding="10,8,10,12"
+                        Visibility="{Binding IsNavSettingsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Button Tag="{StaticResource IconSettings}" Content="Paramètres"
                             Command="{Binding NavigateToSettingsCommand}">
                         <Button.Style>
@@ -99,10 +297,12 @@
                     <StackPanel Margin="10,4,10,12">
 
                         <!-- ───── PAIE ───── -->
-                        <TextBlock Text="PAIE" Style="{StaticResource NavGroupHeaderStyle}"/>
+                        <TextBlock Text="PAIE" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupPaieVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <Button Tag="{StaticResource IconPdf}" Content="Bulletin de paie"
-                                Command="{Binding NavigateToBulletinCommand}">
+                                Command="{Binding NavigateToBulletinCommand}"
+                                Visibility="{Binding IsNavBulletinVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -117,7 +317,8 @@
                         </Button>
 
                         <Button Tag="{StaticResource IconBatch}" Content="Bulletins en masse"
-                                Command="{Binding NavigateToBulletinBatchCommand}">
+                                Command="{Binding NavigateToBulletinBatchCommand}"
+                                Visibility="{Binding IsNavBulletinBatchVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -131,11 +332,61 @@
                             </Button.Style>
                         </Button>
 
+                        <Button Tag="{StaticResource IconHistory}" Content="Rappels &amp; régularisations"
+                                Command="{Binding NavigateToRappelsCommand}"
+                                Visibility="{Binding IsNavRappelsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Rappels &amp; régularisations">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEmploye}" Content="Avantages en nature"
+                                Command="{Binding NavigateToAvantagesNatureCommand}"
+                                Visibility="{Binding IsNavAvantagesNatureVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Avantages en nature">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconReset}" Content="Solde de tout compte"
+                                Command="{Binding NavigateToSoldeToutCompteCommand}"
+                                Visibility="{Binding IsNavSoldeToutCompteVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Solde de Tout Compte &amp; Départs">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <!-- ───── CALCUL ───── -->
-                        <TextBlock Text="CALCUL" Style="{StaticResource NavGroupHeaderStyle}"/>
+                        <TextBlock Text="CALCUL" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupCalculVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <Button Tag="{StaticResource IconCalculator}" Content="Calcul d'IUTS"
-                                Command="{Binding NavigateToCalculationCommand}">
+                                Command="{Binding NavigateToCalculationCommand}"
+                                Visibility="{Binding IsNavCalculVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -150,7 +401,8 @@
                         </Button>
 
                         <Button Tag="{StaticResource IconExcel}" Content="Calcul en lot"
-                                Command="{Binding NavigateToBatchSalaryCalculationCommand}">
+                                Command="{Binding NavigateToBatchSalaryCalculationCommand}"
+                                Visibility="{Binding IsNavCalculBatchVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -165,7 +417,8 @@
                         </Button>
 
                         <Button Tag="{StaticResource IconEstimate}" Content="Estimation du salaire"
-                                Command="{Binding NavigateToBaseSalaryEstimatorCommand}">
+                                Command="{Binding NavigateToBaseSalaryEstimatorCommand}"
+                                Visibility="{Binding IsNavEstimationVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -180,7 +433,8 @@
                         </Button>
 
                         <Button Tag="{StaticResource IconEstimate}" Content="Estimation en lot"
-                                Command="{Binding NavigateToBatchSalaryEstimationCommand}">
+                                Command="{Binding NavigateToBatchSalaryEstimationCommand}"
+                                Visibility="{Binding IsNavEstimationBatchVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -195,10 +449,12 @@
                         </Button>
 
                         <!-- ───── DONNÉES ───── -->
-                        <TextBlock Text="DONNÉES" Style="{StaticResource NavGroupHeaderStyle}"/>
+                        <TextBlock Text="DONNÉES" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupDonneesVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <Button Tag="{StaticResource IconEmploye}" Content="Employés"
-                                Command="{Binding NavigateToEmployeeManagementCommand}">
+                                Command="{Binding NavigateToEmployeeManagementCommand}"
+                                Visibility="{Binding IsNavEmployesVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -213,7 +469,8 @@
                         </Button>
 
                         <Button Tag="{StaticResource IconHistory}" Content="Historique"
-                                Command="{Binding NavigateToHistoryCommand}">
+                                Command="{Binding NavigateToHistoryCommand}"
+                                Visibility="{Binding IsNavHistoriqueVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
@@ -226,6 +483,344 @@
                                 </Style>
                             </Button.Style>
                         </Button>
+
+                        <!-- ───── DÉCLARATIONS ───── -->
+                        <TextBlock Text="DÉCLARATIONS" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupDeclarationsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <Button Tag="{StaticResource IconExport}" Content="Déclaration CNSS"
+                                Command="{Binding NavigateToDeclarationCnssCommand}"
+                                Visibility="{Binding IsNavCnssVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Déclaration CNSS">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconExport}" Content="Déclaration IUTS/TPA"
+                                Command="{Binding NavigateToDeclarationIutsTpaCommand}"
+                                Visibility="{Binding IsNavIutsTpaVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Déclaration IUTS/TPA">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconExport}" Content="Livre de paie"
+                                Command="{Binding NavigateToLivrePaieCommand}"
+                                Visibility="{Binding IsNavLivrePaieVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Livre de paie">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconExport}" Content="Écritures de paie"
+                                Command="{Binding NavigateToEcriturePaieCommand}"
+                                Visibility="{Binding IsNavEcriturePaieVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Écritures de paie">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconExport}" Content="Ordres de virement"
+                                Command="{Binding NavigateToOrdreVirementCommand}"
+                                Visibility="{Binding IsNavOrdreVirementVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Ordres de virement">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- ───── PARAMÉTRAGE ───── -->
+                        <TextBlock Text="PARAMÉTRAGE" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupParametrageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <Button Tag="{StaticResource IconExcel}" Content="Plan de paie"
+                                Command="{Binding NavigateToRubriqueCommand}"
+                                Visibility="{Binding IsNavRubriqueVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Plan de paie">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEmploye}" Content="Profils de paie"
+                                Command="{Binding NavigateToProfilsCommand}"
+                                Visibility="{Binding IsNavProfilsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Profils de paie">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEffaceFormulaire}" Content="Variables du mois"
+                                Command="{Binding NavigateToVariablesCommand}"
+                                Visibility="{Binding IsNavVariablesVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Variables du mois">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconHistory}" Content="Heures supplémentaires"
+                                Command="{Binding NavigateToHeuresSupCommand}"
+                                Visibility="{Binding IsNavHeuresSupVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Heures supplémentaires">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconReset}" Content="Congés et absences"
+                                Command="{Binding NavigateToAbsencesCommand}"
+                                Visibility="{Binding IsNavAbsencesVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Congés et absences">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEmploye}" Content="Prêts et avances"
+                                Command="{Binding NavigateToPretsCommand}"
+                                Visibility="{Binding IsNavPretsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Prêts et avances">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconFile}" Content="Saisies &amp; cessions"
+                                Command="{Binding NavigateToSaisiesCommand}"
+                                Visibility="{Binding IsNavSaisiesVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Saisies-arrêts et cessions sur salaire">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconHistory}" Content="Périodes de paie"
+                                Command="{Binding NavigateToPeriodePaieCommand}"
+                                Visibility="{Binding IsNavPeriodePaieVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Périodes de paie">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconCheck}" Content="Contrôle du moteur"
+                                Command="{Binding NavigateToControleMoteurCommand}"
+                                Visibility="{Binding IsNavControleMoteurVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Contrôle du moteur">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconSettings}" Content="Barèmes légaux"
+                                Command="{Binding NavigateToBaremeCommand}"
+                                Visibility="{Binding IsNavBaremeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Barèmes légaux">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconBuilding}" Content="Conventions &amp; Grilles"
+                                Command="{Binding NavigateToConventionsCommand}"
+                                Visibility="{Binding IsNavConventionsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Conventions collectives et grilles salariales">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- ───── SÉCURITÉ & AUDIT ───── -->
+                        <TextBlock Text="SÉCURITÉ &amp; AUDIT" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupAuditVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <Button Tag="{StaticResource IconCheck}" Content="Journal d'audit"
+                                Command="{Binding NavigateToAuditCommand}"
+                                Visibility="{Binding IsNavAuditVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Journal d'audit">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- État aucun résultat -->
+                        <Border Visibility="{Binding ShowNavNoMatches, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Margin="4,24,4,12"
+                                Padding="12,16"
+                                Background="#141D1F"
+                                BorderBrush="{StaticResource RailBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="&#xE721;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="20"
+                                           Foreground="{StaticResource RailTextDimBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Text="Aucun module trouvé"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource RailTextBrush}"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center"/>
+                                <TextBlock Text="Essayez un autre mot-clé (ex. salaire, cnss, pret...)"
+                                           FontSize="11"
+                                           Foreground="{StaticResource RailTextDimBrush}"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,12"/>
+                                <Button Command="{Binding ClearNavMenuSearchCommand}"
+                                        HorizontalAlignment="Center"
+                                        Cursor="Hand">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{StaticResource RailHoverBrush}"
+                                                    BorderBrush="{StaticResource RailBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="3"
+                                                    Padding="8,4">
+                                                <TextBlock Text="Effacer le filtre"
+                                                           Foreground="{StaticResource RailTextBrush}"
+                                                           FontSize="11"
+                                                           HorizontalAlignment="Center"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Opacity" Value="0.85"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -247,14 +842,23 @@
                  gère plusieurs sociétés. -->
             <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1">
-                <Grid Margin="20,0">
+                <Grid Margin="16,0,20,0">
 
-                    <Button HorizontalAlignment="Left" VerticalAlignment="Center"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Tag="{StaticResource IconRefresh}"
-                            Content="{Binding CurrentDossierName}"
-                            ToolTip="Changer de dossier"
-                            Click="ChangeDossier_Click"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <!-- Bouton pour masquer/réafficher le rail de navigation -->
+                        <Button Style="{StaticResource HeaderIconButtonStyle}"
+                                Tag="{StaticResource IconMenu}"
+                                ToolTip="Afficher / masquer le menu latéral (Ctrl+B)"
+                                Command="{Binding ToggleNavRailCommand}"
+                                Margin="0,0,10,0"/>
+
+                        <Button VerticalAlignment="Center"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Tag="{StaticResource IconRefresh}"
+                                Content="{Binding CurrentDossierName}"
+                                ToolTip="Changer de dossier"
+                                Click="ChangeDossier_Click"/>
+                    </StackPanel>
 
                     <Menu HorizontalAlignment="Right" VerticalAlignment="Center"
                           Background="Transparent" BorderThickness="0" Padding="0">
@@ -270,6 +874,9 @@
                             <MenuItem Header="Enregistrer" Command="{Binding SaveDataCommand}"/>
                             <MenuItem Header="Exporter en PDF" Command="{Binding ExportToPdfCommand}"/>
                             <Separator/>
+                            <MenuItem Header="Afficher / Masquer le menu latéral"
+                                      InputGestureText="Ctrl+B"
+                                      Command="{Binding ToggleNavRailCommand}"/>
                             <MenuItem Header="Changer de dossier..." Click="ChangeDossier_Click"/>
                             <MenuItem Header="Préférences d'affichage" Click="DisplayPreferences_Click"/>
                             <Separator/>

@@ -1,0 +1,376 @@
+<UserControl x:Class="IUTSCalculator.Views.OrdreVirementView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:OrdreVirementViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="750">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <Style x:Key="TotalBadgeLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{StaticResource InkMutedBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+        <Style x:Key="TotalBadgeValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+        </Style>
+        <Style x:Key="MetricCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Ordres de virement bancaire" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock Text="Paiement des salaires : ordres de virement par établissement, remise bancaire et ventilation des règlements"
+                           FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Remise bancaire (.csv)" Tag="{StaticResource IconSave}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ExporterCsvCommand}"/>
+                <Button Content="Ordre de virement (.xlsx)" Tag="{StaticResource IconExcel}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ExporterExcelCommand}"/>
+                <Button Content="Générer l'ordre" Tag="{StaticResource IconCalculator}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}"
+                        Command="{Binding GenererCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Paramètres de sélection et filtres ═══════════ -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="16,12" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Mois -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Top">
+                    <TextBlock Text="Mois" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Width="145" HorizontalAlignment="Left"
+                              Style="{StaticResource FormComboBoxStyle}"
+                              ItemsSource="{Binding MoisDisponibles}"
+                              DisplayMemberPath="Nom"
+                              SelectedItem="{Binding MoisSelectionne}"/>
+                </StackPanel>
+
+                <!-- Année -->
+                <StackPanel Grid.Column="2" VerticalAlignment="Top">
+                    <TextBlock Text="Année" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Width="95" HorizontalAlignment="Left"
+                              Style="{StaticResource FormComboBoxStyle}"
+                              ItemsSource="{Binding AnneesDisponibles}"
+                              SelectedItem="{Binding Annee}"/>
+                </StackPanel>
+
+                <!-- Banque cible -->
+                <StackPanel Grid.Column="4" VerticalAlignment="Top">
+                    <TextBlock Text="Banque cible" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Width="180" HorizontalAlignment="Left"
+                              Style="{StaticResource FormComboBoxStyle}"
+                              ItemsSource="{Binding BanquesDisponibles}"
+                              SelectedItem="{Binding BanqueSelectionnee}"/>
+                </StackPanel>
+
+                <!-- Mode de règlement -->
+                <StackPanel Grid.Column="6" VerticalAlignment="Top">
+                    <TextBlock Text="Mode de règlement" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Width="165" HorizontalAlignment="Left"
+                              Style="{StaticResource FormComboBoxStyle}"
+                              ItemsSource="{Binding ModesDisponibles}"
+                              SelectedItem="{Binding ModeSelectionne}"/>
+                </StackPanel>
+
+                <!-- Période / Référence -->
+                <StackPanel Grid.Column="8" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding PeriodeChoisieLibelle}"
+                               FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource InkBrush}"
+                               HorizontalAlignment="Right"/>
+                    <TextBlock Text="{Binding Ordre.NumeroOrdre, FallbackValue='Réf. : VIR-MENSUEL', Mode=OneWay}"
+                               FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
+                               HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════ Cartes métriques de synthèse ═══════════ -->
+        <Grid Grid.Row="2" Margin="0,0,0,12"
+              Visibility="{Binding AOrdre, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Total Net Virements -->
+            <Border Grid.Column="0" Style="{StaticResource MetricCardStyle}">
+                <StackPanel>
+                    <TextBlock Text="NET À VIRER" Style="{StaticResource TotalBadgeLabel}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding TotalVirements, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                   FontSize="17" FontWeight="Bold" Foreground="{StaticResource AccentBrush2}"/>
+                        <TextBlock Text=" F" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" VerticalAlignment="Bottom" Margin="2,0,0,2"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Total Net Général -->
+            <Border Grid.Column="2" Style="{StaticResource MetricCardStyle}">
+                <StackPanel>
+                    <TextBlock Text="TOTAL TOUS RÈGLEMENTS" Style="{StaticResource TotalBadgeLabel}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding TotalNetGeneral, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                   FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
+                        <TextBlock Text=" F" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" VerticalAlignment="Bottom" Margin="2,0,0,2"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Nombre de virements / salariés -->
+            <Border Grid.Column="4" Style="{StaticResource MetricCardStyle}">
+                <StackPanel>
+                    <TextBlock Text="BÉNÉFICIAIRES" Style="{StaticResource TotalBadgeLabel}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding NombreVirements, Mode=OneWay}"
+                                   FontSize="17" FontWeight="Bold" Foreground="{StaticResource InkBrush}"/>
+                        <TextBlock Text="{Binding NombreTotalSalaries, Mode=OneWay, StringFormat=' / {0} salariés'}"
+                                   FontSize="12" Foreground="{StaticResource InkSubtleBrush}" VerticalAlignment="Bottom" Margin="2,0,0,2"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Conformité bancaire -->
+            <Border Grid.Column="6" Style="{StaticResource MetricCardStyle}">
+                <StackPanel>
+                    <TextBlock Text="CONFORMITÉ COMPTES" Style="{StaticResource TotalBadgeLabel}"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NombreAnomalies, Mode=OneWay}"
+                                   FontSize="17" FontWeight="Bold"
+                                   Foreground="{Binding AAnomalies, Converter={StaticResource BoolToTypeConverter}, ConverterParameter='text:#9C2F28;#1F7A4D'}"/>
+                        <TextBlock Text="{Binding AAnomalies, Converter={StaticResource BooleanToTextConverter}, ConverterParameter=' anomalie(s) RIB;✓ Comptes complets', Mode=OneWay}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{Binding AAnomalies, Converter={StaticResource BoolToTypeConverter}, ConverterParameter='text:#9C2F28;#1F7A4D'}"
+                                   VerticalAlignment="Bottom" Margin="4,0,0,2"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ Résultat (Tableau des paiements) ═══════════ -->
+        <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="0">
+            <DockPanel>
+                <!-- En-tête du tableau avec filtres actifs et statut clôture -->
+                <Border DockPanel.Dock="Top"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="ÉTAT DES RÈGLEMENTS DE SALAIRES"
+                                       Style="{StaticResource SectionLabelStyle}" Margin="0,0,12,0"
+                                       VerticalAlignment="Center"/>
+
+                            <Border Background="{StaticResource WarningTintBrush}"
+                                    BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+                                    CornerRadius="3" Padding="6,2" Margin="0,0,8,0"
+                                    Visibility="{Binding Ordre.EstBrouillon, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="BROUILLON (PÉRIODE NON CLÔTURÉE)" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource DangerBrush}"/>
+                            </Border>
+
+                            <Border Background="#EBF7F0" BorderBrush="#2BA24C" BorderThickness="1"
+                                    CornerRadius="3" Padding="6,2"
+                                    Visibility="{Binding Ordre.EstBrouillon, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                                <TextBlock Text="✓ PÉRIODE CLÔTURÉE" FontSize="10" FontWeight="Bold" Foreground="#1F7A4D"/>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                    Visibility="{Binding AOrdre, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="Banque : " FontSize="12" Foreground="{StaticResource InkMutedBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding BanqueSelectionnee, Mode=OneWay}"
+                                       FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"
+                                       Margin="0,0,16,0" VerticalAlignment="Center"/>
+
+                            <TextBlock Text="|" Foreground="{StaticResource RuleStrongBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+
+                            <TextBlock Text="Mode : " FontSize="12" Foreground="{StaticResource InkMutedBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ModeSelectionne, Mode=OneWay}"
+                                       FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Bandeau de totaux en pied de tableau -->
+                <Border DockPanel.Dock="Bottom"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        Padding="16,10"
+                        Visibility="{Binding AOrdre, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="RÈGLEMENTS DE LA PÉRIODE" Style="{StaticResource TotalBadgeLabel}"/>
+                            <TextBlock Text="{Binding Lignes.Count, Mode=OneWay, StringFormat='{}{0} ligne(s) sélectionnée(s)'}"
+                                       FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0">
+                            <TextBlock Text="TOTAL VIREMENTS BANCAIRES" Style="{StaticResource TotalBadgeLabel}" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding TotalVirements, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                       Style="{StaticResource TotalBadgeValue}" HorizontalAlignment="Right"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="2" Width="1" Background="{StaticResource RuleBrush}" Margin="8,2"/>
+
+                        <Border Grid.Column="3" Background="#E6F0ED" CornerRadius="4" Padding="14,6" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="TOTAL NET AFFICHÉ : " FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource InkMutedBrush}"/>
+                                <TextBlock Text="{Binding TotalNetGeneral, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                           FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentBrush2}"/>
+                                <TextBlock Text=" FCFA" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- État vide -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                            Visibility="{Binding AOrdre, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                    <TextBlock Text="&#xEE71;" FontFamily="Segoe MDL2 Assets" FontSize="36"
+                               Foreground="{StaticResource RuleStrongBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Aucun ordre de virement affiché" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource InkMutedBrush}"
+                               HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                    <TextBlock Text="Choisissez le mois, l'année et la banque cible, puis cliquez sur « Générer l'ordre » pour afficher la liste des règlements."
+                               FontSize="12" Foreground="{StaticResource InkSubtleBrush}"
+                               HorizontalAlignment="Center" Margin="0,4,0,0"
+                               TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Tableau des salariés et règlements -->
+                <DataGrid ItemsSource="{Binding Lignes}"
+                          Style="{StaticResource FormDataGridStyle}"
+                          Margin="0" BorderThickness="0" IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          Visibility="{Binding AOrdre, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="N°" Binding="{Binding Ordre, Mode=OneWay}"
+                                            Width="45" MinWidth="35"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}"
+                                            Width="90" MinWidth="75"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Bénéficiaire" Binding="{Binding NomComplet, Mode=OneWay}"
+                                            Width="190" MinWidth="150"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Emploi / Fonction" Binding="{Binding Fonction, Mode=OneWay}"
+                                            Width="160" MinWidth="120"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Mode de règlement" Binding="{Binding ModeReglement, Mode=OneWay}"
+                                            Width="130" MinWidth="110"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Banque" Binding="{Binding Banque, Mode=OneWay}"
+                                            Width="140" MinWidth="100"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="N° Compte / RIB" Binding="{Binding NumeroCompte, Mode=OneWay}"
+                                            Width="180" MinWidth="140"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Net à payer"
+                                            Binding="{Binding MontantNet, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                            Width="125" MinWidth="100"
+                                            ElementStyle="{StaticResource MoneyTextStyle}"
+                                            HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══════════ Anomalies et barre d'état ═══════════ -->
+        <StackPanel Grid.Row="4" Margin="0,12,0,0">
+            <!-- Bannière d'anomalies RIB -->
+            <Border Padding="12,10" Margin="0,0,0,8"
+                    Background="{StaticResource WarningTintBrush}"
+                    BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+                    CornerRadius="3"
+                    Visibility="{Binding AAnomalies, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="AVERTISSEMENTS : SALARIÉS AVEC COORDONNÉES BANCAIRES INCOMPLÈTES"
+                               Style="{StaticResource SectionLabelStyle}"
+                               Foreground="{StaticResource InkBrush}" Margin="0,0,0,6"/>
+                    <ItemsControl ItemsSource="{Binding Anomalies}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12"
+                                           Foreground="{StaticResource InkBrush}" Margin="0,0,0,3"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource RuleBrush}" Padding="0,8,0,0">
+                <TextBlock Text="{Binding MessageStatut}" FontSize="11"
+                           Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

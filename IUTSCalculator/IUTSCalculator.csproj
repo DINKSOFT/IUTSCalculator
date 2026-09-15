@@ -124,7 +124,12 @@
     <Reference Include="System.Security.Cryptography.Xml, Version=9.0.0.6, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Security.Cryptography.Xml.9.0.6\lib\net462\System.Security.Cryptography.Xml.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Json, Version=8.0.0.5, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL" />
+    <Reference Include="System.Text.Encodings.Web, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encodings.Web.8.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json, Version=8.0.0.5, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.8.0.5\lib\net462\System.Text.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System.Threading.AccessControl, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
     <Reference Include="System.Threading.Channels, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL" />
     <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.4.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -152,6 +157,7 @@
     </ApplicationDefinition>
     <Compile Include="Converters\BooleanToTextConverter.cs" />
     <Compile Include="Converters\BoolToTypeConverter.cs" />
+    <Compile Include="Converters\PourcentageConverter.cs" />
     <Compile Include="Converters\DecimalToStringConverter.cs" />
     <Compile Include="Converters\StringEqualsConverter.cs" />
     <Compile Include="Helpers\Constants.cs" />
@@ -159,6 +165,31 @@
     <Compile Include="Models\AppSettings.cs" />
     <Compile Include="Models\Bulletin.cs" />
     <Compile Include="Models\BulletinTemplate.cs" />
+    <Compile Include="Models\Rubrique.cs" />
+    <Compile Include="Models\BaremeLegal.cs" />
+    <Compile Include="Models\PeriodePaie.cs" />
+    <Compile Include="Models\PersonneACharge.cs" />
+    <Compile Include="Models\VariablePaie.cs" />
+    <Compile Include="Models\Absence.cs" />
+    <Compile Include="Models\Pret.cs" />
+    <Compile Include="Models\ProfilPaie.cs" />
+    <Compile Include="Models\DeclarationCnss.cs" />
+    <Compile Include="Models\DeclarationIutsTpa.cs" />
+    <Compile Include="Models\LivrePaie.cs" />
+    <Compile Include="Models\EcritureComptable.cs" />
+    <Compile Include="Models\OrdreVirement.cs" />
+    <Compile Include="Models\EntreeAudit.cs" />
+    <Compile Include="Models\HeureSupplementaire.cs" />
+    <Compile Include="Models\ConventionCollective.cs" />
+    <Compile Include="Models\GrilleSalaire.cs" />
+    <Compile Include="Models\TrancheAnciennete.cs" />
+    <Compile Include="Models\CalculAncienneteResultat.cs" />
+    <Compile Include="Models\MotifDepart.cs" />
+    <Compile Include="Models\SoldeToutCompte.cs" />
+    <Compile Include="Models\SaisieOpposition.cs" />
+    <Compile Include="Models\RappelPaie.cs" />
+    <Compile Include="Models\ApportRappels.cs" />
+    <Compile Include="Models\AvantageNature.cs" />
     <Compile Include="Models\Dossier.cs" />
     <Compile Include="Models\PayslipMonthly.cs" />
     <Compile Include="Models\UserAccount.cs" />
@@ -171,6 +202,41 @@
     <Compile Include="Services\BulletinExportService.cs" />
     <Compile Include="Services\QrCodeService.cs" />
     <Compile Include="Services\DbValue.cs" />
+    <Compile Include="Services\RubriqueService.cs" />
+    <Compile Include="Services\BaremeService.cs" />
+    <Compile Include="Services\PeriodePaieService.cs" />
+    <Compile Include="Services\PersonneAChargeService.cs" />
+    <Compile Include="Services\VariablePaieService.cs" />
+    <Compile Include="Services\AbsenceService.cs" />
+    <Compile Include="Services\AbsenceExcelService.cs" />
+    <Compile Include="Services\PretService.cs" />
+    <Compile Include="Services\ProfilPaieService.cs" />
+    <Compile Include="Services\ApportVariables.cs" />
+    <Compile Include="Services\DeclarationCnssService.cs" />
+    <Compile Include="Services\DeclarationIutsTpaService.cs" />
+    <Compile Include="Services\ParametresSociaux.cs" />
+    <Compile Include="Services\ControleEquivalenceService.cs" />
+    <Compile Include="Services\DeclarationCnssExportService.cs" />
+    <Compile Include="Services\DeclarationIutsTpaExportService.cs" />
+    <Compile Include="Services\LivrePaieService.cs" />
+    <Compile Include="Services\LivrePaieExportService.cs" />
+    <Compile Include="Services\EcriturePaieService.cs" />
+    <Compile Include="Services\EcriturePaieExportService.cs" />
+    <Compile Include="Services\OrdreVirementService.cs" />
+    <Compile Include="Services\OrdreVirementExportService.cs" />
+    <Compile Include="Services\AuditService.cs" />
+    <Compile Include="Services\AuditExportService.cs" />
+    <Compile Include="Services\HeureSupplementaireService.cs" />
+    <Compile Include="Services\HeuresSupExportService.cs" />
+    <Compile Include="Services\ConventionCollectiveService.cs" />
+    <Compile Include="Services\SoldeToutCompteService.cs" />
+    <Compile Include="Services\SoldeToutCompteExportService.cs" />
+    <Compile Include="Services\SaisieOppositionService.cs" />
+    <Compile Include="Services\SaisieOppositionExportService.cs" />
+    <Compile Include="Services\RappelPaieService.cs" />
+    <Compile Include="Services\RappelPaieExportService.cs" />
+    <Compile Include="Services\AvantageNatureService.cs" />
+    <Compile Include="Services\AvantageNatureExportService.cs" />
     <Compile Include="Services\SQLiteService.cs" />
     <Compile Include="Services\TaxCalculatorService.cs" />
     <Compile Include="Services\TaxDataService.cs" />
@@ -192,6 +258,27 @@
     <Compile Include="ViewModels\BulletinBatchViewModel.cs" />
     <Compile Include="ViewModels\BulletinTemplateOption.cs" />
     <Compile Include="ViewModels\SelectableEmployee.cs" />
+    <Compile Include="ViewModels\MoisSelectionnable.cs" />
+    <Compile Include="ViewModels\RubriqueViewModel.cs" />
+    <Compile Include="ViewModels\BaremeViewModel.cs" />
+    <Compile Include="ViewModels\PeriodePaieViewModel.cs" />
+    <Compile Include="ViewModels\DeclarationCnssViewModel.cs" />
+    <Compile Include="ViewModels\DeclarationIutsTpaViewModel.cs" />
+    <Compile Include="ViewModels\LivrePaieViewModel.cs" />
+    <Compile Include="ViewModels\EcriturePaieViewModel.cs" />
+    <Compile Include="ViewModels\OrdreVirementViewModel.cs" />
+    <Compile Include="ViewModels\ControleEquivalenceViewModel.cs" />
+    <Compile Include="ViewModels\VariablePaieViewModel.cs" />
+    <Compile Include="ViewModels\AbsenceViewModel.cs" />
+    <Compile Include="ViewModels\PretViewModel.cs" />
+    <Compile Include="ViewModels\ProfilPaieViewModel.cs" />
+    <Compile Include="ViewModels\AuditViewModel.cs" />
+    <Compile Include="ViewModels\HeuresSupplementairesViewModel.cs" />
+    <Compile Include="ViewModels\ConventionCollectiveViewModel.cs" />
+    <Compile Include="ViewModels\SoldeToutCompteViewModel.cs" />
+    <Compile Include="ViewModels\SaisieOppositionViewModel.cs" />
+    <Compile Include="ViewModels\RappelPaieViewModel.cs" />
+    <Compile Include="ViewModels\AvantageNatureViewModel.cs" />
     <Compile Include="ViewModels\SettingsViewModel.cs" />
     <Compile Include="Views\BaseSalaryEstimatorView.xaml.cs">
       <DependentUpon>BaseSalaryEstimatorView.xaml</DependentUpon>
@@ -228,6 +315,66 @@
     </Compile>
     <Compile Include="Views\EmployeeManagementView.xaml.cs">
       <DependentUpon>EmployeeManagementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RubriqueView.xaml.cs">
+      <DependentUpon>RubriqueView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BaremeView.xaml.cs">
+      <DependentUpon>BaremeView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\PeriodePaieView.xaml.cs">
+      <DependentUpon>PeriodePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DeclarationCnssView.xaml.cs">
+      <DependentUpon>DeclarationCnssView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DeclarationIutsTpaView.xaml.cs">
+      <DependentUpon>DeclarationIutsTpaView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ControleEquivalenceView.xaml.cs">
+      <DependentUpon>ControleEquivalenceView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\VariablePaieView.xaml.cs">
+      <DependentUpon>VariablePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AbsenceView.xaml.cs">
+      <DependentUpon>AbsenceView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\PretView.xaml.cs">
+      <DependentUpon>PretView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ProfilPaieView.xaml.cs">
+      <DependentUpon>ProfilPaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\LivrePaieView.xaml.cs">
+      <DependentUpon>LivrePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\EcriturePaieView.xaml.cs">
+      <DependentUpon>EcriturePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\OrdreVirementView.xaml.cs">
+      <DependentUpon>OrdreVirementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AuditView.xaml.cs">
+      <DependentUpon>AuditView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\HeuresSupplementairesView.xaml.cs">
+      <DependentUpon>HeuresSupplementairesView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ConventionCollectiveView.xaml.cs">
+      <DependentUpon>ConventionCollectiveView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SoldeToutCompteView.xaml.cs">
+      <DependentUpon>SoldeToutCompteView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SaisieOppositionView.xaml.cs">
+      <DependentUpon>SaisieOppositionView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RappelPaieView.xaml.cs">
+      <DependentUpon>RappelPaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AvantageNatureView.xaml.cs">
+      <DependentUpon>AvantageNatureView.xaml</DependentUpon>
     </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -290,6 +437,86 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\EmployeeManagementView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RubriqueView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\BaremeView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\PeriodePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DeclarationCnssView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DeclarationIutsTpaView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ControleEquivalenceView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\VariablePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AbsenceView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\PretView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ProfilPaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\LivrePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\EcriturePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\OrdreVirementView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AuditView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\HeuresSupplementairesView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ConventionCollectiveView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SoldeToutCompteView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SaisieOppositionView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RappelPaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AvantageNatureView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

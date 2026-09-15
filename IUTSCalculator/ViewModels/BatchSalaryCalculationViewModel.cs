@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -19,6 +20,15 @@ namespace IUTSCalculator.ViewModels
     {
         private readonly DataService _dataService;
         private readonly TaxCalculatorService _taxCalculatorService;
+
+        // Variables du mois (PAI-02), absences (PAI-04) et prêts (PAI-05). Facultatifs :
+        // sans eux, le calcul est celui d'avant ces modules.
+        private readonly VariablePaieService _variablePaieService;
+        private readonly RubriqueService _rubriqueService;
+        private readonly AbsenceService _absenceService;
+        private readonly PretService _pretService;
+        private readonly ProfilPaieService _profilPaieService;
+        private readonly BaremeService _baremeService;
 
         public ObservableCollection<Employee> Employees { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<TaxCalculation> Calculations { get; } = new ObservableCollection<TaxCalculation>();
@@ -45,22 +55,72 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        private string _periode;
-        public string Periode
+        /// <summary>
+        /// Période traitée. C'était un simple libellé saisi à la main (« Janvier 2026 »),
+        /// sans effet sur le calcul ni sur l'enregistrement : le mois et l'année sont
+        /// maintenant des valeurs, parce que c'est d'elles que dépendent les variables du
+        /// mois, les absences, et la période sous laquelle la paie est enregistrée.
+        /// </summary>
+        private int _annee = DateTime.Today.Year;
+        public int Annee
         {
-            get => _periode ?? DateTime.Now.ToString("MMMM yyyy");
-            set => SetProperty(ref _periode, value);
+            get => _annee;
+            set
+            {
+                if (SetProperty(ref _annee, value))
+                    OnPropertyChanged(nameof(Periode));
+            }
         }
+
+        private MoisOption _moisSelectionne =
+            MoisOption.Tous.FirstOrDefault(m => m.Numero == DateTime.Today.Month);
+        public MoisOption MoisSelectionne
+        {
+            get => _moisSelectionne;
+            set
+            {
+                if (SetProperty(ref _moisSelectionne, value))
+                    OnPropertyChanged(nameof(Periode));
+            }
+        }
+
+        public IEnumerable<MoisOption> MoisDisponibles => MoisOption.Tous;
+
+        public IEnumerable<int> AnneesDisponibles =>
+            Enumerable.Range(DateTime.Today.Year - 5, 7).ToList();
+
+        public int Mois => MoisSelectionne != null ? MoisSelectionne.Numero : DateTime.Today.Month;
+
+        /// <summary>Dernier jour du mois traité : la date sous laquelle la paie est enregistrée.</summary>
+        public DateTime PeriodeDate => new DateTime(Annee, Mois, 1).AddMonths(1).AddDays(-1);
+
+        /// <summary>Libellé de la période, pour les en-têtes et les exports.</summary>
+        public string Periode =>
+            new DateTime(Annee, Mois, 1).ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"));
 
         public ICommand LoadEmployeesCommand { get; }
         public ICommand CalculateAllCommand { get; }
         public ICommand ExportAllCommand { get; }
         public ICommand GenerateExcelTableCommand { get; }
 
-        public BatchSalaryCalculationViewModel(DataService dataService, TaxCalculatorService taxCalculatorService)
+        public BatchSalaryCalculationViewModel(
+            DataService dataService,
+            TaxCalculatorService taxCalculatorService,
+            VariablePaieService variablePaieService = null,
+            RubriqueService rubriqueService = null,
+            AbsenceService absenceService = null,
+            PretService pretService = null,
+            ProfilPaieService profilPaieService = null,
+            BaremeService baremeService = null)
         {
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
             _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
+            _variablePaieService = variablePaieService;
+            _rubriqueService = rubriqueService;
+            _absenceService = absenceService;
+            _pretService = pretService;
+            _profilPaieService = profilPaieService;
+            _baremeService = baremeService;
 
             // Le titre alimente le message de la barre d'état et signale l'écran
             // actif dans le rail de navigation : sans lui, ni l'un ni l'autre.
@@ -102,14 +162,79 @@ namespace IUTSCalculator.ViewModels
                 StatusMessage = "Calcul en cours...";
                 Calculations.Clear();
 
-                // Correction : calcul du salaire pour chaque employé avec la méthode existante
-                var results = await Task.Run(() =>
-                    Employees.Select(emp => _taxCalculatorService.CalculateMonthlyTax(emp)).ToList()
-                );
+                // Le calcul porte sur une PÉRIODE : variables du mois et absences du mois
+                // y entrent, exactement comme sur un bulletin. Lues une seule fois pour
+                // tout l'effectif.
+                var apports = await ChargerApportsAsync();
+                var absences = await ChargerAbsencesAsync();
+                var prets = await ChargerPretsAsync();
+                var baseRetenue = await BaseRetenueAsync();
+                var periode = PeriodeDate;
+
+                var salaries = Employees.ToList();
+                var profils = await ChargerProfilsAsync(salaries);
+
+                // Barème daté applicable à la période (module DEC-02) : appliqué une seule
+                // fois pour tout le lot, qui partage la même période.
+                if (_baremeService != null)
+                {
+                    try
+                    {
+                        var bareme = await _baremeService.BaremeApplicableAsync(periode);
+                        _taxCalculatorService.AppliquerBareme(bareme);
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusMessage = "Barème illisible, calcul avec les valeurs historiques : " + ex.Message;
+                        _taxCalculatorService.AppliquerBareme(null);
+                    }
+                }
+
+                var results = await Task.Run(() => salaries
+                    .Select(emp =>
+                    {
+                        var apport = ApportDe(apports, emp.EmployeeId)
+                            .AvecAbsences(AbsenceService.Apport(
+                                emp, absences, periode.Year, periode.Month, baseRetenue))
+                            .AvecPrets(PretService.ApportDe(prets, emp.EmployeeId))
+                            .AvecProfil(ProfilPaieService.ApportDe(profils, emp.EmployeeId));
+
+                        var calcul = _taxCalculatorService.CalculateMonthlyTax(emp, apport);
+
+                        // Le moteur date du jour ; une paie se date de son mois.
+                        calcul.CalculationDate = periode;
+                        return calcul;
+                    })
+                    .ToList());
+
                 foreach (var calc in results)
                     Calculations.Add(calc);
 
-                StatusMessage = $"Calcul terminé pour {Calculations.Count} employés.";
+                // La paie calculée est ENREGISTRÉE sous sa période, en remplaçant celle
+                // qui s'y trouverait déjà : c'est cet historique que lisent la déclaration
+                // CNSS, la déclaration IUTS et le livre de paie. Un calcul qui n'y entre
+                // pas n'existe que le temps de l'écran.
+                int enregistres = 0;
+                var refus = new List<string>();
+
+                foreach (var calcul in results)
+                {
+                    try
+                    {
+                        await _dataService.EnregistrerBulletinDuMoisAsync(calcul, periode);
+                        enregistres++;
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        refus.Add(ex.Message);
+                        break;   // période clôturée : inutile d'insister salarié par salarié
+                    }
+                }
+
+                StatusMessage = refus.Count > 0
+                    ? $"{Calculations.Count} calcul(s) affiché(s), aucun enregistré — {refus[0]}"
+                    : $"Calcul terminé pour {Calculations.Count} employé(s) sur {Periode} — " +
+                      $"{enregistres} enregistré(s) dans la paie du mois.";
             }
             catch (Exception ex)
             {
@@ -119,6 +244,109 @@ namespace IUTSCalculator.ViewModels
             {
                 IsBusy = false;
             }
+        }
+
+        /// <summary>Variables du mois de tout l'effectif, en une lecture.</summary>
+        private async Task<Dictionary<string, ApportVariables>> ChargerApportsAsync()
+        {
+            if (_variablePaieService == null || _rubriqueService == null)
+                return new Dictionary<string, ApportVariables>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var plan = await _rubriqueService.ChargerAsync();
+                return await _variablePaieService.ApportsAsync(Annee, Mois, plan);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Variables du mois illisibles, calcul sans elles : " + ex.Message;
+                return new Dictionary<string, ApportVariables>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Remboursements de prêts de la période, pour tout l'effectif et en une lecture.
+        /// Un dictionnaire vide — module non branché ou lecture impossible — calcule sans
+        /// retenue de remboursement plutôt que de faire échouer le lot.
+        /// </summary>
+        private async Task<Dictionary<string, ApportPrets>> ChargerPretsAsync()
+        {
+            if (_pretService == null)
+                return new Dictionary<string, ApportPrets>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                return await _pretService.ApportsAsync(Annee, Mois);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Prêts illisibles, calcul sans retenue de remboursement : " + ex.Message;
+                return new Dictionary<string, ApportPrets>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Profils applicables à la période, pour tout l'effectif et en une lecture. Un
+        /// dictionnaire vide — module non branché ou lecture impossible — calcule sans les
+        /// profils plutôt que de faire échouer le lot.
+        /// </summary>
+        private async Task<Dictionary<string, ApportProfil>> ChargerProfilsAsync(IEnumerable<Employee> salaries)
+        {
+            if (_profilPaieService == null || _rubriqueService == null)
+                return new Dictionary<string, ApportProfil>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var plan = await _rubriqueService.ChargerAsync();
+                return await _profilPaieService.ApportsAsync(Annee, Mois, salaries, plan);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Profils de paie illisibles, calcul sans eux : " + ex.Message;
+                return new Dictionary<string, ApportProfil>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>Absences de la période, en une lecture.</summary>
+        private async Task<List<Absence>> ChargerAbsencesAsync()
+        {
+            if (_absenceService == null) return new List<Absence>();
+
+            try
+            {
+                return await _absenceService.ChargerPeriodeAsync(Annee, Mois);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Absences illisibles, calcul sans elles : " + ex.Message;
+                return new List<Absence>();
+            }
+        }
+
+        private async Task<BaseRetenueAbsence> BaseRetenueAsync()
+        {
+            try
+            {
+                var reglages = await _dataService.LoadSettingsAsync();
+                return reglages != null ? reglages.BaseRetenueAbsence : BaseRetenueAbsence.TrentiemeMensuel;
+            }
+            catch
+            {
+                return BaseRetenueAbsence.TrentiemeMensuel;
+            }
+        }
+
+        private static ApportVariables ApportDe(
+            Dictionary<string, ApportVariables> apports, string employeeId)
+        {
+            ApportVariables apport;
+            if (apports != null && !string.IsNullOrWhiteSpace(employeeId)
+                && apports.TryGetValue(employeeId, out apport))
+            {
+                return apport;
+            }
+
+            return ApportVariables.Aucun();
         }
 
         private async Task ExportAllAsync()

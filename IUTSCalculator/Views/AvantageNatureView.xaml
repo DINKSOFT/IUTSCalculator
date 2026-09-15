@@ -1,0 +1,339 @@
+<UserControl x:Class="IUTSCalculator.Views.AvantageNatureView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:models="clr-namespace:IUTSCalculator.Models"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:AvantageNatureViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="780">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}"/>
+    </UserControl.Resources>
+
+    <Grid Margin="16,12,16,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="450"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Avantages en nature" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}" TextTrimming="CharacterEllipsis">
+                    <Run Text="Évaluation forfaitaire (CGI Art. 106) ou réelle, réintégration fiscale/sociale (IUTS/CNSS/TPA) et reprise sur net."/>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Actualiser" Tag="{StaticResource IconRefresh}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ChargerDonneesCommand}" Margin="0,0,8,0"/>
+                <Button Content="Exporter le registre" Tag="{StaticResource IconExport}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ExporterExcelCommand}" Margin="0,0,8,0"
+                        ToolTip="Exporter le registre des avantages en nature vers Excel (ClosedXML)"/>
+                <Button Content="Nouvel avantage" Tag="{StaticResource IconAdd}" Margin="0" Width="160"
+                        Style="{StaticResource MenuButtonStyle}"
+                        Command="{Binding NouvelAvantageCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Corps Principal : 2 Colonnes ═══════════ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.5*" MinWidth="600"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*" MinWidth="400"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ── Colonne Gauche : Tableau et Filtres ─────────────────────── -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Barre de filtres -->
+                <Border Grid.Row="0" Margin="0,0,0,8" Padding="10,6" CornerRadius="4"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="150"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="160"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Recherche texte -->
+                        <Grid Grid.Column="0">
+                            <TextBox Text="{Binding RechercheTexte, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource FormTextBoxStyle}"
+                                     Height="30" Padding="26,2,6,2"
+                                     VerticalContentAlignment="Center"
+                                     ToolTip="Rechercher par nom, matricule, libellé ou observation..."/>
+                            <TextBlock Text="{StaticResource IconSearch}"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       Foreground="{StaticResource InkSubtleBrush}"
+                                       HorizontalAlignment="Left" VerticalAlignment="Center"
+                                       Margin="8,0,0,0" IsHitTestVisible="False"/>
+                        </Grid>
+
+                        <!-- Filtre Statut -->
+                        <ComboBox Grid.Column="2" Height="30" Style="{StaticResource FormComboBoxStyle}"
+                                  SelectedIndex="{Binding FiltreStatutIndex, Mode=TwoWay}"
+                                  ToolTip="Filtrer par statut">
+                            <ComboBoxItem Content="Tous les statuts"/>
+                            <ComboBoxItem Content="Actifs en cours"/>
+                            <ComboBoxItem Content="Inactifs / Expirés"/>
+                        </ComboBox>
+
+                        <!-- Filtre Type -->
+                        <ComboBox Grid.Column="4" Height="30" Style="{StaticResource FormComboBoxStyle}"
+                                  SelectedIndex="{Binding FiltreTypeIndex, Mode=TwoWay}"
+                                  ToolTip="Filtrer par type d'avantage">
+                            <ComboBoxItem Content="Tous les types"/>
+                            <ComboBoxItem Content="Logement"/>
+                            <ComboBoxItem Content="Véhicule"/>
+                            <ComboBoxItem Content="Électricité"/>
+                            <ComboBoxItem Content="Eau"/>
+                            <ComboBoxItem Content="Domesticité"/>
+                            <ComboBoxItem Content="Nourriture"/>
+                            <ComboBoxItem Content="Autre"/>
+                        </ComboBox>
+                    </Grid>
+                </Border>
+
+                <!-- Grille des avantages -->
+                <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                    <DataGrid ItemsSource="{Binding AvantagesFiltres}"
+                              SelectedItem="{Binding SelectedAvantage, Mode=TwoWay}"
+                              Style="{StaticResource FormDataGridStyle}"
+                              AutoGenerateColumns="False" IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}"
+                                                Width="85" ElementStyle="{StaticResource CenterTextStyle}"/>
+                            <DataGridTextColumn Header="Salarié bénéficiaire" Binding="{Binding NomSalarie, Mode=OneWay}"
+                                                Width="*" ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding TypeLibelle, Mode=OneWay}"
+                                                Width="140" ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="Mode" Binding="{Binding ModeLibelle, Mode=OneWay}"
+                                                Width="120" ElementStyle="{StaticResource CenterTextStyle}"/>
+                            <DataGridTextColumn Header="Montant Brut" Binding="{Binding MontantAvantage, StringFormat={}{0:N0} FCFA, Mode=OneWay}"
+                                                Width="105" ElementStyle="{StaticResource MoneyTextStyle}"/>
+                            <DataGridTextColumn Header="Part Sal." Binding="{Binding PartSalariale, StringFormat={}{0:N0} FCFA, Mode=OneWay}"
+                                                Width="90" ElementStyle="{StaticResource MoneyTextStyle}"/>
+                            <DataGridTextColumn Header="Net Imposable" Binding="{Binding ValeurNetteImposable, StringFormat={}{0:N0} FCFA, Mode=OneWay}"
+                                                Width="110" ElementStyle="{StaticResource MoneyTextStyle}"/>
+                            <DataGridTextColumn Header="Statut" Binding="{Binding StatutLibelle, Mode=OneWay}"
+                                                Width="90" ElementStyle="{StaticResource CenterTextStyle}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+
+                <!-- Barre récapitulative inférieure -->
+                <Grid Grid.Row="2" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AvantagesFiltres.Count, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
+                        <TextBlock Text=" avantage(s) accordé(s)  |  Net imposable total : " Foreground="{StaticResource InkSubtleBrush}"/>
+                        <TextBlock Text="{Binding TotalNetImposableFiltre, StringFormat={}{0:N0} FCFA, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBlueBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Activer / Désactiver" Tag="{StaticResource IconRefresh}"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding BasculerStatutCommand}" Margin="0,0,8,0"
+                                ToolTip="Basculer l'état actif/inactif de l'avantage sélectionné"/>
+                        <Button Content="Supprimer" Tag="{StaticResource IconDelete}"
+                                Style="{StaticResource DangerButtonStyle}"
+                                Command="{Binding SupprimerCommand}"
+                                ToolTip="Supprimer définitivement l'avantage sélectionné"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <!-- ── Colonne Droite : Formulaire d'attribution ─────────────── -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="16">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- Titre de formulaire -->
+                        <TextBlock Text="FICHE D'ATTRIBUTION D'UN AVANTAGE" Style="{StaticResource SectionLabelStyle}"/>
+
+                        <!-- Salarié -->
+                        <TextBlock Text="Employé bénéficiaire *" Style="{StaticResource FieldLabel}" Margin="0,8,0,4"/>
+                        <ComboBox ItemsSource="{Binding Employes}"
+                                  SelectedItem="{Binding FormEmploye, Mode=TwoWay}"
+                                  DisplayMemberPath="FullNameWithId"
+                                  Style="{StaticResource FormComboBoxStyle}" Height="30"/>
+
+                        <!-- Type d'avantage -->
+                        <TextBlock Text="Type d'avantage *" Style="{StaticResource FieldLabel}" Margin="0,10,0,4"/>
+                        <ComboBox SelectedValue="{Binding FormTypeAvantage, Mode=TwoWay}"
+                                  SelectedValuePath="Tag"
+                                  Style="{StaticResource FormComboBoxStyle}" Height="30">
+                            <ComboBoxItem Content="Logement de fonction" Tag="{x:Static models:TypeAvantageNature.Logement}"/>
+                            <ComboBoxItem Content="Véhicule de fonction" Tag="{x:Static models:TypeAvantageNature.Vehicule}"/>
+                            <ComboBoxItem Content="Électricité (SONABEL)" Tag="{x:Static models:TypeAvantageNature.Electricite}"/>
+                            <ComboBoxItem Content="Eau (ONEA)" Tag="{x:Static models:TypeAvantageNature.Eau}"/>
+                            <ComboBoxItem Content="Domesticité / Gens de maison" Tag="{x:Static models:TypeAvantageNature.Domesticite}"/>
+                            <ComboBoxItem Content="Nourriture / Cantine" Tag="{x:Static models:TypeAvantageNature.Nourriture}"/>
+                            <ComboBoxItem Content="Autre prestation" Tag="{x:Static models:TypeAvantageNature.Autre}"/>
+                        </ComboBox>
+
+                        <!-- Libellé -->
+                        <TextBlock Text="Libellé sur le bulletin *" Style="{StaticResource FieldLabel}" Margin="0,10,0,4"/>
+                        <TextBox Text="{Binding FormLibelle, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource FormTextBoxStyle}"/>
+
+                        <!-- Mode d'évaluation -->
+                        <TextBlock Text="Mode d'évaluation" Style="{StaticResource FieldLabel}" Margin="0,10,0,4"/>
+                        <ComboBox SelectedValue="{Binding FormModeEvaluation, Mode=TwoWay}"
+                                  SelectedValuePath="Tag"
+                                  Style="{StaticResource FormComboBoxStyle}" Height="30">
+                            <ComboBoxItem Content="Forfaitaire réglementaire (Art. 106 CGI)" Tag="{x:Static models:ModeEvaluationAvantage.ForfaitaireLegal}"/>
+                            <ComboBoxItem Content="Valeur réelle des factures / dépenses" Tag="{x:Static models:ModeEvaluationAvantage.ValeurReelle}"/>
+                        </ComboBox>
+
+                        <!-- Montant Brut et Barème CGI -->
+                        <Grid Margin="0,10,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Montant Brut évalué (FCFA) *" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Content="Évaluer CGI (20%)" Tag="{StaticResource IconCalculator}"
+                                    Style="{StaticResource SecondaryButtonStyle}" Padding="6,2" Height="24"
+                                    Command="{Binding CalculerForfaitCgiCommand}"
+                                    ToolTip="Calculer 20% du salaire de base indiciaire plafonné à 75 000 FCFA (Art. 106 CGI)"/>
+                        </Grid>
+                        <TextBox Text="{Binding FormMontantAvantage, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:N0}}"
+                                 Style="{StaticResource FormTextBoxStyle}"/>
+
+                        <!-- Part salariale -->
+                        <TextBlock Text="Participation financière du salarié (déduite du brut) [FCFA]" Style="{StaticResource FieldLabel}" Margin="0,10,0,4"/>
+                        <TextBox Text="{Binding FormPartSalariale, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:N0}}"
+                                 Style="{StaticResource FormTextBoxStyle}"/>
+
+                        <!-- Encart Valeur Nette Imposable -->
+                        <Border Margin="0,10,0,10" Padding="10,8" Background="{StaticResource GroundBrush}"
+                                BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Valeur nette imposable &amp; cotisable :" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
+                                    <TextBlock Text="Réintégrée au brut puis reprise en bas de bulletin." FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding FormValeurNetteImposable, StringFormat={}{0:N0} FCFA, Mode=OneWay}"
+                                           FontWeight="Bold" FontSize="15" Foreground="{StaticResource PrimaryBlueBrush}"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Période d'effet -->
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Date début d'effet *" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker SelectedDate="{Binding FormDateDebut, Mode=TwoWay}" Height="28"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <CheckBox Content="Date fin" IsChecked="{Binding FormHasDateFin, Mode=TwoWay}"
+                                          Style="{StaticResource FieldLabel}" Margin="0,0,0,2"/>
+                                <DatePicker SelectedDate="{Binding FormDateFin, Mode=TwoWay}"
+                                            IsEnabled="{Binding FormHasDateFin}" Height="28"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Drapeaux d'assujettissement -->
+                        <TextBlock Text="Régime fiscal et social" Style="{StaticResource FieldLabel}" Margin="0,12,0,4"/>
+                        <WrapPanel>
+                            <CheckBox Content="Soumis IUTS" IsChecked="{Binding FormSoumisIUTS, Mode=TwoWay}" Margin="0,0,12,4"/>
+                            <CheckBox Content="Soumis CNSS (plafonné)" IsChecked="{Binding FormSoumisCNSS, Mode=TwoWay}" Margin="0,0,12,4"/>
+                            <CheckBox Content="Soumis TPA (3%)" IsChecked="{Binding FormSoumisTPA, Mode=TwoWay}" Margin="0,0,12,4"/>
+                            <CheckBox Content="Avantage actif" IsChecked="{Binding FormActif, Mode=TwoWay}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        </WrapPanel>
+
+                        <!-- Rubriques associées -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Code Rubrique Gain" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding FormCodeGain, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Code Rubrique Retenue" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding FormCodeRetenue, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Commentaire -->
+                        <TextBlock Text="Observations / Référence bail ou contrat" Style="{StaticResource FieldLabel}" Margin="0,10,0,4"/>
+                        <TextBox Text="{Binding FormCommentaire, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource FormTextBoxStyle}" Height="50" AcceptsReturn="True"/>
+
+                        <!-- Boutons d'action -->
+                        <Grid Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0" Content="Nouveau / Vider"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding NouvelAvantageCommand}"/>
+                            <Button Grid.Column="2" Content="Enregistrer" Tag="{StaticResource IconCheck}"
+                                    Style="{StaticResource MenuButtonStyle}"
+                                    Command="{Binding EnregistrerCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ Barre d'état inférieure ═══════════ -->
+        <Border Grid.Row="2" Margin="0,8,0,0" Padding="8,4" CornerRadius="4"
+                Background="{StaticResource SurfaceAltBrush}"
+                BorderBrush="{StaticResource RuleBrush}" BorderThickness="1">
+            <Grid>
+                <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
+                           VerticalAlignment="Center"/>
+                <ProgressBar IsIndeterminate="True" Height="4" Width="100" HorizontalAlignment="Right"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

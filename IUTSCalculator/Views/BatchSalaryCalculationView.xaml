@@ -47,14 +47,23 @@
 
         <!-- ═══════════ Période ═══════════ -->
         <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,14" Padding="16,12">
+            <!-- La période n'est plus un libellé libre : c'est elle qui détermine les
+                 variables du mois, les absences prises en compte, et le mois sous lequel
+                 la paie calculée est enregistrée. -->
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Période" VerticalAlignment="Center" Margin="0,0,12,0"
+                <TextBlock Text="Période traitée" VerticalAlignment="Center" Margin="0,0,12,0"
                            Style="{StaticResource FormTextBlockLabelStyle}"/>
-                <TextBox Width="220" Margin="0"
-                         Style="{StaticResource FormTextBoxStyle}"
-                         Text="{Binding Periode, UpdateSourceTrigger=PropertyChanged}"/>
-                <TextBlock Text="Format attendu : mois et année, par exemple « Janvier 2026 »"
-                           VerticalAlignment="Center" Margin="12,0,0,0"
+                <ComboBox Width="150" Height="34" Margin="0,0,8,0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding MoisDisponibles}"
+                          DisplayMemberPath="Nom"
+                          SelectedItem="{Binding MoisSelectionne}"/>
+                <ComboBox Width="96" Height="34" Margin="0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding AnneesDisponibles}"
+                          SelectedItem="{Binding Annee}"/>
+                <TextBlock Text="Les variables et absences de ce mois entrent dans le calcul, qui est enregistré sous cette période."
+                           VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap" MaxWidth="420"
                            FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
             </StackPanel>
         </Border>

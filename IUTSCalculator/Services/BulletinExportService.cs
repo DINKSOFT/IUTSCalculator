@@ -24,6 +24,35 @@ namespace IUTSCalculator.Services
         private readonly CultureInfo _culture = new CultureInfo("fr-FR");
         private const string CurrencyFormat = "#,##0";
 
+        /// <summary>Devise écrite derrière les montants quand l'affichage est demandé.</summary>
+        private const string Devise = "FCFA";
+
+        /// <summary>
+        /// Format des montants des documents de paie : groupes de trois chiffres séparés
+        /// par une espace ordinaire.
+        ///
+        /// L'espace vient d'ici et non de la culture fr-FR, qui emploie une espace
+        /// insécable. Les polices Type 1 standard du PDF (Helvetica) ne dessinent pas ce
+        /// caractère : les montants sortaient collés — « 125000 » au lieu de
+        /// « 125 000 » — alors que le même code affichait correctement à l'écran.
+        /// </summary>
+        private readonly NumberFormatInfo _formatMontant = ConstruireFormatMontant();
+
+        private static NumberFormatInfo ConstruireFormatMontant()
+        {
+            var format = (NumberFormatInfo)new CultureInfo("fr-FR").NumberFormat.Clone();
+            format.NumberGroupSeparator = " ";
+            format.NumberGroupSizes = new[] { 3 };
+            format.NumberDecimalDigits = 0;
+            return format;
+        }
+
+        /// <summary>
+        /// Écrire « FCFA » derrière chaque montant, ou laisser les nombres nus. Vrai par
+        /// défaut ; l'écran de bulletin place ici le réglage du dossier avant d'exporter.
+        /// </summary>
+        public bool AfficherDevise { get; set; } = true;
+
         /// <summary>Regroupe les polices utilisées dans un export PDF, pour éviter de les recréer/re-passer une à une.</summary>
         private class PdfFonts
         {
@@ -47,14 +76,36 @@ namespace IUTSCalculator.Services
             return await Task.Run(() => ExportToPdf(bulletin, filePath, template));
         }
 
+        /// <summary>Marge du bulletin, identique sur les quatre côtés.</summary>
+        private const float MargePdf = 40f;
+
+        /// <summary>
+        /// Hauteur de la page de composition. Le bulletin est d'abord écrit sur une page
+        /// volontairement très haute, où il ne peut pas déborder : c'est ce qui permet de
+        /// mesurer sa hauteur réelle avant de décider de l'échelle. 4 000 points valent
+        /// près de cinq pages A4 — largement au-delà de tout bulletin concevable.
+        /// </summary>
+        private const float HauteurComposition = 4000f;
+
+        /// <summary>
+        /// Un bulletin tient sur une seule page, quel que soit le nombre de variables du
+        /// mois. La composition se fait en deux temps :
+        ///
+        /// 1. le bulletin est écrit tel quel sur une page de 4 000 points de haut, où rien
+        ///    ne peut le couper, et sa hauteur réelle est relevée ;
+        /// 2. cette page est réimportée dans un A4 et réduite juste ce qu'il faut pour y
+        ///    entrer — à l'identique quand elle y entre déjà.
+        ///
+        /// Découper le bulletin sur deux pages n'était pas une option : un bulletin de paie
+        /// est un document unitaire, et la seconde page ne portait le plus souvent que les
+        /// signatures, détachées du décompte qu'elles sont censées approuver. Réduire le
+        /// texte plutôt que supprimer des lignes est le seul compromis acceptable : tout ce
+        /// que le salarié doit pouvoir vérifier reste imprimé.
+        /// </summary>
         public bool ExportToPdf(Bulletin bulletin, string filePath, BulletinTemplate template = BulletinTemplate.Detaille)
         {
             if (bulletin == null || string.IsNullOrEmpty(filePath))
                 return false;
-
-            Document document = null;
-            PdfWriter writer = null;
-            FileStream fs = null;
 
             try
             {
@@ -62,9 +113,37 @@ namespace IUTSCalculator.Services
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                     Directory.CreateDirectory(directory);
 
-                fs = new FileStream(filePath, FileMode.Create);
-                document = new Document(PageSize.A4, 40, 40, 40, 40);
-                writer = PdfWriter.GetInstance(document, fs);
+                float hauteurContenu;
+                byte[] composition = ComposerBulletinPdf(bulletin, template, out hauteurContenu);
+                if (composition == null || composition.Length == 0)
+                    return false;
+
+                EcrireSurUnePagePdf(composition, hauteurContenu, filePath, bulletin);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de l'export PDF du bulletin : {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Premier temps : le bulletin écrit sur une page assez haute pour qu'il ne soit
+        /// jamais coupé. Renvoie le PDF obtenu et, par <paramref name="hauteurContenu"/>,
+        /// la hauteur effectivement occupée.
+        /// </summary>
+        private byte[] ComposerBulletinPdf(Bulletin bulletin, BulletinTemplate template, out float hauteurContenu)
+        {
+            hauteurContenu = 0f;
+
+            using (var memoire = new MemoryStream())
+            {
+                var format = new Rectangle(PageSize.A4.Width, HauteurComposition);
+                var document = new Document(format, MargePdf, MargePdf, MargePdf, MargePdf);
+                var writer = PdfWriter.GetInstance(document, memoire);
+                writer.CloseStream = false;
+
                 document.Open();
 
                 document.AddTitle("Bulletin de paye");
@@ -95,19 +174,63 @@ namespace IUTSCalculator.Services
 
                 AjouterControlePdf(document, bulletin, f);
 
+                // Relevé AVANT la fermeture : ensuite, la position du curseur est perdue.
+                hauteurContenu = (HauteurComposition - MargePdf) - writer.GetVerticalPosition(false);
+
                 document.Close();
-                return true;
+                return memoire.ToArray();
             }
-            catch (Exception ex)
+        }
+
+        /// <summary>
+        /// Second temps : la page composée est reportée sur un A4, réduite si nécessaire
+        /// pour y tenir entière. L'échelle ne dépasse jamais 1 — un bulletin court n'est
+        /// pas agrandi, il garde sa taille habituelle.
+        /// </summary>
+        private void EcrireSurUnePagePdf(byte[] composition, float hauteurContenu, string filePath, Bulletin bulletin)
+        {
+            PdfReader reader = null;
+
+            try
             {
-                Console.WriteLine($"Erreur lors de l'export PDF du bulletin : {ex.Message}");
-                return false;
+                reader = new PdfReader(composition);
+
+                using (var fs = new FileStream(filePath, FileMode.Create))
+                {
+                    var document = new Document(PageSize.A4, 0f, 0f, 0f, 0f);
+                    var writer = PdfWriter.GetInstance(document, fs);
+                    document.Open();
+
+                    document.AddTitle("Bulletin de paye");
+                    document.AddSubject($"Bulletin de paie - {bulletin.NomComplet} - {bulletin.PeriodeLibelle}");
+                    document.AddCreator("IUTSCalculator");
+                    document.AddAuthor("IUTSCalculator");
+
+                    float hauteurDisponible = PageSize.A4.Height - (2f * MargePdf);
+
+                    float echelle = 1f;
+                    if (hauteurContenu > hauteurDisponible && hauteurContenu > 0f)
+                        echelle = hauteurDisponible / hauteurContenu;
+                    if (echelle > 1f) echelle = 1f;
+
+                    // Le contenu part du haut de la page de composition : on aligne ce haut
+                    // sur le haut de la zone imprimable de l'A4, et on centre horizontalement
+                    // la bande réduite pour ne pas la coller au bord gauche.
+                    float sommetComposition = HauteurComposition - MargePdf;
+                    float sommetCible = PageSize.A4.Height - MargePdf;
+
+                    float decalageY = sommetCible - (echelle * sommetComposition);
+                    float decalageX = (PageSize.A4.Width - (echelle * PageSize.A4.Width)) / 2f;
+
+                    var page = writer.GetImportedPage(reader, 1);
+                    writer.DirectContent.AddTemplate(page, echelle, 0f, 0f, echelle, decalageX, decalageY);
+
+                    document.Close();
+                }
             }
             finally
             {
-                if (document != null && document.IsOpen()) document.Close();
-                writer?.Close();
-                if (fs != null) { fs.Close(); fs.Dispose(); }
+                if (reader != null) reader.Close();
             }
         }
 
@@ -174,7 +297,7 @@ namespace IUTSCalculator.Services
 
             document.Add(headerTable);
 
-            var headerSeparator = new PdfPTable(1) { WidthPercentage = 100, SpacingAfter = 10f };
+            var headerSeparator = new PdfPTable(1) { WidthPercentage = 100, SpacingAfter = 6f };
             headerSeparator.AddCell(new PdfPCell
             {
                 Border = Rectangle.BOTTOM_BORDER,
@@ -189,7 +312,7 @@ namespace IUTSCalculator.Services
         private void EcrireCorpsDetaillePdf(Document document, Bulletin bulletin, PdfFonts f, bool avecCumuls)
         {
             // ---- Bloc identité ----
-            var infoTable = new PdfPTable(4) { WidthPercentage = 100, SpacingAfter = 10f };
+            var infoTable = new PdfPTable(4) { WidthPercentage = 100, SpacingAfter = 5f };
             infoTable.SetWidths(new float[] { 1.3f, 2f, 1.3f, 2f });
             AddCell(infoTable, "Employé", f.LabelBold, BaseColor.LIGHT_GRAY);
             AddCell(infoTable, bulletin.NomComplet, f.Value);
@@ -214,19 +337,21 @@ namespace IUTSCalculator.Services
 
             // ---- Gains ----
             document.Add(SectionHeader("GAINS", f.Section));
-            var gainsTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 10f };
+            var gainsTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 5f };
             gainsTable.SetWidths(new float[] { 3f, 1.3f });
             AddLigne(gainsTable, "Salaire de base", bulletin.SalaireDeBase, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de logement", bulletin.IndemniteLogement, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de transport", bulletin.IndemniteTransport, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de fonction", bulletin.IndemniteFonction, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de sujétion", bulletin.IndemniteSujetion, f.Label, f.Value);
+            AddGainsVariables(gainsTable, bulletin, f, avecTraitement: true);
+            AddRetenueAbsences(gainsTable, bulletin, f);
             AddLigne(gainsTable, "SALAIRE BRUT", bulletin.SalaireBrut, f.LabelBold, f.ValueBold, BaseColor.LIGHT_GRAY);
             document.Add(gainsTable);
 
             // ---- Retenues / impôt ----
             document.Add(SectionHeader("COTISATIONS ET IMPÔT", f.Section));
-            var retenuesTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 10f };
+            var retenuesTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 5f };
             retenuesTable.SetWidths(new float[] { 3f, 1.3f });
             AddLigne(retenuesTable, "CNSS part employé", bulletin.CnssEmploye, f.Label, f.Value);
             AddLigne(retenuesTable, "CNSS part employeur", bulletin.CnssEmployeur, f.Label, f.Value);
@@ -237,10 +362,11 @@ namespace IUTSCalculator.Services
             AddLigne(retenuesTable, $"Abattement charges familiales ({bulletin.ChargesFamiliales})", bulletin.AbattementChargesFamiliales, f.Label, f.Value);
             AddLigne(retenuesTable, "NET IUTS", bulletin.NetIUTS, f.LabelBold, f.ValueBold);
             AddLigne(retenuesTable, "Retenue obligatoire sur salaire", bulletin.RetenueObligatoire, f.Label, f.Value);
+            AddRetenuesDiverses(retenuesTable, bulletin, f);
             document.Add(retenuesTable);
 
             // ---- Résultat ----
-            var netTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 14f };
+            var netTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 8f };
             netTable.SetWidths(new float[] { 3f, 1.3f });
             var netLabelCell = new PdfPCell(new Phrase("SALAIRE NET À PAYER", f.Total))
             {
@@ -268,19 +394,18 @@ namespace IUTSCalculator.Services
                 $"Mode de règlement : {bulletin.ModeReglement}" +
                 (string.IsNullOrWhiteSpace(bulletin.NumeroCompte) ? "" : $" — Compte : {bulletin.NumeroCompte}"),
                 f.Label)
-            { SpacingAfter = 24f };
+            { SpacingAfter = 10f };
             document.Add(reglementPara);
 
             // ---- Signatures ----
-            var signTable = new PdfPTable(2) { WidthPercentage = 100, SpacingBefore = 20f };
-            var empCell = new PdfPCell(new Phrase("\n\n\nL'employeur", f.Label)) { Border = Rectangle.TOP_BORDER, PaddingTop = 4f };
-            var salCell = new PdfPCell(new Phrase("\n\n\nSignature de l'employé(e)", f.Label)) { Border = Rectangle.TOP_BORDER, PaddingTop = 4f };
-            signTable.AddCell(empCell);
-            signTable.AddCell(salCell);
+            var signTable = new PdfPTable(2) { WidthPercentage = 100, SpacingBefore = 14f };
+            signTable.SetWidths(new float[] { 1f, 1f });
+            signTable.AddCell(CelluleSignature("L'employeur", f));
+            signTable.AddCell(CelluleSignature("Signature de l'employé(e)", f));
             document.Add(signTable);
 
             var mention = new Paragraph("Ce bulletin de salaire doit être conservé sans limitation de durée", f.Small)
-            { SpacingBefore = 16f, Alignment = Element.ALIGN_CENTER };
+            { SpacingBefore = 8f, Alignment = Element.ALIGN_CENTER };
             document.Add(mention);
         }
 
@@ -289,7 +414,7 @@ namespace IUTSCalculator.Services
         {
             string titreSection = $"CUMULS DEPUIS JANVIER {bulletin.PeriodeFin.Year}" + (bulletin.CumulsEstimes ? " (estimés)" : "");
             document.Add(SectionHeader(titreSection, f.Section));
-            var cumulsTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 10f };
+            var cumulsTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 5f };
             cumulsTable.SetWidths(new float[] { 3f, 1.3f });
             AddLigne(cumulsTable, "Cumul salaire brut", bulletin.CumulBrutAnnuel, f.Label, f.Value);
             AddLigne(cumulsTable, "Cumul CNSS part employé", bulletin.CumulCnssEmployeAnnuel, f.Label, f.Value);
@@ -307,7 +432,7 @@ namespace IUTSCalculator.Services
         /// <summary>Corps condensé (demi-page) : identité minimale + totaux essentiels uniquement.</summary>
         private void EcrireCorpsCondensePdf(Document document, Bulletin bulletin, PdfFonts f)
         {
-            var infoTable = new PdfPTable(4) { WidthPercentage = 100, SpacingAfter = 8f };
+            var infoTable = new PdfPTable(4) { WidthPercentage = 100, SpacingAfter = 5f };
             infoTable.SetWidths(new float[] { 1.3f, 2f, 1.3f, 2f });
             AddCell(infoTable, "Employé", f.LabelBold, BaseColor.LIGHT_GRAY);
             AddCell(infoTable, bulletin.NomComplet, f.Value);
@@ -315,11 +440,15 @@ namespace IUTSCalculator.Services
             AddCell(infoTable, bulletin.PeriodeLibelle, f.Value);
             document.Add(infoTable);
 
-            var totauxTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 10f };
+            var totauxTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 5f };
             totauxTable.SetWidths(new float[] { 3f, 1.3f });
             AddLigne(totauxTable, "Salaire brut", bulletin.SalaireBrut, f.Label, f.Value);
-            decimal totalRetenues = bulletin.CnssEmploye + bulletin.NetIUTS + bulletin.RetenueObligatoire;
-            AddLigne(totauxTable, "Total des retenues (CNSS + IUTS + retenue obligatoire)", totalRetenues, f.Label, f.Value);
+            decimal totalRetenues = TotalDesRetenues(bulletin);
+            AddLigne(totauxTable,
+                bulletin.TotalRetenuesDiverses > 0m
+                    ? "Total des retenues (CNSS + IUTS + retenue obligatoire + retenues diverses)"
+                    : "Total des retenues (CNSS + IUTS + retenue obligatoire)",
+                totalRetenues, f.Label, f.Value);
             AddLigne(totauxTable, "SALAIRE NET À PAYER", bulletin.SalaireNetAPayer, f.LabelBold, f.ValueBold, new BaseColor(220, 235, 220));
             document.Add(totauxTable);
 
@@ -334,7 +463,7 @@ namespace IUTSCalculator.Services
         /// <summary>Corps bilingue français / anglais.</summary>
         private void EcrireCorpsBilinguePdf(Document document, Bulletin bulletin, PdfFonts f)
         {
-            var infoTable = new PdfPTable(4) { WidthPercentage = 100, SpacingAfter = 10f };
+            var infoTable = new PdfPTable(4) { WidthPercentage = 100, SpacingAfter = 5f };
             infoTable.SetWidths(new float[] { 1.6f, 2f, 1.6f, 2f });
             AddCell(infoTable, "Employé / Employee", f.LabelBold, BaseColor.LIGHT_GRAY);
             AddCell(infoTable, bulletin.NomComplet, f.Value);
@@ -348,27 +477,30 @@ namespace IUTSCalculator.Services
             document.Add(infoTable);
 
             document.Add(SectionHeader("GAINS / EARNINGS", f.Section));
-            var gainsTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 10f };
+            var gainsTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 5f };
             gainsTable.SetWidths(new float[] { 3f, 1.3f });
             AddLigne(gainsTable, "Salaire de base / Base salary", bulletin.SalaireDeBase, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de logement / Housing allowance", bulletin.IndemniteLogement, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de transport / Transport allowance", bulletin.IndemniteTransport, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de fonction / Function allowance", bulletin.IndemniteFonction, f.Label, f.Value);
             AddLigne(gainsTable, "Indemnité de sujétion / Special duty allowance", bulletin.IndemniteSujetion, f.Label, f.Value);
+            AddGainsVariables(gainsTable, bulletin, f, avecTraitement: false);
+            AddRetenueAbsences(gainsTable, bulletin, f);
             AddLigne(gainsTable, "SALAIRE BRUT / GROSS SALARY", bulletin.SalaireBrut, f.LabelBold, f.ValueBold, BaseColor.LIGHT_GRAY);
             document.Add(gainsTable);
 
             document.Add(SectionHeader("COTISATIONS ET IMPÔT / DEDUCTIONS & TAX", f.Section));
-            var retenuesTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 10f };
+            var retenuesTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 5f };
             retenuesTable.SetWidths(new float[] { 3f, 1.3f });
             AddLigne(retenuesTable, "CNSS part employé / Employee social security", bulletin.CnssEmploye, f.Label, f.Value);
             AddLigne(retenuesTable, "CNSS part employeur / Employer social security", bulletin.CnssEmployeur, f.Label, f.Value);
             AddLigne(retenuesTable, "Base IUTS / Taxable base", bulletin.BaseIUTS, f.Label, f.Value);
             AddLigne(retenuesTable, "NET IUTS / Net income tax", bulletin.NetIUTS, f.LabelBold, f.ValueBold);
             AddLigne(retenuesTable, "Retenue obligatoire / Mandatory withholding", bulletin.RetenueObligatoire, f.Label, f.Value);
+            AddRetenuesDiverses(retenuesTable, bulletin, f);
             document.Add(retenuesTable);
 
-            var netTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 14f };
+            var netTable = new PdfPTable(2) { WidthPercentage = 100, SpacingAfter = 8f };
             netTable.SetWidths(new float[] { 3f, 1.3f });
             var netLabelCell = new PdfPCell(new Phrase("SALAIRE NET À PAYER / NET PAY", f.Total))
             {
@@ -392,16 +524,17 @@ namespace IUTSCalculator.Services
                 $"Mode de règlement / Payment method : {bulletin.ModeReglement}" +
                 (string.IsNullOrWhiteSpace(bulletin.NumeroCompte) ? "" : $" — Compte / Account : {bulletin.NumeroCompte}"),
                 f.Label)
-            { SpacingAfter = 24f };
+            { SpacingAfter = 10f };
             document.Add(reglementPara);
 
-            var signTable = new PdfPTable(2) { WidthPercentage = 100, SpacingBefore = 20f };
-            signTable.AddCell(new PdfPCell(new Phrase("\n\n\nL'employeur / Employer", f.Label)) { Border = Rectangle.TOP_BORDER, PaddingTop = 4f });
-            signTable.AddCell(new PdfPCell(new Phrase("\n\n\nSignature de l'employé(e) / Employee signature", f.Label)) { Border = Rectangle.TOP_BORDER, PaddingTop = 4f });
+            var signTable = new PdfPTable(2) { WidthPercentage = 100, SpacingBefore = 14f };
+            signTable.SetWidths(new float[] { 1f, 1f });
+            signTable.AddCell(CelluleSignature("L'employeur / Employer", f));
+            signTable.AddCell(CelluleSignature("Signature de l'employé(e) / Employee signature", f));
             document.Add(signTable);
 
             var mention = new Paragraph("Ce bulletin de salaire doit être conservé sans limitation de durée / This pay slip must be kept indefinitely", f.Small)
-            { SpacingBefore = 16f, Alignment = Element.ALIGN_CENTER };
+            { SpacingBefore = 8f, Alignment = Element.ALIGN_CENTER };
             document.Add(mention);
         }
 
@@ -424,7 +557,7 @@ namespace IUTSCalculator.Services
             if (string.IsNullOrWhiteSpace(numeroControle))
                 return;
 
-            var controleTable = new PdfPTable(2) { WidthPercentage = 100, SpacingBefore = 16f };
+            var controleTable = new PdfPTable(2) { WidthPercentage = 100, SpacingBefore = 10f };
             controleTable.SetWidths(new float[] { 1f, 4f });
 
             var qrCell = new PdfPCell { Border = Rectangle.NO_BORDER, Padding = 0f, VerticalAlignment = Element.ALIGN_MIDDLE };
@@ -444,12 +577,34 @@ namespace IUTSCalculator.Services
             document.Add(controleTable);
         }
 
+        /// <summary>Hauteur réservée à la signature manuscrite, sous l'intitulé.</summary>
+        private const float HauteurZoneSignature = 80f;
+
+        /// <summary>
+        /// Case de signature : l'intitulé en haut, puis une zone libre d'une hauteur
+        /// déterminée, où signer. La hauteur est fixée en points plutôt que par des sauts
+        /// de ligne — trois retours à la ligne donnaient une zone dont la taille dépendait
+        /// de la police, et qui devenait trop étroite pour une signature réelle.
+        /// </summary>
+        private PdfPCell CelluleSignature(string intitule, PdfFonts f)
+        {
+            var cellule = new PdfPCell(new Phrase(intitule, f.Label))
+            {
+                Border = Rectangle.TOP_BORDER,
+                PaddingTop = 5f,
+                PaddingLeft = 4f,
+                MinimumHeight = HauteurZoneSignature,
+                VerticalAlignment = Element.ALIGN_TOP
+            };
+            return cellule;
+        }
+
         private Paragraph SectionHeader(string text, Font font)
         {
             var p = new Paragraph(text, font)
             {
-                SpacingBefore = 8f,
-                SpacingAfter = 4f
+                SpacingBefore = 5f,
+                SpacingAfter = 2f
             };
             return p;
         }
@@ -458,7 +613,7 @@ namespace IUTSCalculator.Services
         {
             var cell = new PdfPCell(new Phrase(text, font))
             {
-                Padding = 5f,
+                Padding = 4f,
                 VerticalAlignment = Element.ALIGN_MIDDLE
             };
             if (background != null) cell.BackgroundColor = background;
@@ -467,14 +622,87 @@ namespace IUTSCalculator.Services
 
         private void AddLigne(PdfPTable table, string label, decimal montant, Font labelFont, Font valueFont, BaseColor background = null)
         {
-            var labelCell = new PdfPCell(new Phrase(label, labelFont)) { Padding = 5f, HorizontalAlignment = Element.ALIGN_LEFT };
-            var valueCell = new PdfPCell(new Phrase(FormatAmount(montant), valueFont)) { Padding = 5f, HorizontalAlignment = Element.ALIGN_RIGHT };
+            var labelCell = new PdfPCell(new Phrase(label, labelFont)) { Padding = 4f, HorizontalAlignment = Element.ALIGN_LEFT };
+            var valueCell = new PdfPCell(new Phrase(FormatAmount(montant), valueFont)) { Padding = 4f, HorizontalAlignment = Element.ALIGN_RIGHT };
             if (background != null) { labelCell.BackgroundColor = background; valueCell.BackgroundColor = background; }
             table.AddCell(labelCell);
             table.AddCell(valueCell);
         }
 
-        private string FormatAmount(decimal montant) => montant.ToString(CurrencyFormat, _culture) + " FCFA";
+        /// <summary>
+        /// Gains variables du mois (PAI-02), insérés entre les rubriques permanentes et le
+        /// salaire brut. Sans eux, le brut du bulletin ne serait pas la somme des lignes
+        /// qui le précèdent : un bulletin invérifiable par le salarié.
+        /// </summary>
+        private void AddGainsVariables(PdfPTable table, Bulletin bulletin, PdfFonts f, bool avecTraitement)
+        {
+            if (bulletin == null || !bulletin.ADesGainsVariables) return;
+
+            foreach (var ligne in bulletin.GainsVariables)
+            {
+                string label = avecTraitement && !string.IsNullOrWhiteSpace(ligne.Traitement)
+                    ? string.Format("{0}  [{1}]", ligne.Libelle, ligne.Traitement)
+                    : ligne.Libelle;
+                AddLigne(table, label, ligne.Montant, f.Label, f.Value);
+            }
+        }
+
+        /// <summary>
+        /// Retenue pour absence non rémunérée (PAI-04), placée juste avant le salaire
+        /// brut qu'elle a réduit. En négatif : c'est une soustraction dans une colonne
+        /// de gains, et rien ne doit laisser croire le contraire.
+        /// </summary>
+        private void AddRetenueAbsences(PdfPTable table, Bulletin bulletin, PdfFonts f)
+        {
+            if (bulletin == null || !bulletin.ADesAbsencesRetenues) return;
+
+            string label = string.IsNullOrWhiteSpace(bulletin.LibelleRetenueAbsences)
+                ? "Absence non rémunérée"
+                : bulletin.LibelleRetenueAbsences;
+
+            AddLigne(table, label, -bulletin.RetenueAbsences, f.Label, f.Value);
+        }
+
+        /// <summary>
+        /// Retenues diverses du mois (acompte, prêt, opposition…), déduites du net après
+        /// impôt et cotisations.
+        /// </summary>
+        private void AddRetenuesDiverses(PdfPTable table, Bulletin bulletin, PdfFonts f)
+        {
+            if (bulletin == null || !bulletin.ADesRetenuesVariables) return;
+
+            foreach (var ligne in bulletin.RetenuesVariables)
+                AddLigne(table, ligne.Libelle, ligne.Montant, f.Label, f.Value);
+
+            AddLigne(table, "Total des retenues diverses", bulletin.TotalRetenuesDiverses,
+                     f.LabelBold, f.ValueBold);
+        }
+
+        /// <summary>
+        /// Total de ce qui est retiré du brut pour arriver au net : cotisations, impôt,
+        /// retenue obligatoire ET retenues diverses du mois. Centralisé ici parce que trois
+        /// éditions le recalculaient chacune de leur côté — et en oubliaient une part dès
+        /// qu'un acompte était saisi, si bien que brut moins retenues ne donnait plus le net.
+        /// </summary>
+        private static decimal TotalDesRetenues(Bulletin bulletin)
+        {
+            if (bulletin == null) return 0m;
+
+            return bulletin.CnssEmploye + bulletin.NetIUTS
+                 + bulletin.RetenueObligatoire + bulletin.TotalRetenuesDiverses;
+        }
+
+        private string FormatAmount(decimal montant)
+        {
+            string nombre = montant.ToString(CurrencyFormat, _formatMontant);
+            return AfficherDevise ? nombre + " " + Devise : nombre;
+        }
+
+        /// <summary>Format numérique Excel correspondant au réglage de devise.</summary>
+        private string FormatMontantExcel
+        {
+            get { return AfficherDevise ? "#,##0 \"" + Devise + "\"" : "#,##0"; }
+        }
 
         #endregion
 
@@ -615,6 +843,8 @@ namespace IUTSCalculator.Services
             row = WriteMoneyRow(ws, row, "Indemnité de transport", bulletin.IndemniteTransport);
             row = WriteMoneyRow(ws, row, "Indemnité de fonction", bulletin.IndemniteFonction);
             row = WriteMoneyRow(ws, row, "Indemnité de sujétion", bulletin.IndemniteSujetion);
+            row = WriteGainsVariablesExcel(ws, row, bulletin);
+            row = WriteRetenueAbsencesExcel(ws, row, bulletin);
             row = WriteMoneyRow(ws, row, "SALAIRE BRUT", bulletin.SalaireBrut, bold: true, fill: true);
             row++;
 
@@ -628,6 +858,7 @@ namespace IUTSCalculator.Services
             row = WriteMoneyRow(ws, row, $"Abattement charges familiales ({bulletin.ChargesFamiliales})", bulletin.AbattementChargesFamiliales);
             row = WriteMoneyRow(ws, row, "NET IUTS", bulletin.NetIUTS, bold: true);
             row = WriteMoneyRow(ws, row, "Retenue obligatoire sur salaire", bulletin.RetenueObligatoire);
+            row = WriteRetenuesDiversesExcel(ws, row, bulletin);
             row++;
 
             row = WriteMoneyRow(ws, row, "SALAIRE NET À PAYER", bulletin.SalaireNetAPayer, bold: true, fill: true, big: true);
@@ -678,8 +909,7 @@ namespace IUTSCalculator.Services
             row++;
 
             row = WriteMoneyRow(ws, row, "Salaire brut", bulletin.SalaireBrut);
-            decimal totalRetenues = bulletin.CnssEmploye + bulletin.NetIUTS + bulletin.RetenueObligatoire;
-            row = WriteMoneyRow(ws, row, "Total des retenues", totalRetenues);
+            row = WriteMoneyRow(ws, row, "Total des retenues", TotalDesRetenues(bulletin));
             row = WriteMoneyRow(ws, row, "SALAIRE NET À PAYER", bulletin.SalaireNetAPayer, bold: true, fill: true, big: true);
             row++;
 
@@ -705,6 +935,8 @@ namespace IUTSCalculator.Services
             row = WriteMoneyRow(ws, row, "Indemnité de transport / Transport allowance", bulletin.IndemniteTransport);
             row = WriteMoneyRow(ws, row, "Indemnité de fonction / Function allowance", bulletin.IndemniteFonction);
             row = WriteMoneyRow(ws, row, "Indemnité de sujétion / Special duty allowance", bulletin.IndemniteSujetion);
+            row = WriteGainsVariablesExcel(ws, row, bulletin);
+            row = WriteRetenueAbsencesExcel(ws, row, bulletin);
             row = WriteMoneyRow(ws, row, "SALAIRE BRUT / GROSS SALARY", bulletin.SalaireBrut, bold: true, fill: true);
             row++;
 
@@ -714,6 +946,7 @@ namespace IUTSCalculator.Services
             row = WriteMoneyRow(ws, row, "Base IUTS / Taxable base", bulletin.BaseIUTS);
             row = WriteMoneyRow(ws, row, "NET IUTS / Net income tax", bulletin.NetIUTS, bold: true);
             row = WriteMoneyRow(ws, row, "Retenue obligatoire / Mandatory withholding", bulletin.RetenueObligatoire);
+            row = WriteRetenuesDiversesExcel(ws, row, bulletin);
             row++;
 
             row = WriteMoneyRow(ws, row, "SALAIRE NET À PAYER / NET PAY", bulletin.SalaireNetAPayer, bold: true, fill: true, big: true);
@@ -777,7 +1010,7 @@ namespace IUTSCalculator.Services
         {
             ws.Cell(row, 1).Value = label;
             ws.Cell(row, 2).Value = montant;
-            ws.Cell(row, 2).Style.NumberFormat.Format = "#,##0 \"FCFA\"";
+            ws.Cell(row, 2).Style.NumberFormat.Format = FormatMontantExcel;
 
             if (bold)
             {
@@ -794,6 +1027,41 @@ namespace IUTSCalculator.Services
                 ws.Cell(row, 2).Style.Font.FontSize = 13;
             }
             return row + 1;
+        }
+
+        /// <summary>Gains variables du mois, insérés avant la ligne de salaire brut.</summary>
+        private int WriteGainsVariablesExcel(IXLWorksheet ws, int row, Bulletin bulletin)
+        {
+            if (bulletin == null || !bulletin.ADesGainsVariables) return row;
+
+            foreach (var ligne in bulletin.GainsVariables)
+                row = WriteMoneyRow(ws, row, ligne.Libelle, ligne.Montant);
+
+            return row;
+        }
+
+        /// <summary>Retenue pour absence non rémunérée, insérée avant le salaire brut.</summary>
+        private int WriteRetenueAbsencesExcel(IXLWorksheet ws, int row, Bulletin bulletin)
+        {
+            if (bulletin == null || !bulletin.ADesAbsencesRetenues) return row;
+
+            string label = string.IsNullOrWhiteSpace(bulletin.LibelleRetenueAbsences)
+                ? "Absence non rémunérée"
+                : bulletin.LibelleRetenueAbsences;
+
+            return WriteMoneyRow(ws, row, label, -bulletin.RetenueAbsences);
+        }
+
+        /// <summary>Retenues diverses du mois, insérées après la retenue obligatoire.</summary>
+        private int WriteRetenuesDiversesExcel(IXLWorksheet ws, int row, Bulletin bulletin)
+        {
+            if (bulletin == null || !bulletin.ADesRetenuesVariables) return row;
+
+            foreach (var ligne in bulletin.RetenuesVariables)
+                row = WriteMoneyRow(ws, row, ligne.Libelle, ligne.Montant);
+
+            return WriteMoneyRow(ws, row, "Total des retenues diverses",
+                                 bulletin.TotalRetenuesDiverses, bold: true);
         }
 
         #endregion
@@ -857,7 +1125,7 @@ namespace IUTSCalculator.Services
                 decimal totalBrut = 0, totalRetenues = 0, totalNet = 0;
                 foreach (var b in bulletins)
                 {
-                    decimal retenues = b.CnssEmploye + b.NetIUTS + b.RetenueObligatoire;
+                    decimal retenues = TotalDesRetenues(b);
                     AddCell(table, b.NomComplet, f.Value);
                     AddCell(table, b.Emploi ?? "-", f.Value);
                     AddCell(table, FormatAmount(b.SalaireBrut), f.Value);
@@ -953,7 +1221,7 @@ namespace IUTSCalculator.Services
                     decimal totalBrut = 0, totalRetenues = 0, totalNet = 0;
                     foreach (var b in bulletins)
                     {
-                        decimal retenues = b.CnssEmploye + b.NetIUTS + b.RetenueObligatoire;
+                        decimal retenues = TotalDesRetenues(b);
                         ws.Cell(row, 1).Value = b.NomComplet;
                         ws.Cell(row, 2).Value = b.Emploi ?? "-";
                         ws.Cell(row, 3).Value = b.SalaireBrut;
@@ -976,7 +1244,7 @@ namespace IUTSCalculator.Services
                     int totalRow = row;
                     row += 2;
 
-                    ws.Range(firstDataRow, 3, totalRow, 5).Style.NumberFormat.Format = "#,##0 \"FCFA\"";
+                    ws.Range(firstDataRow, 3, totalRow, 5).Style.NumberFormat.Format = FormatMontantExcel;
 
                     string numeroControle = QrCodeService.GenererNumeroControle(
                         $"REGISTRE|{premier.PeriodeFin:yyyyMM}|{bulletins.Count}|{totalNet}|{DateTime.Now:yyyyMMddHHmmss}");

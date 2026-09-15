@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data.SQLite;
@@ -53,7 +53,8 @@ namespace IUTSCalculator.Services
         private const string ColonnesEmploye =
             "EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, " +
             "FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, " +
-            "Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale";
+            "Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, " +
+            "DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie";
 
         /// <summary>
         /// Construit un employé à partir de la ligne courante du lecteur. Point de passage
@@ -80,7 +81,27 @@ namespace IUTSCalculator.Services
                 Category = DbValue.TextFromDb(reader["Category"]),
                 Fonction = DbValue.TextFromDb(reader["Fonction"]),
                 DateEntree = DbValue.DateFromDb(reader["DateEntree"], default(DateTime)),
-                SituationMatrimoniale = DbValue.TextFromDb(reader["SituationMatrimoniale"])
+                SituationMatrimoniale = DbValue.TextFromDb(reader["SituationMatrimoniale"]),
+                NumeroCnss = DbValue.TextFromDb(reader["NumeroCnss"]),
+                DateNaissance = DbValue.DateNullableFromDb(reader["DateNaissance"]),
+                LieuNaissance = DbValue.TextFromDb(reader["LieuNaissance"]),
+                Sexe = DbValue.TextFromDb(reader["Sexe"]),
+                Nationalite = DbValue.TextFromDb(reader["Nationalite"]),
+                NumeroCnib = DbValue.TextFromDb(reader["NumeroCnib"]),
+                DateDelivranceCnib = DbValue.DateNullableFromDb(reader["DateDelivranceCnib"]),
+                LieuDelivranceCnib = DbValue.TextFromDb(reader["LieuDelivranceCnib"]),
+                Adresse = DbValue.TextFromDb(reader["Adresse"]),
+                Telephone = DbValue.TextFromDb(reader["Telephone"]),
+                Email = DbValue.TextFromDb(reader["Email"]),
+                NumeroIfu = DbValue.TextFromDb(reader["NumeroIfu"]),
+                Banque = DbValue.TextFromDb(reader["Banque"]),
+                NumeroCompte = DbValue.TextFromDb(reader["NumeroCompte"]),
+                ModeReglement = DbValue.TextFromDb(reader["ModeReglement"]),
+                ConventionId = reader["ConventionId"] != DBNull.Value && reader["ConventionId"] != null ? Convert.ToInt32(reader["ConventionId"]) : (int?)null,
+                Echelon = DbValue.TextFromDb(reader["Echelon"]),
+                DateSortie = DbValue.DateNullableFromDb(reader["DateSortie"]),
+                MotifDepart = DbValue.TextFromDb(reader["MotifDepart"]),
+                StatutSalarie = DbValue.IntFromDb(reader["StatutSalarie"])
             };
         }
 
@@ -157,9 +178,9 @@ namespace IUTSCalculator.Services
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
                     INSERT OR REPLACE INTO Employees
-                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale)
+                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie)
                     VALUES
-                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale);";
+                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie);";
 
                 cmd.Parameters.AddWithValue("@EmployeeId", employee.EmployeeId);
                 cmd.Parameters.AddWithValue("@FirstName", employee.FirstName ?? "");
@@ -178,6 +199,26 @@ namespace IUTSCalculator.Services
                 cmd.Parameters.AddWithValue("@DateEntree",
                     employee.DateEntree == default(DateTime) ? string.Empty : DbValue.DateToDb(employee.DateEntree));
                 cmd.Parameters.AddWithValue("@SituationMatrimoniale", employee.SituationMatrimoniale ?? "");
+                cmd.Parameters.AddWithValue("@NumeroCnss", employee.NumeroCnss ?? "");
+                cmd.Parameters.AddWithValue("@DateNaissance", DbValue.DateNullableToDb(employee.DateNaissance));
+                cmd.Parameters.AddWithValue("@LieuNaissance", employee.LieuNaissance ?? "");
+                cmd.Parameters.AddWithValue("@Sexe", employee.Sexe ?? "");
+                cmd.Parameters.AddWithValue("@Nationalite", employee.Nationalite ?? "");
+                cmd.Parameters.AddWithValue("@NumeroCnib", employee.NumeroCnib ?? "");
+                cmd.Parameters.AddWithValue("@DateDelivranceCnib", DbValue.DateNullableToDb(employee.DateDelivranceCnib));
+                cmd.Parameters.AddWithValue("@LieuDelivranceCnib", employee.LieuDelivranceCnib ?? "");
+                cmd.Parameters.AddWithValue("@Adresse", employee.Adresse ?? "");
+                cmd.Parameters.AddWithValue("@Telephone", employee.Telephone ?? "");
+                cmd.Parameters.AddWithValue("@Email", employee.Email ?? "");
+                cmd.Parameters.AddWithValue("@NumeroIfu", employee.NumeroIfu ?? "");
+                cmd.Parameters.AddWithValue("@Banque", employee.Banque ?? "");
+                cmd.Parameters.AddWithValue("@NumeroCompte", employee.NumeroCompte ?? "");
+                cmd.Parameters.AddWithValue("@ModeReglement", employee.ModeReglement ?? "");
+                cmd.Parameters.AddWithValue("@ConventionId", employee.ConventionId.HasValue ? (object)employee.ConventionId.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Echelon", employee.Echelon ?? "");
+                cmd.Parameters.AddWithValue("@DateSortie", DbValue.DateNullableToDb(employee.DateSortie));
+                cmd.Parameters.AddWithValue("@MotifDepart", employee.MotifDepart ?? "");
+                cmd.Parameters.AddWithValue("@StatutSalarie", employee.StatutSalarie);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -260,7 +301,14 @@ namespace IUTSCalculator.Services
                             MasseSalariale = DbValue.MoneyFromDb(reader["MasseSalariale"]),
                             ChargesPatronales = DbValue.MoneyFromDb(reader["ChargesPatronales"]),
                             NetSalaryAfterTaxPersisted = DbValue.MoneyFromDb(reader["NetSalaryAfterTax"]),
-                            SalaireNetaPayerPersisted = DbValue.MoneyFromDb(reader["SalaireNetaPayer"])
+                            SalaireNetaPayerPersisted = DbValue.MoneyFromDb(reader["SalaireNetaPayer"]),
+                            AssietteCnss = DbValue.MoneyFromDb(reader["AssietteCnss"]),
+                            CnssPrestationsFamiliales = DbValue.MoneyFromDb(reader["CnssPrestationsFamiliales"]),
+                            CnssRisquesProfessionnels = DbValue.MoneyFromDb(reader["CnssRisquesProfessionnels"]),
+                            CnssPensionsPatronal = DbValue.MoneyFromDb(reader["CnssPensionsPatronal"]),
+                            RetenuesDiverses = DbValue.MoneyFromDb(reader["RetenuesDiverses"]),
+                            GainsVariables = DbValue.MoneyFromDb(reader["GainsVariables"]),
+                            AssietteTPA = DbValue.MoneyFromDb(reader["AssietteTPA"])
                         });
                     }
                 }
@@ -287,6 +335,178 @@ namespace IUTSCalculator.Services
             }
         }
 
+        /// <summary>
+        /// Enregistre le bulletin d'un salarié pour un mois donné, en REMPLAÇANT celui
+        /// qui existerait déjà pour ce salarié et ce mois.
+        ///
+        /// C'est ce remplacement qui fait la différence entre un historique et un
+        /// empilement : sans lui, régénérer trois fois le bulletin de septembre laisserait
+        /// trois lignes, et la déclaration CNSS déclarerait trois fois le même salaire.
+        /// Un salarié n'a qu'un bulletin par mois.
+        ///
+        /// Le verrou de clôture s'applique : un mois arrêté n'accepte plus de bulletin.
+        /// </summary>
+        public async Task EnregistrerBulletinDuMoisAsync(
+            TaxCalculation calculation, DateTime periode, Bulletin bulletin = null)
+        {
+            if (calculation == null) throw new ArgumentNullException(nameof(calculation));
+
+            var debut = new DateTime(periode.Year, periode.Month, 1);
+            var fin = debut.AddMonths(1).AddDays(-1);
+
+            // La date du calcul EST celle de la période : c'est elle que lisent les
+            // déclarations, et c'est sur elle que porte le verrou de clôture.
+            calculation.CalculationDate = fin;
+
+            string employeeId = calculation.Employee != null ? calculation.Employee.EmployeeId : null;
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(employeeId))
+                    {
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            cmd.Transaction = tx;
+                            cmd.CommandText =
+                                "DELETE FROM TaxCalculations " +
+                                "WHERE EmployeeId = @employe " +
+                                "  AND CalculationDate >= @debut AND CalculationDate <= @fin " +
+                                "  AND IsAnnual = 0 AND IsRegularization = 0;";
+                            cmd.Parameters.AddWithValue("@employe", employeeId);
+                            cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
+                            cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.AddDays(1).AddTicks(-1)));
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    // Un identifiant neuf : l'ancien vient d'être supprimé, le réutiliser
+                    // ferait dépendre le résultat de l'ordre des opérations.
+                    calculation.Id = Guid.NewGuid().ToString();
+
+                    await AddCalculationToHistoryAsync(calculation, conn, tx);
+
+                    // Le document lui-même est archivé à côté de son calcul : c'est lui
+                    // qu'on réaffichera, sans rien recalculer, si le bulletin est rappelé.
+                    if (bulletin != null)
+                        await ArchiverBulletinAsync(conn, tx, calculation.Id, bulletin);
+
+                    tx.Commit();
+                }
+                catch
+                {
+                    try { tx.Rollback(); }
+                    catch { /* connexion perdue */ }
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Écrit le bulletin édité en clair à côté de son calcul. Un échec de
+        /// sérialisation ne doit pas faire perdre la paie : le calcul reste enregistré,
+        /// seul le rappel à l'identique sera indisponible pour ce mois.
+        /// </summary>
+        private static async Task ArchiverBulletinAsync(
+            SQLiteConnection conn, SQLiteTransaction tx, string calculationId, Bulletin bulletin)
+        {
+            if (string.IsNullOrEmpty(calculationId) || bulletin == null) return;
+
+            string archive;
+            try
+            {
+                archive = JsonSerializer.Serialize(bulletin);
+            }
+            catch
+            {
+                return;
+            }
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "UPDATE TaxCalculations SET BulletinArchive = @archive WHERE Id = @id;";
+                cmd.Parameters.AddWithValue("@archive", archive);
+                cmd.Parameters.AddWithValue("@id", calculationId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        /// <summary>
+        /// Rappelle le bulletin archivé d'un salarié pour un mois : le document tel qu'il
+        /// a été édité, sans aucun recalcul. Renvoie null si ce mois n'a pas de bulletin
+        /// enregistré, ou s'il a été enregistré avant l'archivage (bulletins antérieurs à
+        /// la migration 15) — l'appelant propose alors de le régénérer.
+        /// </summary>
+        public async Task<Bulletin> RappelerBulletinAsync(string employeeId, DateTime periode)
+        {
+            if (string.IsNullOrWhiteSpace(employeeId)) return null;
+
+            var debut = new DateTime(periode.Year, periode.Month, 1);
+            var fin = debut.AddMonths(1).AddDays(-1);
+
+            string archive = null;
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText =
+                    "SELECT BulletinArchive FROM TaxCalculations " +
+                    "WHERE EmployeeId = @employe " +
+                    "  AND CalculationDate >= @debut AND CalculationDate <= @fin " +
+                    "  AND IsAnnual = 0 AND IsRegularization = 0 " +
+                    "ORDER BY CalculationDate DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@employe", employeeId);
+                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
+                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.AddDays(1).AddTicks(-1)));
+
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                        archive = DbValue.TextFromDb(reader["BulletinArchive"]);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(archive)) return null;
+
+            try
+            {
+                return JsonSerializer.Deserialize<Bulletin>(archive);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Vrai si un bulletin est enregistré pour ce salarié et ce mois.</summary>
+        public async Task<bool> BulletinEnregistreAsync(string employeeId, DateTime periode)
+        {
+            if (string.IsNullOrWhiteSpace(employeeId)) return false;
+
+            var debut = new DateTime(periode.Year, periode.Month, 1);
+            var fin = debut.AddMonths(1).AddDays(-1);
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText =
+                    "SELECT COUNT(*) FROM TaxCalculations " +
+                    "WHERE EmployeeId = @employe " +
+                    "  AND CalculationDate >= @debut AND CalculationDate <= @fin " +
+                    "  AND IsAnnual = 0 AND IsRegularization = 0;";
+                cmd.Parameters.AddWithValue("@employe", employeeId);
+                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
+                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.AddDays(1).AddTicks(-1)));
+
+                object brut = await cmd.ExecuteScalarAsync();
+                int nombre;
+                return brut != null && int.TryParse(brut.ToString(), out nombre) && nombre > 0;
+            }
+        }
+
         public async Task AddCalculationToHistoryAsync(TaxCalculation calculation)
         {
             using (var conn = _sqliteService.CreateConnection())
@@ -294,6 +514,33 @@ namespace IUTSCalculator.Services
             {
                 await AddCalculationToHistoryAsync(calculation, conn, tx);
                 tx.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Refuse l'écriture si le calcul tombe dans une période de paie clôturée
+        /// (module PAI-01).
+        ///
+        /// C'est ici, et nulle part ailleurs, que le verrou a un sens : tous les
+        /// enregistrements d'un calcul passent par <c>AddCalculationToHistoryAsync</c>.
+        /// Sans ce contrôle, la clôture ne serait qu'une étiquette — on pourrait écraser
+        /// en novembre un bulletin de mars déjà déclaré à la CNSS et à la DGI.
+        ///
+        /// Tant qu'aucune période n'a été clôturée, ce contrôle ne change rien : une
+        /// période jamais ouverte n'est pas close.
+        /// </summary>
+        private static async Task VerifierPeriodeOuverteAsync(
+            SQLiteConnection conn, SQLiteTransaction tx, TaxCalculation calculation)
+        {
+            if (calculation == null) return;
+
+            if (await PeriodePaieService.EstClotureeAsync(conn, calculation.CalculationDate, tx))
+            {
+                throw new InvalidOperationException(string.Format(
+                    "La période de {0:MM/yyyy} est clôturée : ce bulletin ne peut plus être " +
+                    "enregistré. Rouvrez la période depuis l'écran « Périodes de paie » si la " +
+                    "correction est justifiée.",
+                    calculation.CalculationDate));
             }
         }
 
@@ -308,6 +555,9 @@ namespace IUTSCalculator.Services
             if (calculation.CalculationDate == default)
                 calculation.CalculationDate = DateTime.Now;
 
+            // Verrou de clôture : la date est désormais connue, le contrôle a un sens.
+            await VerifierPeriodeOuverteAsync(conn, tx, calculation);
+
             // L'employé peut être absent (calcul libre, sans fiche associée) : la colonne
             // EmployeeId accepte alors une chaîne vide, comme plus bas.
             if (calculation.Employee != null)
@@ -318,9 +568,9 @@ namespace IUTSCalculator.Services
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
                     INSERT OR REPLACE INTO TaxCalculations
-                    (Id, EmployeeId, CalculationDate, SalaireBrut, BaseIUTSHorsDeduction, IUTSNet, TaxRate, FamilyChargeReduction, ExemptAmount, CalculationDetails, IsAnnual, IsRegularization, TaxDifference, CnssEmployee, CnssPartPatronale, TaxePatronale, RetenueSpeciale, MasseSalariale, ChargesPatronales, NetSalaryAfterTax, SalaireNetaPayer)
+                    (Id, EmployeeId, CalculationDate, SalaireBrut, BaseIUTSHorsDeduction, IUTSNet, TaxRate, FamilyChargeReduction, ExemptAmount, CalculationDetails, IsAnnual, IsRegularization, TaxDifference, CnssEmployee, CnssPartPatronale, TaxePatronale, RetenueSpeciale, MasseSalariale, ChargesPatronales, NetSalaryAfterTax, SalaireNetaPayer, AssietteCnss, CnssPrestationsFamiliales, CnssRisquesProfessionnels, CnssPensionsPatronal, RetenuesDiverses, GainsVariables, AssietteTPA)
                     VALUES
-                    (@Id, @EmployeeId, @CalculationDate, @SalaireBrut, @BaseIUTSHorsDeduction, @IUTSNet, @TaxRate, @FamilyChargeReduction, @ExemptAmount, @CalculationDetails, @IsAnnual, @IsRegularization, @TaxDifference, @CnssEmployee, @CnssPartPatronale, @TaxePatronale, @RetenueSpeciale, @MasseSalariale, @ChargesPatronales, @NetSalaryAfterTax, @SalaireNetaPayer);";
+                    (@Id, @EmployeeId, @CalculationDate, @SalaireBrut, @BaseIUTSHorsDeduction, @IUTSNet, @TaxRate, @FamilyChargeReduction, @ExemptAmount, @CalculationDetails, @IsAnnual, @IsRegularization, @TaxDifference, @CnssEmployee, @CnssPartPatronale, @TaxePatronale, @RetenueSpeciale, @MasseSalariale, @ChargesPatronales, @NetSalaryAfterTax, @SalaireNetaPayer, @AssietteCnss, @CnssPrestationsFamiliales, @CnssRisquesProfessionnels, @CnssPensionsPatronal, @RetenuesDiverses, @GainsVariables, @AssietteTPA);";
 
                 cmd.Parameters.AddWithValue("@Id", calculation.Id);
                 cmd.Parameters.AddWithValue("@EmployeeId", calculation.Employee?.EmployeeId ?? "");
@@ -343,8 +593,27 @@ namespace IUTSCalculator.Services
                 cmd.Parameters.AddWithValue("@RetenueSpeciale", DbValue.MoneyToDb(calculation.RetenueSpeciale));
                 cmd.Parameters.AddWithValue("@MasseSalariale", DbValue.MoneyToDb(calculation.MasseSalariale));
                 cmd.Parameters.AddWithValue("@ChargesPatronales", DbValue.MoneyToDb(calculation.ChargesPatronales));
-                cmd.Parameters.AddWithValue("@NetSalaryAfterTax", DbValue.MoneyToDb(calculation.NetSalaryAfterTaxPersisted));
-                cmd.Parameters.AddWithValue("@SalaireNetaPayer", DbValue.MoneyToDb(calculation.SalaireNetaPayerPersisted));
+                // Les deux nets sont des champs de persistance distincts des propriétés
+                // calculées. Si l'appelant ne les a pas alimentés, on écrit la valeur
+                // calculée plutôt qu'un zéro : un net à payer nul en base rend faux tout
+                // ce qui s'appuie dessus — totaux de période, livre de paie, virements.
+                decimal netApresImpot = calculation.NetSalaryAfterTaxPersisted != 0m
+                    ? calculation.NetSalaryAfterTaxPersisted
+                    : calculation.NetSalaryAfterTax;
+
+                decimal netAPayer = calculation.SalaireNetaPayerPersisted != 0m
+                    ? calculation.SalaireNetaPayerPersisted
+                    : calculation.SalaireNetaPayer;
+
+                cmd.Parameters.AddWithValue("@NetSalaryAfterTax", DbValue.MoneyToDb(netApresImpot));
+                cmd.Parameters.AddWithValue("@SalaireNetaPayer", DbValue.MoneyToDb(netAPayer));
+                cmd.Parameters.AddWithValue("@AssietteCnss", DbValue.MoneyToDb(calculation.AssietteCnss));
+                cmd.Parameters.AddWithValue("@CnssPrestationsFamiliales", DbValue.MoneyToDb(calculation.CnssPrestationsFamiliales));
+                cmd.Parameters.AddWithValue("@CnssRisquesProfessionnels", DbValue.MoneyToDb(calculation.CnssRisquesProfessionnels));
+                cmd.Parameters.AddWithValue("@CnssPensionsPatronal", DbValue.MoneyToDb(calculation.CnssPensionsPatronal));
+                cmd.Parameters.AddWithValue("@RetenuesDiverses", DbValue.MoneyToDb(calculation.RetenuesDiverses));
+                cmd.Parameters.AddWithValue("@GainsVariables", DbValue.MoneyToDb(calculation.GainsVariables));
+                cmd.Parameters.AddWithValue("@AssietteTPA", DbValue.MoneyToDb(calculation.AssietteTPA));
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -423,6 +692,34 @@ namespace IUTSCalculator.Services
                         if (ColumnExists(reader, "ExportDirectory"))
                             settings.ExportDirectory = reader["ExportDirectory"]?.ToString();
 
+                        // Colonnes ajoutées par la migration 13 (congés et absences).
+                        if (ColumnExists(reader, "JoursCongesParMois"))
+                        {
+                            decimal jours = DbValue.DecimalFromDb(reader["JoursCongesParMois"]);
+                            if (jours > 0m) settings.JoursCongesParMois = jours;
+                        }
+
+                        if (ColumnExists(reader, "BaseRetenueAbsence"))
+                        {
+                            int baseRetenue;
+                            if (int.TryParse((reader["BaseRetenueAbsence"] ?? "").ToString(), out baseRetenue)
+                                && Enum.IsDefined(typeof(BaseRetenueAbsence), baseRetenue))
+                            {
+                                settings.BaseRetenueAbsence = (BaseRetenueAbsence)baseRetenue;
+                            }
+                        }
+
+                        // Colonne ajoutée par la migration 12 : une base plus ancienne
+                        // ouverte avant la mise à niveau garde la valeur par défaut.
+                        if (ColumnExists(reader, "AfficherDevise"))
+                        {
+                            var brut = reader["AfficherDevise"];
+                            int valeur;
+                            settings.AfficherDeviseSurBulletin =
+                                brut == null || brut == DBNull.Value
+                                || !int.TryParse(brut.ToString(), out valeur) || valeur != 0;
+                        }
+
                         if (ColumnExists(reader, "TaxBrackets"))
                         {
                             var json = reader["TaxBrackets"]?.ToString();
@@ -480,9 +777,9 @@ namespace IUTSCalculator.Services
                     cmd.Transaction = tx;
                     cmd.CommandText = @"
                         INSERT INTO AppSettings 
-                        (Theme, Language, AutoSave, LastUpdated, ExportDirectory, TaxBrackets, FamilyCharges)
+                        (Theme, Language, AutoSave, LastUpdated, ExportDirectory, TaxBrackets, FamilyCharges, AfficherDevise, JoursCongesParMois, BaseRetenueAbsence)
                         VALUES 
-                        (@Theme, @Language, @AutoSave, @LastUpdated, @ExportDirectory, @TaxBrackets, @FamilyCharges);";
+                        (@Theme, @Language, @AutoSave, @LastUpdated, @ExportDirectory, @TaxBrackets, @FamilyCharges, @AfficherDevise, @JoursCongesParMois, @BaseRetenueAbsence);";
                     cmd.Parameters.AddWithValue("@Theme", settings.Theme ?? "Light");
                     cmd.Parameters.AddWithValue("@Language", settings.Language ?? "fr-FR");
                     cmd.Parameters.AddWithValue("@AutoSave", settings.AutoSave ? 1 : 0);
@@ -490,6 +787,10 @@ namespace IUTSCalculator.Services
                     cmd.Parameters.AddWithValue("@ExportDirectory", settings.ExportDirectory ?? string.Empty);
                     cmd.Parameters.AddWithValue("@TaxBrackets", settings.TaxBrackets != null ? JsonSerializer.Serialize(settings.TaxBrackets) : string.Empty);
                     cmd.Parameters.AddWithValue("@FamilyCharges", settings.FamilyCharges != null ? JsonSerializer.Serialize(settings.FamilyCharges) : string.Empty);
+                    cmd.Parameters.AddWithValue("@AfficherDevise", settings.AfficherDeviseSurBulletin ? 1 : 0);
+                    cmd.Parameters.AddWithValue("@JoursCongesParMois", DbValue.DecimalToDb(
+                        settings.JoursCongesParMois > 0m ? settings.JoursCongesParMois : 2.5m));
+                    cmd.Parameters.AddWithValue("@BaseRetenueAbsence", (int)settings.BaseRetenueAbsence);
                     await cmd.ExecuteNonQueryAsync();
                 }
                 tx.Commit();

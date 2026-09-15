@@ -83,6 +83,11 @@
                         <Label Content="IFU / NIF" Style="{StaticResource FormLabelStyle}"/>
                         <TextBox Text="{Binding EditingDossier.IFU, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
 
+                        <Label Content="N° employeur CNSS" Style="{StaticResource FormLabelStyle}"/>
+                        <TextBox Text="{Binding EditingDossier.NumeroEmployeurCnss, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 ToolTip="Numéro d'employeur à la CNSS. Il figure en en-tête du bordereau de cotisations."/>
+
                         <Label Content="RCCM" Style="{StaticResource FormLabelStyle}"/>
                         <TextBox Text="{Binding EditingDossier.RCCM, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
 

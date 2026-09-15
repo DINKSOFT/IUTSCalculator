@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace IUTSCalculator.Models
 {
@@ -27,16 +29,20 @@ namespace IUTSCalculator.Models
         public string EntrepriseLogoPath { get; set; }
 
         /// <summary>Indique si un logo valide (chemin renseigné et fichier existant) est disponible</summary>
+        [JsonIgnore]
         public bool HasLogo => !string.IsNullOrWhiteSpace(EntrepriseLogoPath) && File.Exists(EntrepriseLogoPath);
 
         /// <summary>Inverse de <see cref="HasLogo"/> (utilisé pour afficher l'emplacement réservé au logo)</summary>
+        [JsonIgnore]
         public bool NoLogo => !HasLogo;
 
         /// <summary>Adresse et ville de l'entreprise sur une seule ligne (ex. "12 Av. Kwamé N'Krumah, Ouagadougou")</summary>
+        [JsonIgnore]
         public string EntrepriseAdresseLigne =>
             string.Join(", ", new[] { EntrepriseAdresse, EntrepriseVille }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         /// <summary>IFU et RCCM de l'entreprise sur une seule ligne</summary>
+        [JsonIgnore]
         public string EntrepriseIdentifiants =>
             string.Join("  —  ", new[]
             {
@@ -87,8 +93,115 @@ namespace IUTSCalculator.Models
         public decimal IndemniteFonction { get; set; }
         public decimal IndemniteSujetion { get; set; }
 
-        /// <summary>Salaire brut = salaire de base + toutes les indemnités</summary>
+        /// <summary>Salaire brut = salaire de base + toutes les indemnités + gains variables du mois</summary>
         public decimal SalaireBrut { get; set; }
+
+        #endregion
+
+        #region Variables du mois (PAI-02)
+
+        /// <summary>
+        /// Les variables saisies pour ce salarié sur cette période : heures supplémentaires,
+        /// primes, acomptes, oppositions… Vide quand rien n'a été saisi, auquel cas le
+        /// bulletin est en tout point celui qu'on obtenait avant ce module.
+        ///
+        /// Ces lignes ne sont pas décoratives : elles expliquent l'écart entre la somme des
+        /// rubriques permanentes et le salaire brut. Un bulletin dont le brut ne se
+        /// décompose pas n'est pas opposable au salarié.
+        /// </summary>
+        public List<LigneBulletinVariable> LignesVariables { get; set; }
+            = new List<LigneBulletinVariable>();
+
+        /// <summary>Total des gains variables du mois (compris dans <see cref="SalaireBrut"/>).</summary>
+        public decimal TotalGainsVariables { get; set; }
+
+        /// <summary>
+        /// Retenue pour absence non rémunérée (module PAI-04), déjà déduite du
+        /// <see cref="SalaireBrut"/>. Affichée en clair sur le bulletin : un brut
+        /// inférieur au salaire contractuel sans ligne pour l'expliquer est la première
+        /// cause de contestation d'un bulletin.
+        /// </summary>
+        public decimal RetenueAbsences { get; set; }
+
+        /// <summary>Libellé de cette retenue (« Absence non rémunérée (3 j) »).</summary>
+        public string LibelleRetenueAbsences { get; set; }
+
+        /// <summary>Vrai si une absence non rémunérée pèse sur ce bulletin.</summary>
+        [JsonIgnore]
+        public bool ADesAbsencesRetenues
+        {
+            get { return RetenueAbsences > 0m; }
+        }
+
+        /// <summary>
+        /// Total des retenues diverses du mois, déduites du net après impôt et cotisations
+        /// (acompte, prêt, opposition, cotisation syndicale).
+        /// </summary>
+        public decimal TotalRetenuesDiverses { get; set; }
+
+        /// <summary>Vrai si des variables ont été saisies : pilote l'affichage des sections dédiées.</summary>
+        [JsonIgnore]
+        public bool ADesVariables
+        {
+            get { return LignesVariables != null && LignesVariables.Count > 0; }
+        }
+
+        /// <summary>Gains variables seuls, dans l'ordre de saisie.</summary>
+        [JsonIgnore]
+        public List<LigneBulletinVariable> GainsVariables
+        {
+            get
+            {
+                return (LignesVariables ?? new List<LigneBulletinVariable>())
+                    .Where(l => !l.EstRetenue).ToList();
+            }
+        }
+
+        /// <summary>Retenues diverses seules, dans l'ordre de saisie.</summary>
+        [JsonIgnore]
+        public List<LigneBulletinVariable> RetenuesVariables
+        {
+            get
+            {
+                return (LignesVariables ?? new List<LigneBulletinVariable>())
+                    .Where(l => l.EstRetenue).ToList();
+            }
+        }
+
+        /// <summary>Vrai si au moins un gain variable figure sur le bulletin.</summary>
+        [JsonIgnore]
+        public bool ADesGainsVariables
+        {
+            get { return GainsVariables.Count > 0; }
+        }
+
+        /// <summary>Vrai si au moins une retenue diverse figure sur le bulletin.</summary>
+        [JsonIgnore]
+        public bool ADesRetenuesVariables
+        {
+            get { return RetenuesVariables.Count > 0; }
+        }
+
+        /// <summary>
+        /// Rémunération permanente : salaire de base et indemnités contractuelles, hors
+        /// variables du mois. C'est le sous-total qui rend le brut vérifiable.
+        /// </summary>
+        [JsonIgnore]
+        public decimal TotalRemunerationPermanente
+        {
+            get
+            {
+                return SalaireDeBase + IndemniteLogement + IndemniteTransport
+                     + IndemniteFonction + IndemniteSujetion;
+            }
+        }
+
+        /// <summary>
+        /// Congés acquis restants à la fin de la période, tels que le compteur PAI-04 les
+        /// arrête. Zéro tant qu'aucune absence n'est enregistrée, auquel cas le bulletin
+        /// garde le décompte estimé d'après l'ancienneté.
+        /// </summary>
+        public decimal SoldeCongesJours { get; set; }
 
         #endregion
 
@@ -172,9 +285,11 @@ namespace IUTSCalculator.Models
         /// <summary>Date/heure à laquelle ce bulletin a été généré</summary>
         public DateTime DateGeneration { get; set; } = DateTime.Now;
 
+        [JsonIgnore]
         public string NomComplet => $"{NomEmploye} {PrenomEmploye}".Trim();
 
         /// <summary>Libellé de période au format "01 au 28 Février 2024", comme sur le modèle de référence</summary>
+        [JsonIgnore]
         public string PeriodeLibelle
         {
             get
@@ -184,6 +299,35 @@ namespace IUTSCalculator.Models
                 moisAnnee = culture.TextInfo.ToTitleCase(moisAnnee);
                 return $"{PeriodeDebut:dd} au {PeriodeFin:dd} {moisAnnee}";
             }
+        }
+    }
+
+    /// <summary>
+    /// Une variable du mois telle qu'elle figure sur le bulletin (PAI-02) : un instantané
+    /// de la saisie, figé au moment de la génération comme le reste du bulletin.
+    /// </summary>
+    public class LigneBulletinVariable
+    {
+        /// <summary>Code de la rubrique (HSUP, PRIME, ACOMPTE…).</summary>
+        public string Code { get; set; }
+
+        /// <summary>Libellé affiché, quantité comprise le cas échéant : « Heures supplémentaires (12) ».</summary>
+        public string Libelle { get; set; }
+
+        /// <summary>Montant en valeur absolue ; le sens est porté par <see cref="EstRetenue"/>.</summary>
+        public decimal Montant { get; set; }
+
+        /// <summary>Vrai pour une retenue sur net, faux pour un gain.</summary>
+        public bool EstRetenue { get; set; }
+
+        /// <summary>Traitement fiscal et social, en clair : « IUTS + CNSS », « Non soumis »…</summary>
+        public string Traitement { get; set; }
+
+        /// <summary>Montant signé, pour les affichages qui mélangent gains et retenues.</summary>
+        [JsonIgnore]
+        public decimal MontantSigne
+        {
+            get { return EstRetenue ? -Montant : Montant; }
         }
     }
 }

@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Windows;
+using System.Windows.Input;
 using IUTSCalculator.ViewModels;
 
 namespace IUTSCalculator
@@ -29,6 +30,27 @@ namespace IUTSCalculator
 
             // S'abonner à l'événement de fermeture
             Closed += MainWindow_Closed;
+        }
+
+        /// <summary>
+        /// Raccourci clavier global (Ctrl+F ou Ctrl+K) pour atteindre rapidement la barre de recherche du menu
+        /// </summary>
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            base.OnPreviewKeyDown(e);
+
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control &&
+                (e.Key == Key.F || e.Key == Key.K))
+            {
+                if (_mainViewModel != null && !_mainViewModel.IsNavRailVisible)
+                {
+                    _mainViewModel.IsNavRailVisible = true;
+                }
+
+                NavMenuSearchBox?.Focus();
+                NavMenuSearchBox?.SelectAll();
+                e.Handled = true;
+            }
         }
 
         /// <summary>

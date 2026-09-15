@@ -16,6 +16,7 @@ namespace IUTSCalculator.Models
         private string _sigle;
         private string _ifu;
         private string _rccm;
+        private string _numeroEmployeurCnss;
         private string _regimeFiscal;
         private string _adresse;
         private string _ville;
@@ -76,6 +77,27 @@ namespace IUTSCalculator.Models
                 if (_ifu != value)
                 {
                     _ifu = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Numéro d'employeur à la CNSS (module DEC-04).
+        ///
+        /// C'est l'identifiant de l'entreprise sur la déclaration de cotisations. Il figure
+        /// en en-tête du bordereau, et la Caisse rejette une déclaration qui ne le porte
+        /// pas — d'où sa place ici, à côté de l'IFU et du RCCM, plutôt que dans un coin de
+        /// l'écran de déclaration.
+        /// </summary>
+        public string NumeroEmployeurCnss
+        {
+            get => _numeroEmployeurCnss;
+            set
+            {
+                if (_numeroEmployeurCnss != value)
+                {
+                    _numeroEmployeurCnss = value;
                     OnPropertyChanged();
                 }
             }

@@ -1,0 +1,426 @@
+<UserControl x:Class="IUTSCalculator.Views.RubriqueView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:RubriqueViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,0,0,10"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Plan de paie" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock FontSize="12" Foreground="{StaticResource InkSubtleBrush}">
+                    <Run Text="{Binding NombreGains, Mode=OneWay}"/>
+                    <Run Text="gains ·"/>
+                    <Run Text="{Binding NombreRetenues, Mode=OneWay}"/>
+                    <Run Text="retenues — les rubriques se créent ici, sans livraison de code"/>
+                </TextBlock>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Recharger" Tag="{StaticResource IconRefresh}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding RechargerCommand}"/>
+                <Button Content="Nouvelle rubrique" Tag="{StaticResource IconAdd}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}"
+                        Command="{Binding NouvelleRubriqueCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="400"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ───── Liste des rubriques ───── -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <DockPanel>
+
+                    <!-- Barre de recherche et filtre -->
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Background="{StaticResource SurfaceAltBrush}" Padding="12,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Recherche rapide -->
+                            <Grid Grid.Column="0">
+                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource FormTextBoxStyle}"
+                                         Height="32" Padding="28,4,26,4" Margin="0"
+                                         VerticalContentAlignment="Center"
+                                         ToolTip="Rechercher par code, libellé ou compte comptable..."/>
+                                <TextBlock Text="{StaticResource IconSearch}"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                           Foreground="{StaticResource InkSubtleBrush}"
+                                           HorizontalAlignment="Left" VerticalAlignment="Center"
+                                           Margin="8,0,0,0" IsHitTestVisible="False"/>
+                                <Button Command="{Binding ClearSearchCommand}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,6,0" Width="20" Height="20"
+                                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                        ToolTip="Effacer la recherche"
+                                        Visibility="{Binding HasSearchText, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                               Foreground="{StaticResource InkSubtleBrush}"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Filtre Sens -->
+                            <ComboBox Grid.Column="2" Height="32" Margin="0"
+                                      Style="{StaticResource FormComboBoxStyle}"
+                                      ItemsSource="{Binding SensFiltreOptions}"
+                                      SelectedValue="{Binding SelectedSensFilter, Mode=TwoWay}"
+                                      SelectedValuePath="Key"
+                                      DisplayMemberPath="Value"
+                                      ToolTip="Filtrer par sens (gain, retenue, information)"/>
+
+                            <!-- Réinitialiser -->
+                            <Button Grid.Column="3" Content="Effacer filtres" Tag="{StaticResource IconClear}"
+                                    MinWidth="0" Padding="10,0" Height="32" Margin="8,0,0,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    ToolTip="Réinitialiser les filtres"
+                                    Command="{Binding ResetFiltersCommand}"
+                                    Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </Grid>
+                    </Border>
+
+                    <Border DockPanel.Dock="Bottom"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
+                            Background="{StaticResource SurfaceAltBrush}" Padding="14,8">
+                        <Grid>
+                            <TextBlock HorizontalAlignment="Left" FontSize="11"
+                                       Foreground="{StaticResource InkSubtleBrush}">
+                                <Run Text="{Binding NombreRubriquesAffichees, Mode=OneWay}"/>
+                                <Run Text="sur"/>
+                                <Run Text="{Binding Rubriques.Count, Mode=OneWay}"/>
+                                <Run Text="rubrique(s)"/>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+
+                    <DataGrid ItemsSource="{Binding RubriquesView}"
+                              SelectedItem="{Binding RubriqueSelectionnee}"
+                              Style="{StaticResource FormDataGridStyle}"
+                              Margin="0" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Ordre" Binding="{Binding Ordre}"
+                                                Width="70" MinWidth="60"
+                                                ElementStyle="{StaticResource CenterTextStyle}"
+                                                HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Code" Binding="{Binding Code}"
+                                                Width="110" MinWidth="100"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="Libellé" Binding="{Binding Libelle}"
+                                                Width="2*" MinWidth="200"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="Sens" Binding="{Binding SensLibelle}"
+                                                Width="100" MinWidth="90"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="Calcul" Binding="{Binding ModeCalculLibelle}"
+                                                Width="*" MinWidth="150"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridTextColumn Header="Plafond" Binding="{Binding PlafondLibelle}"
+                                                Width="*" MinWidth="150"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+                            <DataGridCheckBoxColumn Header="IUTS" Binding="{Binding SoumisIUTS}"
+                                                    IsReadOnly="True" Width="60"/>
+                            <DataGridCheckBoxColumn Header="CNSS" Binding="{Binding SoumisCNSS}"
+                                                    IsReadOnly="True" Width="60"/>
+                            <DataGridCheckBoxColumn Header="TPA" Binding="{Binding SoumisTPA}"
+                                                    IsReadOnly="True" Width="60"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <!-- ───── Fiche de la rubrique ───── -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+                <DockPanel>
+
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                            Padding="16,12">
+                        <Grid>
+                            <TextBlock Text="RUBRIQUE" HorizontalAlignment="Left"
+                                       Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                            <TextBlock HorizontalAlignment="Right" FontSize="11"
+                                       Foreground="{StaticResource InkSubtleBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Création"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EstEnEdition}" Value="True">
+                                                <Setter Property="Text" Value="Modification"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+
+                    <Border DockPanel.Dock="Bottom"
+                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
+                            Padding="16,12"
+                            Visibility="{Binding ALaFiche, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Enregistrer" Width="140"
+                                    Style="{StaticResource MenuButtonStyle}"
+                                    Command="{Binding EnregistrerCommand}"/>
+                            <Button Content="Annuler"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding AnnulerCommand}"/>
+                            <Button Content="Supprimer" Margin="0"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Command="{Binding SupprimerCommand}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- État vide -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                                Visibility="{Binding ALaFiche, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                        <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                                   Foreground="{StaticResource RuleStrongBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Aucune rubrique sélectionnée" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkMutedBrush}"
+                                   HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                        <TextBlock Text="Choisissez une ligne du plan de paie, ou créez une nouvelle rubrique."
+                                   FontSize="12" Foreground="{StaticResource InkSubtleBrush}"
+                                   HorizontalAlignment="Center" Margin="0,4,0,0"
+                                   TextWrapping="Wrap" MaxWidth="250" TextAlignment="Center"/>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14"
+                                  Visibility="{Binding ALaFiche, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel DataContext="{Binding FicheCourante}">
+
+                            <TextBlock Text="IDENTIFICATION" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="116"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Code" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           IsEnabled="{Binding CodeModifiable}"
+                                           ToolTip="Le code d'une rubrique système est figé : le moteur de calcul s'y réfère."
+                                           Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Libellé" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding Libelle, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Sens" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="2" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormComboBoxStyle}"
+                                           ItemsSource="{Binding DataContext.SensDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           SelectedItem="{Binding Sens, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Ordre" Style="{StaticResource FieldLabel}"/>
+                                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBox Width="72" Margin="0" TextAlignment="Right"
+                                             Style="{StaticResource FormTextBoxStyle}"
+                                             Text="{Binding Ordre, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBlock Text="ordre d'impression sur le bulletin"
+                                               Style="{StaticResource Hint}" Margin="8,0,0,0"/>
+                                </StackPanel>
+
+                                <CheckBox Grid.Row="4" Grid.Column="1" Content="Rubrique active" Margin="0,0,0,4"
+                                          Style="{StaticResource FormCheckBoxStyle}"
+                                          IsChecked="{Binding Active, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,10,0,14"/>
+
+                            <TextBlock Text="CALCUL" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="116"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,10"
+                                           Style="{StaticResource FormComboBoxStyle}"
+                                           ItemsSource="{Binding DataContext.ModesCalcul, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           SelectedItem="{Binding ModeCalcul, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Montant par défaut" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,10" TextAlignment="Right"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding MontantFixe, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="FCFA" Style="{StaticResource Hint}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Base de calcul" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,10"
+                                           IsEditable="True"
+                                           Style="{StaticResource FormComboBoxStyle}"
+                                           ToolTip="Rubrique servant de base. Laisser vide pour appliquer le taux au salaire brut."
+                                           ItemsSource="{Binding DataContext.CodesBase, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           Text="{Binding CodeBase, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Taux salarial" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,0,0,10" TextAlignment="Right"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding TauxSalarial, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="du brut" Style="{StaticResource Hint}"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Taux patronal" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="4" Grid.Column="1" Margin="0,0,0,10" TextAlignment="Right"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding TauxPatronal, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="2" Text="du brut" Style="{StaticResource Hint}"/>
+                            </Grid>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,10,0,14"/>
+
+                            <TextBlock Text="TRAITEMENT FISCAL ET SOCIAL" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <CheckBox Content="Entre dans la base imposable à l'IUTS" Margin="0,0,0,8"
+                                      Style="{StaticResource FormCheckBoxStyle}"
+                                      IsChecked="{Binding SoumisIUTS, UpdateSourceTrigger=PropertyChanged}"/>
+                            <CheckBox Content="Entre dans l'assiette des cotisations CNSS" Margin="0,0,0,8"
+                                      Style="{StaticResource FormCheckBoxStyle}"
+                                      IsChecked="{Binding SoumisCNSS, UpdateSourceTrigger=PropertyChanged}"/>
+                            <CheckBox Content="Entre dans l'assiette de la taxe patronale et d'apprentissage (TPA)" Margin="0,0,0,8"
+                                      Style="{StaticResource FormCheckBoxStyle}"
+                                      IsChecked="{Binding SoumisTPA, UpdateSourceTrigger=PropertyChanged}"/>
+                            <CheckBox Content="Exonération plafonnée" Margin="0,0,0,10"
+                                      Style="{StaticResource FormCheckBoxStyle}"
+                                      IsChecked="{Binding Plafonne, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <Grid Visibility="{Binding Plafonne, Converter={StaticResource BoolToTypeConverter}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="116"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="En % du brut" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1" Margin="0,0,0,10" TextAlignment="Right"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding PourcentagePlafond, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Art. 106" Style="{StaticResource Hint}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Plafond absolu" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,10" TextAlignment="Right"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding Plafond, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="FCFA" Style="{StaticResource Hint}"/>
+                            </Grid>
+
+                            <Border Background="{StaticResource WarningTintBrush}"
+                                    BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+                                    Padding="12,10" Margin="0,4,0,0"
+                                    Visibility="{Binding Plafonne, Converter={StaticResource BoolToTypeConverter}}">
+                                <TextBlock TextWrapping="Wrap" FontSize="12"
+                                           Foreground="{StaticResource WarningBrush}"
+                                           Text="Le plafond retenu est le plus petit des deux valeurs. Ce qui dépasse est réintégré dans la base imposable."/>
+                            </Border>
+
+                            <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,14,0,14"/>
+
+                            <TextBlock Text="IMPUTATION COMPTABLE" Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="116"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Compte général" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding CompteComptable, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Contrepartie" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           Text="{Binding CompteContrepartie, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Commentaire" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Top" Margin="0,6,0,0"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" Margin="0"
+                                           Style="{StaticResource FormTextBoxStyle}"
+                                           AcceptsReturn="True" TextWrapping="Wrap"
+                                           MinHeight="60" VerticalContentAlignment="Top"
+                                           Text="{Binding Commentaire, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ Pied ═══════════ -->
+        <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{StaticResource RuleBrush}"
+                Margin="0,14,0,0" Padding="0,10,0,0">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                       Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+        </Border>
+    </Grid>
+</UserControl>

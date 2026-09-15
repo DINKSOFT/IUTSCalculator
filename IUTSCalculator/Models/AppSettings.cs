@@ -64,6 +64,27 @@ namespace IUTSCalculator.Models
         };
 
         /// <summary>
+        /// Faut-il écrire la devise (« FCFA ») derrière chaque montant des bulletins
+        /// exportés ? Vrai par défaut, ce qui reproduit l'affichage d'origine. Les
+        /// entreprises qui impriment sur un papier à en-tête mentionnant déjà la devise
+        /// préfèrent l'omettre : la colonne des montants y gagne en lisibilité.
+        /// </summary>
+        public bool AfficherDeviseSurBulletin { get; set; } = true;
+
+        /// <summary>
+        /// Droit à congé payé acquis par mois de service effectif. 2,5 jours ouvrables
+        /// est le minimum légal burkinabè (30 jours par an) ; une convention collective
+        /// peut être plus favorable, d'où le réglage.
+        /// </summary>
+        public decimal JoursCongesParMois { get; set; } = 2.5m;
+
+        /// <summary>
+        /// Base de retenue d'une absence non rémunérée : 1/30e du salaire mensuel par
+        /// défaut, l'usage le plus répandu. La loi ne prescrit pas de diviseur.
+        /// </summary>
+        public BaseRetenueAbsence BaseRetenueAbsence { get; set; } = BaseRetenueAbsence.TrentiemeMensuel;
+
+        /// <summary>
         /// Date de la dernière mise à jour des paramètres
         /// </summary>
         public DateTime LastUpdated { get; set; } = DateTime.Now;

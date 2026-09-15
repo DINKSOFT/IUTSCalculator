@@ -49,6 +49,23 @@
                            FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
             </StackPanel>
 
+            <!-- Période traitée : un calcul de paie appartient à un mois. C'est de lui que
+                 dépendent les variables et absences prises en compte, et sous lui que le
+                 calcul est enregistré — donc déclaré. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                <TextBlock Text="Période" VerticalAlignment="Center" Margin="0,0,10,0"
+                           Style="{StaticResource FormTextBlockLabelStyle}"/>
+                <ComboBox Width="140" Height="34" Margin="0,0,8,0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding MoisDisponibles}"
+                          DisplayMemberPath="Nom"
+                          SelectedItem="{Binding MoisSelectionne}"/>
+                <ComboBox Width="92" Height="34" Margin="0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding AnneesDisponibles}"
+                          SelectedItem="{Binding Annee}"/>
+            </StackPanel>
+
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
                 <Button Content="Nouveau" Tag="{StaticResource IconNew}"
                         Style="{StaticResource SecondaryButtonStyle}"

@@ -89,8 +89,10 @@
             <SolidColorBrush x:Key="RailHoverBrush" Color="{StaticResource RailHover}"/>
             <SolidColorBrush x:Key="RailTextBrush" Color="{StaticResource RailText}"/>
             <SolidColorBrush x:Key="RailTextDimBrush" Color="{StaticResource RailTextDim}"/>
+            <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}"/>
             <SolidColorBrush x:Key="AccentBrush2" Color="{StaticResource Accent}"/>
             <SolidColorBrush x:Key="AccentDarkBrush" Color="{StaticResource AccentDark}"/>
+            <SolidColorBrush x:Key="AccentDarkerBrush" Color="{StaticResource AccentDark}"/>
             <SolidColorBrush x:Key="AccentTintBrush" Color="{StaticResource AccentTint}"/>
             <SolidColorBrush x:Key="AccentTintRuleBrush" Color="{StaticResource AccentTintRule}"/>
             <SolidColorBrush x:Key="RowSelectedBrush" Color="{StaticResource RowSelected}"/>
@@ -127,17 +129,19 @@
             <sys:String x:Key="IconDelete">&#xE107;</sys:String>
             <sys:String x:Key="IconView">&#xE8F4;</sys:String>
             <sys:String x:Key="IconExcelAlt">&#xEA90;</sys:String>
+            <sys:String x:Key="IconFile">&#xE8A5;</sys:String>
             <sys:String x:Key="IconEmploye">&#xE716;</sys:String>
             <sys:String x:Key="IconReset">&#xE8EB;</sys:String>
             <sys:String x:Key="IconInfo">&#xE946;</sys:String>
             <sys:String x:Key="IconWarning">&#xE7BA;</sys:String>
             <sys:String x:Key="IconError">&#xE7BA;</sys:String>
             <sys:String x:Key="IconSuccess">&#xE8B3;</sys:String>
-            <sys:String x:Key="IconSearch">&#xE8B6;</sys:String>
+            <sys:String x:Key="IconSearch">&#xE721;</sys:String>
             <sys:String x:Key="IconAdd">&#xE8C8;</sys:String>
             <sys:String x:Key="IconSubtract">&#xE8C7;</sys:String>
             <sys:String x:Key="IconCheck">&#xE8FD;</sys:String>
             <sys:String x:Key="IconClose">&#xE8BB;</sys:String>
+            <sys:String x:Key="IconCancel">&#xE711;</sys:String>
             <sys:String x:Key="IconWarningAlt">&#xE7BA;</sys:String>
             <sys:String x:Key="IconImport">&#xE78B;</sys:String>
             <sys:String x:Key="IconExport">&#xEE71;</sys:String>
@@ -146,6 +150,8 @@
             <sys:String x:Key="IconMore">&#xE712;</sys:String>
             <sys:String x:Key="IconChevron">&#xE70D;</sys:String>
             <sys:String x:Key="IconBuilding">&#xE825;</sys:String>
+            <sys:String x:Key="IconMenu">&#xE700;</sys:String>
+            <sys:String x:Key="IconCollapseLeft">&#xE76B;</sys:String>
 
             <!-- ═══════════════════════════════════════════════════════════════
                  TYPOGRAPHIE
@@ -266,6 +272,18 @@
                 <Setter Property="Background" Value="Transparent"/>
             </Style>
 
+            <!-- Même habillage que la case à cocher, pour un bouton radio : un Style
+                 ciblant CheckBox ne peut pas s'appliquer à un RadioButton (il dérive de
+                 ToggleButton, pas de CheckBox) et lèverait une exception à l'affichage. -->
+            <Style x:Key="FormRadioButtonStyle" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Margin" Value="0,4,0,4"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Background" Value="Transparent"/>
+            </Style>
+
             <Style TargetType="DatePicker" x:Key="FormDatePickerStyle">
                 <Setter Property="FontSize" Value="13"/>
                 <Setter Property="Height" Value="30"/>
@@ -381,6 +399,9 @@
                 </Setter>
             </Style>
 
+            <!-- Bouton d'action principale : alias explicite de MenuButtonStyle -->
+            <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource MenuButtonStyle}"/>
+
             <!-- Action secondaire : contour, pas de remplissage. -->
             <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource MenuButtonStyle}">
                 <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
@@ -436,6 +457,85 @@
             <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
                 <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
                 <Setter Property="BorderBrush" Value="{StaticResource DangerRuleBrush}"/>
+            </Style>
+
+            <!-- Bouton icône pour bandeau / en-tête -->
+            <Style x:Key="HeaderIconButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource RuleStrongBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+                <Setter Property="Width" Value="34"/>
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="3"
+                                    SnapsToDevicePixels="True">
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           Text="{TemplateBinding Tag}"
+                                           FontSize="15"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceAltBrush}"/>
+                                    <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource InkSubtleBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource RuleBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Bouton icône pour l'en-tête du rail de navigation sombre -->
+            <Style x:Key="RailIconButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Foreground" Value="{StaticResource RailTextBrush}"/>
+                <Setter Property="Width" Value="30"/>
+                <Setter Property="Height" Value="30"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="3"
+                                    SnapsToDevicePixels="True">
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           Text="{TemplateBinding Tag}"
+                                           FontSize="14"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource RailHoverBrush}"/>
+                                    <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource RailBorderBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <!-- ═══════════════════════════════════════════════════════════════
@@ -536,6 +636,10 @@
                 <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
             </Style>
 
+            <!-- Texte aligné à droite pour nombres, heures et montants -->
+            <Style x:Key="RightTextStyle" TargetType="TextBlock" BasedOn="{StaticResource MoneyTextStyle}"/>
+            <Style x:Key="CellNumberStyle" TargetType="TextBlock" BasedOn="{StaticResource MoneyTextStyle}"/>
+
             <Style x:Key="GridCellStyle" TargetType="DataGridCell">
                 <Setter Property="Padding" Value="10,0"/>
                 <Setter Property="BorderThickness" Value="0"/>
@@ -615,6 +719,8 @@
             <converters:BooleanToTextConverter x:Key="BooleanToTextConverter"/>
             <converters:DecimalToStringConverter x:Key="DecimalToStringConverter"/>
             <converters:StringEqualsConverter x:Key="StringEqualsConverter"/>
+            <converters:PourcentageConverter x:Key="PourcentageConverter"/>
+            <converters:MontantConverter x:Key="MontantConverter"/>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
         </ResourceDictionary>

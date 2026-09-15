@@ -1,0 +1,1025 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Guide d'Utilisation & Manuel de Référence — Sigma Paie & RH</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 18mm 15mm 20mm 15mm;
+    @bottom-center {
+      content: "Sigma Paie & RH — Manuel de Référence";
+      font-size: 8pt;
+      color: #718096;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    @bottom-right {
+      content: "Page " counter(page);
+      font-size: 8pt;
+      font-weight: bold;
+      color: #14675A;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+  }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #2D3748;
+    line-height: 1.55;
+    font-size: 10pt;
+    margin: 0;
+    padding: 0;
+    background-color: #FFFFFF;
+  }
+
+  /* Page de couverture */
+  .cover-page {
+    page-break-after: always;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 30px 20px;
+    box-sizing: border-box;
+    background: linear-gradient(145deg, #0F4C42 0%, #14675A 60%, #1A8272 100%);
+    color: #FFFFFF;
+    border-radius: 6px;
+  }
+
+  .cover-header {
+    border-bottom: 2px solid rgba(255,255,255,0.25);
+    padding-bottom: 20px;
+  }
+  .cover-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+  }
+  .cover-title {
+    font-size: 34pt;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
+  }
+  .cover-subtitle {
+    font-size: 15pt;
+    font-weight: 300;
+    color: #D1EAE5;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .cover-body {
+    margin: 40px 0;
+  }
+  .cover-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+  }
+  .cover-feature-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-left: 4px solid #F6AD55;
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    font-size: 9.5pt;
+    line-height: 1.4;
+  }
+  .cover-feature-item strong {
+    color: #FBD38D;
+    display: block;
+    margin-bottom: 3px;
+    font-size: 10.5pt;
+  }
+
+  .cover-footer {
+    border-top: 2px solid rgba(255,255,255,0.25);
+    padding-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    color: #CBD5E0;
+  }
+
+  /* Titres et structure */
+  h1 {
+    color: #0F4C42;
+    font-size: 18pt;
+    font-weight: 700;
+    border-bottom: 2.5px solid #14675A;
+    padding-bottom: 6px;
+    margin-top: 30px;
+    margin-bottom: 16px;
+    page-break-after: avoid;
+    letter-spacing: -0.3px;
+  }
+
+  h2 {
+    color: #14675A;
+    font-size: 13.5pt;
+    font-weight: 700;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+    border-left: 4px solid #14675A;
+    padding-left: 10px;
+  }
+
+  h3 {
+    color: #2D3748;
+    font-size: 11pt;
+    font-weight: 600;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 10px 0;
+    text-align: justify;
+  }
+
+  ul, ol {
+    margin: 0 0 12px 0;
+    padding-left: 22px;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+
+  /* Tableaux */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 18px 0;
+    font-size: 8.8pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background-color: #14675A;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 8px 10px;
+    text-align: left;
+    border: 1px solid #0F4C42;
+  }
+  td {
+    padding: 6px 10px;
+    border: 1px solid #CBD5E0;
+    vertical-align: middle;
+  }
+  tr:nth-child(even) {
+    background-color: #F7FAFC;
+  }
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .center {
+    text-align: center;
+  }
+
+  /* Boîtes d'avertissement et conseils */
+  .callout {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 14px 0;
+    page-break-inside: avoid;
+    font-size: 9.2pt;
+  }
+  .callout-info {
+    background-color: #EBF8FF;
+    border-left: 4px solid #3182CE;
+    color: #2B6CB0;
+  }
+  .callout-law {
+    background-color: #FEFCBF;
+    border-left: 4px solid #D69E2E;
+    color: #744210;
+  }
+  .callout-success {
+    background-color: #F0FFF4;
+    border-left: 4px solid #38A169;
+    color: #22543D;
+  }
+  .callout-warning {
+    background-color: #FFF5F5;
+    border-left: 4px solid #E53E3E;
+    color: #9B2C2C;
+  }
+  .callout-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9.8pt;
+  }
+
+  /* Emplacements de captures d'écran illustrées */
+  .screenshot-container {
+    margin: 18px 0;
+    border: 1.5px solid #CBD5E0;
+    border-radius: 8px;
+    background-color: #FAFAFA;
+    padding: 14px;
+    page-break-inside: avoid;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .screenshot-placeholder {
+    border: 2px dashed #14675A;
+    background-color: #F4F8F6;
+    border-radius: 6px;
+    padding: 24px 20px;
+    text-align: center;
+    color: #14675A;
+  }
+  .screenshot-placeholder-icon {
+    font-size: 24pt;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .screenshot-placeholder-title {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .screenshot-placeholder-desc {
+    font-size: 8.5pt;
+    color: #4A5568;
+    max-width: 550px;
+    margin: 0 auto;
+    line-height: 1.4;
+  }
+  .screenshot-caption {
+    font-size: 8.5pt;
+    font-style: italic;
+    color: #718096;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Schémas ASCII et diagrammes */
+  pre.diagram {
+    background-color: #1A202C;
+    color: #E2E8F0;
+    padding: 14px;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8pt;
+    line-height: 1.35;
+    overflow: hidden;
+    margin: 14px 0;
+    page-break-inside: avoid;
+  }
+
+  /* Badge de statut */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .badge-success { background: #C6F6D5; color: #22543D; }
+  .badge-warning { background: #FEEBC8; color: #744210; }
+  .badge-danger { background: #FED7D7; color: #742A2A; }
+  .badge-info { background: #EBF8FF; color: #2B6CB0; }
+
+  /* Saut de page propre */
+  .page-break {
+    page-break-before: always;
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE DE COUVERTURE -->
+<div class="cover-page">
+  <div class="cover-header">
+    <div class="cover-badge">Logiciel Professionnel de Gestion de la Paie</div>
+    <h1 class="cover-title" style="color:white; border:none; margin:0;">SIGMA PAIE &amp; RH</h1>
+    <p class="cover-subtitle">Guide d'Utilisation &amp; Manuel Pratique de Référence</p>
+  </div>
+
+  <div class="cover-body">
+    <p style="font-size: 11pt; color: #E6FFFA; margin-bottom: 25px;">
+      Guide d'exploitation complet à destination des Directeurs des Ressources Humaines, Gestionnaires de Paie,
+      Directeurs Administratifs et Financiers, et Auditeurs Comptables.
+    </p>
+
+    <div class="cover-features">
+      <div class="cover-feature-item">
+        <strong>Conformité Droit du Travail</strong>
+        Code du Travail du Burkina Faso, congés payés (2,5 j/m), retenues pour absence et majorations d'heures supplémentaires.
+      </div>
+      <div class="cover-feature-item">
+        <strong>Fiscalité des Salaires (CGI)</strong>
+        Barème progressif de l'IUTS, réductions de charges familiales (8% à 14%) et Taxe Patronale d'Apprentissage (TPA 3% / 4%).
+      </div>
+      <div class="cover-feature-item">
+        <strong>Sécurité Sociale (CNSS)</strong>
+        Cotisations par branche (Prestations familiales 7%, Risques pro 2,5%, Retraite 11%), plafond mensuel de 600 000 FCFA.
+      </div>
+      <div class="cover-feature-item">
+        <strong>Comptabilité SYSCOHADA</strong>
+        Génération automatique de la pièce d'OD équilibrée, comptes 66, 42, 43, 44 et intégration logicielle.
+      </div>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <div><strong>Édition :</strong> Septembre 2026 | Version du Logiciel : <strong>2.0 (Schéma v20)</strong></div>
+    <div>Multi-sociétés | SQLite Chiffré | Architecture MVVM WPF</div>
+  </div>
+</div>
+
+<!-- INTRODUCTION & ARCHITECTURE -->
+<div class="page-break"></div>
+<h1>1. Introduction &amp; Architecture du Système</h1>
+
+<h2>1.1. Présentation générale et cadre juridique</h2>
+<p>
+  <strong>Sigma Paie &amp; RH</strong> est une solution logicielle professionnelle dédiée à la gestion intégrale de la paie,
+  du personnel et des obligations légales au Burkina Faso. Contrairement aux tableurs et calculatrices génériques qui
+  exposent l'entreprise à des risques de redressement fiscal ou d'erreurs de cotisations, Sigma Paie &amp; RH intègre nativement
+  les moteurs de calculs conformes au <strong>Code du Travail</strong>, au <strong>Code Général des Impôts (CGI)</strong>,
+  aux textes régissant la <strong>Caisse Nationale de Sécurité Sociale (CNSS)</strong> et aux normes comptables de l'<strong>OHADA (SYSCOHADA révisé)</strong>.
+</p>
+
+<div class="callout callout-law">
+  <div class="callout-title">Cadre Légal &amp; Réglementaire Intégré</div>
+  Le logiciel applique avec une rigueur absolue au centime près :
+  <ul>
+    <li><strong>L'Impôt Unique sur les Traitements et Salaires (IUTS)</strong> calculé sur le Revenu Net Imposable par tranche progressive avec réduction pour charges de famille de 8% à 14%.</li>
+    <li><strong>Les cotisations de Sécurité Sociale (CNSS)</strong> ventilées par branche dans la limite du plafond mensuel de 600 000 FCFA.</li>
+    <li><strong>La Taxe Patronale et d'Apprentissage (TPA)</strong> à 3% pour le personnel national et 4% pour les expatriés.</li>
+    <li><strong>L'équilibrage comptable SYSCOHADA</strong> : Débit (Charges 66) = Crédit (Dettes 42, 43, 44).</li>
+  </ul>
+</div>
+
+<h2>1.2. Architecture multi-entreprises &amp; isolation des données</h2>
+<p>
+  Le système repose sur un principe d'<strong>étanchéité absolue entre sociétés</strong>. Chaque entreprise cliente ou filiale
+  gérée fait l'objet d'un dossier indépendant doté de sa propre base de données SQLite physique (<code>dossier_&lt;id&gt;.db</code>)
+  placée dans l'espace applicatif sécurisé de la machine.
+</p>
+<p>
+  Cette architecture offre des garanties indispensables :
+</p>
+<ul>
+  <li><strong>Cloisonnement strict</strong> : Aucun salarié, bulletin de paie, virement ou écriture comptable ne peut être mélangé entre deux entités juridiques.</li>
+  <li><strong>Sauvegarde et portabilité autonome</strong> : Chaque dossier peut être archivé, sauvegardé sur support externe ou transmis à un auditeur sans compromettre les autres entreprises.</li>
+  <li><strong>Migration de schéma automatique et transparente (v20)</strong> : Lors de l'ouverture d'une ancienne base, le logiciel crée automatiquement une copie de secours (<code>.avant-v20.bak</code>) avant d'appliquer les migrations de mise à niveau.</li>
+</ul>
+
+<!-- ILLUSTRATION EMPLACEMENT 1 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128187;</span>
+    <div class="screenshot-placeholder-title">[Illustration 1 : Écran de Sélection de Dossier &amp; Rail de Navigation Principal]</div>
+    <div class="screenshot-placeholder-desc">
+      Vue de l'interface au démarrage : dialogue d'ouverture de l'entreprise avec affichage de la Raison Sociale, de l'IFU, de la Ville et du bandeau de navigation latérale regroupant les 4 domaines métiers.
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 1.1 — Accueil multi-dossiers et navigation par domaine d'activité</div>
+</div>
+
+---
+
+<!-- MODULES DU SOCLE -->
+<div class="page-break"></div>
+<h1>2. Le Paramétrage du Socle Social (Phase 1)</h1>
+
+<p>
+  Avant de procéder au premier calcul de paie, le socle de paramétrage de l'entreprise doit être initialisé. Il comprend
+  le plan de paie (rubriques), les barèmes légaux datés et les profils de rémunération par catégorie.
+</p>
+
+<h2>2.1. SOC-01 : Plan de Paie &amp; Rubriques Paramétrables</h2>
+<p>
+  Toute ligne apparaissant sur un bulletin de salaire découle d'une <strong>Rubrique de Paie</strong>. Les rubriques sont codifiées
+  par familles normalisées et caractérisées par leur sens mathématique et leur régime fiscal et social.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 12%;">Code</th>
+      <th style="width: 38%;">Désignation de la Rubrique</th>
+      <th style="width: 14%;" class="center">Sens</th>
+      <th style="width: 12%;" class="center">IUTS</th>
+      <th style="width: 12%;" class="center">CNSS</th>
+      <th style="width: 12%;" class="center">TPA</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>100</strong></td>
+      <td>Salaire de base contractuel</td>
+      <td class="center"><span class="badge badge-success">Gain (+)</span></td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+    </tr>
+    <tr>
+      <td><strong>110</strong></td>
+      <td>Sursalaire conventionnel</td>
+      <td class="center"><span class="badge badge-success">Gain (+)</span></td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+    </tr>
+    <tr>
+      <td><strong>200</strong></td>
+      <td>Prime d'ancienneté légale</td>
+      <td class="center"><span class="badge badge-success">Gain (+)</span></td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+    </tr>
+    <tr>
+      <td><strong>220</strong></td>
+      <td>Indemnité de fonction / responsabilité</td>
+      <td class="center"><span class="badge badge-success">Gain (+)</span></td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+    </tr>
+    <tr>
+      <td><strong>300</strong></td>
+      <td>Indemnité de logement</td>
+      <td class="center"><span class="badge badge-success">Gain (+)</span></td>
+      <td class="center">Oui (Plafonné)</td>
+      <td class="center">Oui</td>
+      <td class="center">Oui</td>
+    </tr>
+    <tr>
+      <td><strong>310</strong></td>
+      <td>Indemnité légale de transport</td>
+      <td class="center"><span class="badge badge-success">Gain (+)</span></td>
+      <td class="center">Exonérée (Plfd)</td>
+      <td class="center">Exonérée</td>
+      <td class="center">Exonérée</td>
+    </tr>
+    <tr>
+      <td><strong>400</strong></td>
+      <td>Retenue pour absence non rémunérée</td>
+      <td class="center"><span class="badge badge-danger">Retenue (-)</span></td>
+      <td class="center">Déductible</td>
+      <td class="center">Déductible</td>
+      <td class="center">Déductible</td>
+    </tr>
+    <tr>
+      <td><strong>500</strong></td>
+      <td>Cotisation CNSS Retraite Salariale (5,5%)</td>
+      <td class="center"><span class="badge badge-danger">Retenue (-)</span></td>
+      <td class="center">Déductible</td>
+      <td class="center">-</td>
+      <td class="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>600</strong></td>
+      <td>IUTS (Impôt retenu à la source)</td>
+      <td class="center"><span class="badge badge-danger">Retenue (-)</span></td>
+      <td class="center">-</td>
+      <td class="center">-</td>
+      <td class="center">-</td>
+    </tr>
+    <tr>
+      <td><strong>710</strong></td>
+      <td>Remboursement prêt interne d'entreprise</td>
+      <td class="center"><span class="badge badge-warning">Ret. Net (-)</span></td>
+      <td class="center">-</td>
+      <td class="center">-</td>
+      <td class="center">-</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2.2. SOC-02 : Barèmes Légaux Datés (IUTS, CNSS, TPA)</h2>
+<p>
+  Le module <strong>SOC-02</strong> conserve l'historique complet des barèmes applicables par date d'effet. Un bulletin de paie
+  recalculé ou audité sur un exercice clos s'exécute avec les règles d'époque, sans impact des modifications législatives futures.
+</p>
+
+<h3>1. Barème progressif mensuel de l'IUTS :</h3>
+<ul>
+  <li>Tranche de <strong>0 à 30 000 FCFA</strong> : Taux de <strong>0%</strong> (Franchise fiscale d'impôt).</li>
+  <li>Tranche de <strong>30 001 à 50 000 FCFA</strong> : Taux de <strong>12,1%</strong>.</li>
+  <li>Tranche de <strong>50 001 à 80 000 FCFA</strong> : Taux de <strong>13,9%</strong>.</li>
+  <li>Tranche de <strong>80 001 à 120 000 FCFA</strong> : Taux de <strong>15,7%</strong>.</li>
+  <li>Tranche de <strong>120 001 à 170 000 FCFA</strong> : Taux de <strong>18,4%</strong>.</li>
+  <li>Tranche de <strong>170 001 à 250 000 FCFA</strong> : Taux de <strong>21,7%</strong>.</li>
+  <li>Tranche au-delà de <strong>250 000 FCFA</strong> : Taux de <strong>25,0%</strong>.</li>
+</ul>
+
+<h3>2. Réductions pour charges de famille (IUTS Net) :</h3>
+<p>
+  Le montant brut d'IUTS obtenu par application du barème ci-dessus est minoré d'une réduction pour charges de famille :
+  <strong>1 charge = 8%</strong>, <strong>2 charges = 10%</strong>, <strong>3 charges = 12%</strong>, <strong>4 charges et plus = 14%</strong> (maximum légal).
+</p>
+
+<h3>3. Cotisations de Sécurité Sociale (CNSS) :</h3>
+<p>
+  Le salaire brut soumis aux cotisations CNSS est plafonné à <strong>600 000 FCFA par mois</strong>.
+  Les taux légaux sont :
+</p>
+<ul>
+  <li><strong>Prestations familiales (Employeur)</strong> : 7,0% plafonné.</li>
+  <li><strong>Risques professionnels (Employeur)</strong> : 2,5% (taux standard paramétrable de 1% à 4%).</li>
+  <li><strong>Retraite / Vieillesse Part Patronale</strong> : 5,5% plafonné.</li>
+  <li><strong>Retraite / Vieillesse Part Salariale</strong> : 5,5% plafonné (retenu sur le salaire de l'employé).</li>
+</ul>
+
+---
+
+<!-- GESTION DU PERSONNEL -->
+<div class="page-break"></div>
+<h1>3. Gestion Administrative du Personnel (SAL-01)</h1>
+
+<p>
+  L'écran <strong>Gestion des Employés</strong> centralise les dossiers des travailleurs. Contrairement aux logiciels
+  rudimentaires où les charges de famille sont une simple valeur textuelle sans vérification, Sigma Paie &amp; RH intègre un
+  registre nominatif avec contrôle d'âge automatique.
+</p>
+
+<h2>3.1. Structure complète de la fiche collaborateur</h2>
+<ul>
+  <li><strong>Identifiant &amp; État Civil</strong> : Matricule interne, Nom, Prénom, Sexe, Date de naissance, Situation matrimoniale, Nationalité.</li>
+  <li><strong>Contrat &amp; Classification</strong> : Emploi / Fonction occupée, Catégorie socioprofessionnelle (Cadre, Maîtrise, Employé, Ouvrier), Date d'embauche.</li>
+  <li><strong>Immatriculation Sociale</strong> : Numéro d'assuré CNSS (indispensable pour l'état nominatif officiel).</li>
+  <li><strong>Rémunération de base</strong> : Salaire mensuel de base, Indemnité de logement, Indemnité de transport, Indemnités de fonction et sujétion.</li>
+  <li><strong>Domiciliation Bancaire</strong> : Mode de paiement (Virement, Chèque, Espèces), Nom de la Banque et Numéro de compte / RIB complet.</li>
+</ul>
+
+<!-- ILLUSTRATION EMPLACEMENT 2 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128100;</span>
+    <div class="screenshot-placeholder-title">[Illustration 2 : Fiche du Salarié &amp; Registre Nominatif des Charges de Famille]</div>
+    <div class="screenshot-placeholder-desc">
+      Vue de l'écran « Employés » montrant la liste du personnel à gauche et le formulaire à onglets à droite : onglet Rémunération contractuelle et onglet Charges de famille avec alerte d'âge légal et bouton « Reprendre le décompte ».
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 3.1 — Fiche collaborateur et contrôle d'éligibilité des personnes à charge</div>
+</div>
+
+<h2>3.2. Contrôle d'éligibilité des charges de famille (SAL-01)</h2>
+<p>
+  Le gestionnaire ajoute nominativement chaque personne à charge (Enfant, Conjoint, Ascendant) avec sa date de naissance :
+</p>
+<div class="callout callout-info">
+  <div class="callout-title">Règles d'Âge et Justificatifs Légaux</div>
+  <ul>
+    <li><strong>Enfants jusqu'à 21 ans</strong> : Pris en compte automatiquement de plein droit.</li>
+    <li><strong>Enfants de 21 à 25 ans</strong> : Maintenus sous réserve de la fourniture annuelle d'un certificat de scolarité ou contrat d'apprentissage valide.</li>
+    <li><strong>Conjoint</strong> : Pris en compte uniquement si la case <em>« Le conjoint travaille »</em> est <strong>décochée</strong>. Si le conjoint exerce une activité salariée, il est exclu du décompte de ce salarié.</li>
+    <li><strong>Alerte automatique de sortie</strong> : Le système liste nominativement dans un bandeau jaune les enfants qui fêteront leur 21ème ou 25ème anniversaire dans les 12 prochains mois.</li>
+  </ul>
+</div>
+
+---
+
+<!-- CYCLE DE PAIE -->
+<div class="page-break"></div>
+<h1>4. Le Traitement Mensuel de la Paie (Phase 2 &amp; Moteur)</h1>
+
+<p>
+  Le cycle de traitement mensuel suit une chronologie standardisée, jalonnée par la saisie des variables, le traitement des
+  absences et prêts, puis le calcul et le verrouillage de clôture.
+</p>
+
+<pre class="diagram">
++-----------------------------------------------------------------------------------+
+|                        WORKFLOW DU TRAITEMENT MENSUEL                             |
++-----------------------------------------------------------------------------------+
+|  1. OUVERTURE        2. VARIABLES          3. CONGÉS/PRÊTS      4. CALCUL GLOBAL  |
+|  Sélection du mois   Primes variables,     Décompte absences    Génération par lot|
+|  Statut "Ouverte" -> heures supp., etc. -> et prélèvements  -> des bulletins avec |
+|                      (PAI-02)              prêts (PAI-04/05)    contrôles d'écart |
+|                                                                        |          |
+|  7. EXPORTS          6. PIÈCES COMPTABLES  5. CLÔTURE DU MOIS          v          |
+|  Ordres virement     Journal d'OD          Verrouillage figé    VÉRIFICATION DU   |
+|  (CPT-02), CNSS/IUTS (CPT-01) équilibré <- des chiffres     <- LIVRE DE PAIE     |
+|  (DEC-03/04)         Débit = Crédit        (PAI-01)             (ETA-01)          |
++-----------------------------------------------------------------------------------+
+</pre>
+
+<h2>4.1. PAI-01 : Périodes de Paie &amp; Verrou de Clôture</h2>
+<p>
+  L'écran <strong>Périodes de paie</strong> affiche les 12 mois de l'année. Une période possède deux états fondamentaux :
+</p>
+<ul>
+  <li><strong>Période Ouverte</strong> : La saisie des heures, primes et embauches est autorisée. Les bulletins sont provisoires et recalculables.</li>
+  <li><strong>Période Clôturée</strong> : Un clic sur <em>« Clôturer la période »</em> fige instantanément en base l'effectif, la masse salariale brute, les cotisations CNSS, l'IUTS et le net à payer global. <strong>Aucun bulletin ne peut plus être altéré</strong>.</li>
+  <li><strong>Réouverture motivée</strong> : En cas de rectification majeure imposant une réouverture, le gestionnaire doit saisir un motif textuel explicite. Cette action est consignée dans le <strong>Journal d'Audit</strong>.</li>
+</ul>
+
+<h2>4.2. PAI-04 : Gestion des Congés &amp; Retenues pour Absences</h2>
+<p>
+  Toute journée d'absence non rémunérée diminue la rémunération brute du travailleur selon la formule légale :
+</p>
+$$\text{Retenue Journalière} = \frac{\text{Salaire de Base} + \text{Primes Permanentes}}{\text{Nombre de jours ouvrés du mois (ex: 22 j)}}$$
+<p>
+  Le montant est déduit sur la rubrique <code>400 - Retenue pour absence</code>. Cette déduction diminue proportionnellement l'assiette soumise à la CNSS, à l'IUTS et à la TPA.
+</p>
+
+<!-- ILLUSTRATION EMPLACEMENT 3 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128197;</span>
+    <div class="screenshot-placeholder-title">[Illustration 3 : Grille de Saisie des Variables du Mois &amp; Suivi des Absences]</div>
+    <div class="screenshot-placeholder-desc">
+      Vue de l'écran « Variables du mois » permettant la saisie directe des primes ponctuelles par salarié, avec les boutons « Ajouter à tous » et « Reporter le mois précédent ».
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 4.1 — Saisie rapide et sécurisée des éléments variables périodiques</div>
+</div>
+
+<h2>4.3. Édition des Bulletins de Paie &amp; QR Code de Sécurité</h2>
+<p>
+  Le bulletin de paie Sigma Paie &amp; RH est certifié conforme aux prescriptions de l'Article 114 du Code du Travail burkinabè :
+</p>
+<ul>
+  <li>En-tête entreprise avec Raison Sociale, Numéro IFU, RCCM et Identifiant Employeur CNSS.</li>
+  <li>Détail individuel : Matricule, Emploi, Catégorie, Nombre de charges de famille, Mode de paiement.</li>
+  <li>Corps du bulletin à double colonne (Gains / Retenues) avec bases de calcul, taux et montants nets.</li>
+  <li>Pied de bulletin avec cumul annuel des salaires bruts et de l'IUTS retenu.</li>
+  <li><strong>QR Code Cryptographique SHA-256</strong> : Chaque bulletin imprimé contient un QR Code intégrant une signature infalsifiable des données clés (Matricule, Mois, Brut, IUTS, Net). Un simple scan par smartphone ou douchette optique vérifie l'authenticité du document et déjoue toute falsification papier.</li>
+</ul>
+
+<!-- ILLUSTRATION EMPLACEMENT 4 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128196;</span>
+    <div class="screenshot-placeholder-title">[Illustration 4 : Modèle Officiel du Bulletin de Paie avec QR Code de Sécurité]</div>
+    <div class="screenshot-placeholder-desc">
+      Aperçu du bulletin de paie officiel généré en PDF : mise en page soignée, rubriques classées, totaux fiscaux et sociaux, et QR Code d'authenticité SHA-256 en bas à droite.
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 4.2 — Spécimen de bulletin certifié avec empreinte de sécurité cryptographique</div>
+</div>
+
+---
+
+<!-- ÉTATS RÉGLEMENTAIRES -->
+<div class="page-break"></div>
+<h1>5. États Réglementaires &amp; Déclarations Officielles (Phase 3)</h1>
+
+<h2>5.1. ETA-01 : Le Livre de Paie Mensuel</h2>
+<p>
+  Le <strong>Livre de Paie</strong> synthétise l'ensemble des éléments servis au cours du mois dans un grand tableau croisé
+  <em>Salariés &times; Rubriques</em>.
+</p>
+
+<!-- ILLUSTRATION EMPLACEMENT 5 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128218;</span>
+    <div class="screenshot-placeholder-title">[Illustration 5 : Écran du Livre de Paie &amp; Contrôle d'Équilibrage]</div>
+    <div class="screenshot-placeholder-desc">
+      Capture de l'écran « Livre de paie » montrant la matrice des colonnes de gains et retenues, les totaux généraux de clôture et le badge vert « CONTRÔLE D'ÉQUILIBRE CONFORME ».
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 5.1 — Grand livre de paie mensuel avec balance de contrôle intégrée</div>
+</div>
+
+<div class="callout callout-success">
+  <div class="callout-title">Contrôle Mathématique d'Équilibrage Strict</div>
+  Le Livre de Paie intègre une formule de contrôle inviolable :
+  $$\text{Total Salaires Bruts} - \text{Total Retenues Salariales} = \text{Total Salaires Nets à Payer}$$
+  Si un écart même d'un seul franc apparaît, le badge passe immédiatement à l'orange/rouge avec signalement de la ligne divergente.
+</div>
+
+<h2>5.2. DEC-01 &amp; DEC-04 : Déclaration Sociale CNSS</h2>
+<p>
+  Le module produit automatiquement les deux volets de la déclaration trimestrielle ou mensuelle de sécurité sociale :
+</p>
+<ul>
+  <li><strong>Le Bordereau Récapitulatif de Cotisations</strong> : Ventilation exacte de l'assiette plafonnée à 600 000 FCFA par salarié entre la branche <em>Prestations Familiales (7%)</em>, <em>Risques Professionnels (2,5%)</em> et <em>Retraite (11% partagée)</em>.</li>
+  <li><strong>L'État Nominatif Trimestriel</strong> : Fichier Excel normalisé aux spécifications de la CNSS Burkina Faso, prêt pour télé-versement (Matricule CNSS, Nom, Prénom, Salaires mois par mois).</li>
+</ul>
+
+<h2>5.3. DEC-02 &amp; DEC-03 : Déclaration Fiscale IUTS &amp; TPA</h2>
+<p>
+  Exigible auprès du service des impôts de rattachement au plus tard le 15 de chaque mois :
+</p>
+<ul>
+  <li><strong>Bordereau IUTS</strong> : Récapitulatif du montant total d'IUTS retenu à la source sur le personnel national et expatrié.</li>
+  <li><strong>Bordereau TPA</strong> : Calcul de la Taxe Patronale d'Apprentissage assise sur la masse brute imposable (3% nationaux / 4% expatriés).</li>
+  <li><strong>État nominatif d'appui</strong> : Justificatif ligne à ligne comportant le revenu brut, les indemnités exonérées, la CNSS déduite, le RNI, le nombre de charges et l'impôt net.</li>
+</ul>
+
+---
+
+<!-- COMPTABILITÉ & BANQUE -->
+<div class="page-break"></div>
+<h1>6. Traitements Comptables &amp; Règlements Bancaires</h1>
+
+<h2>6.1. CPT-01 : Écritures Comptables SYSCOHADA</h2>
+<p>
+  Le module <strong>CPT-01</strong> supprime toute ressaisie manuelle de la paie par les services comptables. Il génère
+  automatiquement la <strong>Pièce d'Opérations Diverses (OD) mensuelle de paie</strong> selon les normes strictes du plan SYSCOHADA révisé.
+</p>
+
+<!-- ILLUSTRATION EMPLACEMENT 6 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128188;</span>
+    <div class="screenshot-placeholder-title">[Illustration 6 : Pièce d'OD de Paie SYSCOHADA Révisé]</div>
+    <div class="screenshot-placeholder-desc">
+      Vue de l'écran « Écritures de paie » affichant les comptes de charges de classe 6 au débit (6611, 6612, 6641, 6413) et les comptes de tiers de classe 4 au crédit (4211, 4311, 4471, 4472) avec totaux parfaitement équilibrés.
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 6.1 — Journal d'écritures de paie prêt à l'exportation comptable</div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 15%;">Compte</th>
+      <th style="width: 45%;">Intitulé du Compte SYSCOHADA</th>
+      <th style="width: 20%;" class="num">Débit (FCFA)</th>
+      <th style="width: 20%;" class="num">Crédit (FCFA)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>661100</code></td>
+      <td>Rémunération directe — Salaires de base</td>
+      <td class="num">5 800 000</td>
+      <td class="num">-</td>
+    </tr>
+    <tr>
+      <td><code>661200</code></td>
+      <td>Indemnités de logement et avantages en nature</td>
+      <td class="num">620 000</td>
+      <td class="num">-</td>
+    </tr>
+    <tr>
+      <td><code>661300</code></td>
+      <td>Indemnités de transport et déplacements</td>
+      <td class="num">430 000</td>
+      <td class="num">-</td>
+    </tr>
+    <tr>
+      <td><code>664100</code></td>
+      <td>Charges sociales patronales — CNSS</td>
+      <td class="num">1 024 650</td>
+      <td class="num">-</td>
+    </tr>
+    <tr>
+      <td><code>641300</code></td>
+      <td>Taxe Patronale et d'Apprentissage (TPA)</td>
+      <td class="num">205 500</td>
+      <td class="num">-</td>
+    </tr>
+    <tr style="background-color: #EDF2F7; font-weight: bold;">
+      <td><code>421100</code></td>
+      <td>Personnel — Salaires nets à payer</td>
+      <td class="num">-</td>
+      <td class="num">5 124 250</td>
+    </tr>
+    <tr>
+      <td><code>431100</code></td>
+      <td>Sécurité Sociale — CNSS Totale (Salariale + Patronale)</td>
+      <td class="num">-</td>
+      <td class="num">1 366 200</td>
+    </tr>
+    <tr>
+      <td><code>447100</code></td>
+      <td>État — Impôts retenus à la source (IUTS)</td>
+      <td class="num">-</td>
+      <td class="num">684 200</td>
+    </tr>
+    <tr>
+      <td><code>447200</code></td>
+      <td>État — Taxes sur salaires dues (TPA)</td>
+      <td class="num">-</td>
+      <td class="num">205 500</td>
+    </tr>
+    <tr>
+      <td><code>422100</code></td>
+      <td>Personnel — Acomptes et prêts récupérés</td>
+      <td class="num">-</td>
+      <td class="num">700 000</td>
+    </tr>
+    <tr style="background-color: #E2E8F0; font-weight: bold; border-top: 2px solid #14675A;">
+      <td colspan="2">TOTAL GÉNÉRAL ÉQUILIBRÉ (DÉBIT = CRÉDIT)</td>
+      <td class="num">8 080 150</td>
+      <td class="num">8 080 150</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6.2. CPT-02 : Ordres de Virement Bancaire &amp; Règlements</h2>
+<p>
+  Ce module gère le décaissement réel des salaires avec un niveau de sécurité optimal :
+</p>
+<ul>
+  <li><strong>Détection préventive des erreurs de RIB</strong> : Alerte visuelle pour tout compte incomplet, manquant ou dont le format de clé ne correspond pas aux normes bancaires de l'UEMOA.</li>
+  <li><strong>Ventilation par établissement bancaire</strong> : Génération de bordereaux séparés si les employés sont domiciliés dans des banques différentes (Coris Bank, BOA, Ecobank, UBA, etc.).</li>
+  <li><strong>Lettre officielle d'ordre de virement</strong> : Texte administratif généré avec montant total en chiffres et en toutes lettres, numéro de compte débiteur de l'entreprise et tableau des bénéficiaires.</li>
+  <li><strong>Export CSV bancaire normalisé</strong> : Fichier d'échange interbancaire prêt pour importation dans le portail web d'e-banking de la banque de l'entreprise.</li>
+</ul>
+
+<!-- ILLUSTRATION EMPLACEMENT 7 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#127974;</span>
+    <div class="screenshot-placeholder-title">[Illustration 7 : Ordres de Virement Bancaire &amp; Analyse des RIB]</div>
+    <div class="screenshot-placeholder-desc">
+      Aperçu du module CPT-02 : tableau des règlements nets, sélecteur de banque, panneau d'analyse des anomalies de comptes et aperçu de la lettre de virement officielle.
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 6.2 — Sécurisation des paiements et édition des ordres de virement par banque</div>
+</div>
+
+---
+
+<!-- AUDIT ET SÉCURITÉ -->
+<div class="page-break"></div>
+<h1>7. Sécurité, Audit &amp; Traçabilité des Opérations (ADM-02)</h1>
+
+<p>
+  Le module <strong>ADM-02</strong> garantit une traçabilité totale et infalsifiable de tous les événements survenus dans le système.
+  Il répond aux exigences des commissaires aux comptes, auditeurs fiscaux et directions générales.
+</p>
+
+<!-- ILLUSTRATION EMPLACEMENT 8 -->
+<div class="screenshot-container">
+  <div class="screenshot-placeholder">
+    <span class="screenshot-placeholder-icon">&#128270;</span>
+    <div class="screenshot-placeholder-title">[Illustration 8 : Journal d'Audit &amp; Traçabilité des Salaires]</div>
+    <div class="screenshot-placeholder-desc">
+      Vue de l'écran « Journal d'audit » avec la barre de filtres multicritères, les 4 cartes KPI en temps réel, la liste des modifications contractuelles soulignées en doré et le volet inférieur d'inspection détaillée.
+    </div>
+  </div>
+  <div class="screenshot-caption">Figure 7.1 — Piste d'audit inviolable des mouvements de rémunération et clôtures</div>
+</div>
+
+<h2>7.1. Ce qui est tracé en base (Table `JournalAudit`)</h2>
+<p>
+  Chaque opération fait l'objet d'un enregistrement comprenant l'horodatage précis, l'opérateur, l'adresse machine, l'action,
+  le matricule du salarié et la comparaison différentielle :
+</p>
+<ul>
+  <li><strong>Modifications de rémunération contractuelle</strong> : Salaire de base, prime de logement, transport, sujétion, fonction. Le système enregistre l'ancienne valeur, la nouvelle valeur et l'écart (ex: <em>« KOUASSI Amadou : Salaire de base passé de 500 000 F à 650 000 F (+150 000 F) »</em>).</li>
+  <li><strong>Modifications des coordonnées bancaires</strong> : Changement de RIB ou de mode de paiement.</li>
+  <li><strong>Évolution des charges de famille</strong> : Ajout ou retrait d'enfants (impact direct sur l'IUTS).</li>
+  <li><strong>Actes de gestion sensibles</strong> : Création de salarié, radiation d'employé, clôture de période, réouverture avec saisie obligatoire du motif, validation de lots de variables.</li>
+</ul>
+
+<h2>7.2. Double Export d'Audit Officiel</h2>
+<p>
+  L'écran offre deux modes d'exportation documentaire :
+</p>
+<ol>
+  <li><strong>Export Excel ClosedXML Paysage (.xlsx)</strong> : Rapport formel de direction avec en-tête IFU/RCCM, récapitulatif des cartes KPI et tableau des 12 colonnes légales d'audit.</li>
+  <li><strong>Export CSV RFC-4180 avec BOM UTF-8 (.csv)</strong> : Fichier délimité universel garantissant une ouverture sans altération des accents sous Microsoft Excel et intégrable dans tout outil externe de Business Intelligence.</li>
+</ol>
+
+---
+
+<!-- SYNTHÈSE DES MODULES -->
+<div class="page-break"></div>
+<h1>8. Synthèse des Modules Livrés &amp; Feuille de Route</h1>
+
+<p>
+  Au terme de la Phase 3, les <strong>16 premiers modules fondamentaux</strong> de la feuille de route de 53 modules sont
+  entièrement opérationnels, testés et conformes :
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 15%;">Module</th>
+      <th style="width: 45%;">Désignation Fonctionnelle</th>
+      <th style="width: 20%;" class="center">Phase</th>
+      <th style="width: 20%;" class="center">État</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>SOC-01</strong></td>
+      <td>Plan de paie (rubriques, gains, retenues, assujettissements)</td>
+      <td class="center">Phase 1</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>SOC-02</strong></td>
+      <td>Barèmes légaux datés (IUTS, CNSS, TPA, historisation)</td>
+      <td class="center">Phase 1</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>SOC-03</strong></td>
+      <td>Profils de paie (packages de rubriques par catégorie)</td>
+      <td class="center">Phase 1</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>SAL-01</strong></td>
+      <td>Gestion du personnel &amp; Charges de famille nominatives</td>
+      <td class="center">Phase 1</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>PAI-01</strong></td>
+      <td>Périodes de paie, totaux arrêtés et verrou de clôture</td>
+      <td class="center">Phase 2</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>PAI-02</strong></td>
+      <td>Variables du mois (primes, saisie en lot, report N-1)</td>
+      <td class="center">Phase 2</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>PAI-04</strong></td>
+      <td>Congés payés et retenues pour absences non rémunérées</td>
+      <td class="center">Phase 2</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>PAI-05</strong></td>
+      <td>Prêts, acomptes et échéanciers de remboursement</td>
+      <td class="center">Phase 2</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>DEC-01</strong></td>
+      <td>Contrôle d'équivalence et audit comparatif du moteur</td>
+      <td class="center">Phase 2</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>DEC-02</strong></td>
+      <td>Taxe Patronale et d'Apprentissage (TPA 3% nationaux / 4% expat)</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>DEC-03</strong></td>
+      <td>Déclaration fiscale IUTS / TPA (bordereau et état nominatif)</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>DEC-04</strong></td>
+      <td>Déclaration sociale CNSS (bordereau par branche et nominatif)</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>ETA-01</strong></td>
+      <td>Livre de paie mensuel salariés &times; rubriques (export ClosedXML)</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>CPT-01</strong></td>
+      <td>Écritures comptables SYSCOHADA (pièce d'OD équilibrée)</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>CPT-02</strong></td>
+      <td>Ordres de virement bancaire et récapitulatif des règlements</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+    <tr>
+      <td><strong>ADM-02</strong></td>
+      <td>Journal d'audit et traçabilité des opérations de paie</td>
+      <td class="center">Phase 3</td>
+      <td class="center"><span class="badge badge-success">Validé &amp; Conforme</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-info" style="margin-top: 25px;">
+  <div class="callout-title">Prochaine Étape : Ouverture de la Phase 4 (Pilotage &amp; Conventions)</div>
+  La Phase 4 s'ouvrira avec les modules :
+  <ul>
+    <li><strong>PAI-03</strong> : Heures supplémentaires (décompte et majorations légales à 115%, 130%, 150%, 200%, heures de nuit et dimanches/jours fériés).</li>
+    <li><strong>SOC-05</strong> : Grilles de salaires et conventions collectives (gestion automatisée de la prime d'ancienneté par tranche d'années d'expérience).</li>
+  </ul>
+</div>
+
+<p style="text-align: center; color: #718096; font-size: 8pt; margin-top: 40px; border-top: 1px solid #E2E8F0; padding-top: 15px;">
+  Manuel de Référence Officiel — Sigma Paie &amp; RH — Édité pour les professionnels de la Paie et des Ressources Humaines.
+</p>
+
+</body>
+</html>

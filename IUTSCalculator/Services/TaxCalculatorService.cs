@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using IUTSCalculator.Models;
@@ -17,11 +17,34 @@ namespace IUTSCalculator.Services
 
         public event EventHandler<TaxParametersUpdatedEventArgs> TaxParametersUpdated;
 
+        /// <summary>
+        /// Taux et plafonds sociaux appliqués par le moteur (module DEC-01).
+        ///
+        /// Initialisés aux VALEURS HISTORIQUES — celles qui étaient écrites en dur dans
+        /// ce fichier — pour que rien ne change tant qu'un barème daté n'est pas appliqué
+        /// explicitement via <see cref="AppliquerBareme"/>. C'est la garantie
+        /// d'équivalence : un appelant qui ne connaît pas ce module obtient exactement les
+        /// mêmes bulletins qu'avant.
+        /// </summary>
+        public ParametresSociaux ParametresAppliques { get; private set; }
+
         public TaxCalculatorService(TaxDataService taxDataService)
         {
             _taxDataService = taxDataService ?? throw new ArgumentNullException(nameof(taxDataService));
+            ParametresAppliques = ParametresSociaux.Historiques();
             _taxDataUpdatedHandler = (sender, e) => OnTaxDataUpdated(e);
             _taxDataService.TaxDataUpdated += _taxDataUpdatedHandler;
+        }
+
+        /// <summary>
+        /// Applique les taux d'un barème daté (SOC-02) aux calculs suivants. Passer
+        /// <c>null</c> revient aux valeurs historiques.
+        /// </summary>
+        public void AppliquerBareme(BaremeLegal bareme)
+        {
+            ParametresAppliques = bareme == null
+                ? ParametresSociaux.Historiques()
+                : ParametresSociaux.DepuisBareme(bareme);
         }
 
         /// <summary>
@@ -238,10 +261,38 @@ namespace IUTSCalculator.Services
             }
         }
 
+        /// <summary>
+        /// Calcul mensuel sans variable : comportement inchangé depuis toujours.
+        /// </summary>
         public TaxCalculation CalculateMonthlyTax(Employee employee)
+        {
+            return CalculateMonthlyTax(employee, ApportVariables.Aucun());
+        }
+
+        /// <summary>
+        /// Calcul mensuel tenant compte des variables du mois (branchement de PAI-02).
+        ///
+        /// <b>Équivalence stricte.</b> Avec <see cref="ApportVariables.Aucun"/>, cette
+        /// méthode donne au franc près ce que donnait l'ancienne : tous les apports sont
+        /// nuls, et chaque terme ajouté ci-dessous s'annule.
+        ///
+        /// Trois assiettes sont désormais distinguées là où il n'y en avait qu'une :
+        ///
+        ///   • <c>brutImposable</c> — ce qui entre dans la base IUTS ;
+        ///   • <c>brutCotisable</c> — ce qui entre dans l'assiette CNSS ;
+        ///   • <c>SalaireBrut</c>  — le brut complet qui s'imprime sur le bulletin.
+        ///
+        /// Les confondre était sans conséquence tant que tous les éléments de paie étaient
+        /// soumis aux deux. Ce n'est plus vrai dès qu'une rubrique porte des drapeaux
+        /// différents, et c'est précisément ce que SOC-01 rend possible.
+        /// </summary>
+        public TaxCalculation CalculateMonthlyTax(Employee employee, ApportVariables apport)
         {
             if (employee == null)
                 throw new ArgumentNullException(nameof(employee));
+
+            if (apport == null)
+                apport = ApportVariables.Aucun();
 
             var calculation = new TaxCalculation
             {
@@ -249,9 +300,9 @@ namespace IUTSCalculator.Services
                 CalculationDate = DateTime.Now
             };
 
-            // Salaire brut = salaire de base + toutes les indemnités de toute nature
-            // (logement, fonction, transport, sujétion, avantages en nature...), cf. Art.109/111 CGI.
-            decimal grossIncome = employee.BaseSalary
+            // Rémunération permanente : salaire de base + indemnités de toute nature
+            // (logement, fonction, transport, sujétion), cf. Art.109/111 CGI.
+            decimal remunerationPermanente = employee.BaseSalary
                                 + employee.HousingAllowance
                                 + employee.FunctionAllowance
                                 + employee.TransportAllowance
@@ -259,14 +310,68 @@ namespace IUTSCalculator.Services
 
             decimal otherAllowances = 0m;
             decimal benefitsInKind = 0m;
-            grossIncome += otherAllowances + benefitsInKind;
+            remunerationPermanente += otherAllowances + benefitsInKind;
 
-            calculation.SalaireBrut = grossIncome;
+            // Absences non rémunérées (module PAI-04) : la retenue s'impute sur la
+            // rémunération permanente AVANT tout calcul. Une journée non travaillée ne
+            // réduit pas seulement le net, elle réduit l'assiette de l'impôt et des
+            // cotisations — retenir après coup ferait payer au salarié l'IUTS et la CNSS
+            // sur un salaire qu'il n'a pas perçu.
+            //
+            // Sans absence saisie, la retenue vaut zéro et la ligne ci-dessous ne change
+            // rien : c'est la garantie d'équivalence stricte, vérifiable sur l'écran de
+            // contrôle du moteur.
+            decimal retenueAbsences = apport.RetenueSurBrut;
+            if (retenueAbsences > remunerationPermanente)
+                retenueAbsences = remunerationPermanente;
+            if (retenueAbsences < 0m)
+                retenueAbsences = 0m;
 
-            calculation.CnssEmployee = CalculerCotisationSociale(grossIncome, 800000, 0.055m);
+            remunerationPermanente -= retenueAbsences;
+            calculation.RetenueAbsences = retenueAbsences;
+
+            // Base imposable à l'IUTS : le permanent, plus les gains variables soumis.
+            decimal grossIncome = remunerationPermanente + apport.GainsImposables;
+
+            // Assiette des cotisations : le permanent, plus les gains variables cotisables.
+            decimal brutCotisable = remunerationPermanente + apport.GainsCotisables;
+
+            calculation.GainsVariables = apport.TousLesGains;
+            calculation.RetenuesDiverses = apport.Retenues;
+
+            // Le brut du bulletin comprend TOUT ce qui est versé, y compris les gains ni
+            // imposables ni cotisables — qui rejoignent donc le net sans passer par le
+            // calcul, puisque le net se déduit du brut.
+            calculation.SalaireBrut = grossIncome + apport.GainsNonSoumis;
+
+            // ── Cotisations CNSS (module DEC-01) ────────────────────────────────
+            //
+            // Les taux et le plafond viennent désormais de ParametresSociaux, initialisés
+            // aux valeurs historiques (5,5 % / 16 % / 800 000) : à paramètres inchangés,
+            // les trois lignes ci-dessous donnent exactement ce que donnaient les
+            // littéraux qu'elles remplacent.
+            var parametres = ParametresAppliques;
+            // L'assiette porte sur le brut COTISABLE, pas sur le brut imposable :
+            // sans variable les deux sont égaux, avec variables ils divergent.
+            decimal assietteCnss = parametres.Assiette(brutCotisable);
+            calculation.AssietteCnss = assietteCnss;
+
+            calculation.CnssEmployee = assietteCnss * parametres.TauxCnssSalarie;
+
+            // Report historique : la retenue CNSS alimente le champ « cotisation de
+            // retraite » du salarié, dont se sert plus bas le plafond de déduction de
+            // l'article 111. Conservé tel quel — le déloger changerait la base imposable,
+            // ce qui sort du périmètre d'une mise en conformité à équivalence stricte.
             employee.PensionContribution = calculation.CnssEmployee;
 
-            calculation.CnssPartPatronale = CalculerCotisationSociale(grossIncome, 800000, 0.16m);
+            // Ventilation par branche, exigée sur le bordereau CNSS. Aucun arrondi n'est
+            // appliqué par branche : la somme des trois est donc exactement égale à la
+            // part patronale globale, en arithmétique décimale.
+            calculation.CnssPrestationsFamiliales = assietteCnss * parametres.TauxPrestationsFamiliales;
+            calculation.CnssRisquesProfessionnels = assietteCnss * parametres.TauxRisquesProfessionnels;
+            calculation.CnssPensionsPatronal = assietteCnss * parametres.TauxPensionsPatronal;
+
+            calculation.CnssPartPatronale = assietteCnss * parametres.TauxPatronalTotal;
 
             decimal exemptAmount = CalculateExemptAmount(employee, grossIncome, calculation.CnssEmployee);
             calculation.ExemptAmount = exemptAmount;
@@ -305,8 +410,36 @@ namespace IUTSCalculator.Services
             calculation.TaxRate = grossIncome > 0 ? netTax / grossIncome * 100 : 0;
 
             calculation.RetenueSpeciale = (grossIncome - netTax - calculation.CnssEmployee) * 0.01m;
-            calculation.TaxePatronale = grossIncome * 0.03m;
-            calculation.MasseSalariale = grossIncome + calculation.TaxePatronale + calculation.CnssPartPatronale;
+
+            // ── Taxe patronale et d'apprentissage (module DEC-02) ───────────────
+            //
+            // Assiette : le salaire brut, diminué des rubriques que le plan de paie en
+            // exonère explicitement (apport.GainsExoneresTPA). Par défaut aucune rubrique
+            // n'est exonérée — l'assiette reste donc le brut intégral, exactement ce que
+            // calculait l'acompte livré avec DEC-01.
+            //
+            // Taux : tiré des paramètres, eux-mêmes issus du barème daté applicable à la
+            // période (SOC-02) quand l'appelant l'a résolu via AppliquerBareme ; sinon la
+            // valeur historique de 3 %, inchangée.
+            //
+            // Pas de plafonnement : à la différence de la CNSS, la TPA n'est pas assise sur
+            // une assiette plafonnée — aucun texte ne le prévoit.
+            decimal assietteTPA = calculation.SalaireBrut - apport.GainsExoneresTPA;
+            if (assietteTPA < 0m) assietteTPA = 0m;
+
+            calculation.AssietteTPA = assietteTPA;
+            calculation.TaxePatronale = assietteTPA * parametres.TauxTaxePatronale;
+            calculation.MasseSalariale = calculation.SalaireBrut + calculation.TaxePatronale + calculation.CnssPartPatronale;
+
+            // Net après impôt et net à payer : le modèle les expose en propriétés CALCULÉES,
+            // mais la base stocke deux champs distincts, qui restaient à zéro faute d'être
+            // alimentés. Un bulletin enregistré partait donc avec un net à payer nul, et
+            // les totaux d'une période affichaient 0 pour tout l'effectif.
+            //
+            // Ces deux lignes ne changent aucun montant calculé : elles recopient, à la
+            // toute fin, ce que le calcul vient d'établir.
+            calculation.NetSalaryAfterTaxPersisted = calculation.NetSalaryAfterTax;
+            calculation.SalaireNetaPayerPersisted = calculation.SalaireNetaPayer;
 
             GenerateCalculationDetails(calculation, exemptAmount, pensionContribution, professionalDeduction, grossTax);
 
@@ -441,7 +574,7 @@ namespace IUTSCalculator.Services
             details.AppendLine($"10. Rosalaire : {calculation.RetenueSpeciale:N0} FCFA");
             details.AppendLine($"11. Salaire net à payer : {calculation.SalaireNetaPayer:N0} FCFA");
             details.AppendLine($"12. CNSS Part Patronal  : {calculation.CnssPartPatronale:N0} FCFA");
-            details.AppendLine($"13. TPA : {calculation.TaxePatronale:N0} FCFA");
+            details.AppendLine($"13. TPA : {calculation.TaxePatronale:N0} FCFA (assiette {calculation.AssietteTPA:N0} FCFA)");
             details.AppendLine($"14. Masse Salarial : {calculation.MasseSalariale:N0} FCFA");
 
             calculation.CalculationDetails = details.ToString();
@@ -491,7 +624,7 @@ namespace IUTSCalculator.Services
             return exemptHousingAllowance + exemptFunctionAllowance + exemptTransportAllowance;
         }
 
-        private decimal CalculateGrossTax(decimal taxableIncome)
+        public decimal CalculateGrossTax(decimal taxableIncome)
         {
             decimal tax = 0m;
 

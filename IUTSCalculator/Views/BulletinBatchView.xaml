@@ -17,7 +17,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="*" MinHeight="220"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -50,6 +50,8 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="14"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="14"/>
@@ -64,31 +66,39 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock  Grid.Row="0" Grid.Column="0" Text="Période" Style="{StaticResource FieldLabel}"/>
-                    <DatePicker Grid.Row="1" Grid.Column="0" Width="150" Margin="0"
+                    <TextBlock  Grid.Row="0" Grid.Column="0" Text="Période (du)" Style="{StaticResource FieldLabel}"/>
+                    <DatePicker Grid.Row="1" Grid.Column="0" Width="140" Margin="0"
                                 Style="{StaticResource FormDatePickerStyle}"
                                 SelectedDate="{Binding Periode, Mode=TwoWay}"/>
 
-                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Congés pris (j)" Style="{StaticResource FieldLabel}"/>
-                    <TextBox   Grid.Row="1" Grid.Column="2" Width="96" Margin="0" TextAlignment="Right"
+                    <TextBlock  Grid.Row="0" Grid.Column="2" Text="au (optionnel)" Style="{StaticResource FieldLabel}"
+                                ToolTip="Laissez identique à « du » pour un seul mois. Une plage de plusieurs mois range chaque employé dans son propre sous-dossier."/>
+                    <DatePicker Grid.Row="1" Grid.Column="2" Width="140" Margin="0"
+                                Style="{StaticResource FormDatePickerStyle}"
+                                SelectedDate="{Binding PeriodeFin, Mode=TwoWay}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Congés pris (j)" Style="{StaticResource FieldLabel}"
+                               ToolTip="Valeur par défaut appliquée si l'employé n'a pas d'absence enregistrée. Si des congés ont été saisis ou importés via « Congés et absences », ils sont automatiquement pris en compte individuellement."/>
+                    <TextBox   Grid.Row="1" Grid.Column="4" Width="96" Margin="0" TextAlignment="Right"
                                Style="{StaticResource FormTextBoxStyle}"
+                               ToolTip="Valeur par défaut pour ce lot. Les congés individuels saisis ou importés dans l'écran « Congés et absences » sont automatiquement prioritaires."
                                Text="{Binding CongesPrisJours, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Mode de règlement" Style="{StaticResource FieldLabel}"/>
-                    <ComboBox  Grid.Row="1" Grid.Column="4" Width="170" Margin="0"
+                    <TextBlock Grid.Row="0" Grid.Column="6" Text="Mode de règlement" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox  Grid.Row="1" Grid.Column="6" Width="170" Margin="0"
                                Style="{StaticResource FormComboBoxStyle}"
                                ItemsSource="{Binding ModesReglement}"
                                SelectedItem="{Binding ModeReglement, Mode=TwoWay}"/>
 
-                    <TextBlock Grid.Row="0" Grid.Column="6" Text="Modèle de bulletin" Style="{StaticResource FieldLabel}"/>
-                    <ComboBox  Grid.Row="1" Grid.Column="6" Width="200" Margin="0"
+                    <TextBlock Grid.Row="0" Grid.Column="8" Text="Modèle de bulletin" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox  Grid.Row="1" Grid.Column="8" Width="200" Margin="0"
                                Style="{StaticResource FormComboBoxStyle}"
                                ItemsSource="{Binding Templates}"
                                DisplayMemberPath="Label"
                                SelectedItem="{Binding SelectedTemplateOption, Mode=TwoWay}"/>
 
-                    <TextBlock Grid.Row="0" Grid.Column="8" Text="Dossier de destination des PDF" Style="{StaticResource FieldLabel}"/>
-                    <Grid Grid.Row="1" Grid.Column="8">
+                    <TextBlock Grid.Row="0" Grid.Column="10" Text="Dossier de destination des PDF" Style="{StaticResource FieldLabel}"/>
+                    <Grid Grid.Row="1" Grid.Column="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -100,7 +110,42 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{Binding ChoisirDossierCommand}"/>
                     </Grid>
+
                 </Grid>
+
+                <!-- Mois de la plage à cocher : toujours visible dès qu'un mois est défini,
+                     pour écarter un mois précis sans redéfinir toute la plage. -->
+                <Border Margin="0,12,0,0" Padding="10,8"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                        Visibility="{Binding AfficherSelectionMois, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Text="MOIS DE LA PLAGE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,6"/>
+                        <ItemsControl ItemsSource="{Binding MoisPlage}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Margin="0,0,18,4"
+                                              Style="{StaticResource FormCheckBoxStyle}"
+                                              Content="{Binding Libelle}"
+                                              IsChecked="{Binding EstSelectionne, Mode=TwoWay}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Affichage de la devise : même réglage de dossier que l'écran
+                     « Bulletin de paie », retenu d'un export à l'autre. -->
+                <CheckBox Margin="0,12,0,0" HorizontalAlignment="Left"
+                          Style="{StaticResource FormCheckBoxStyle}"
+                          Content="Écrire « FCFA » après les montants"
+                          ToolTip="Décochez pour n'imprimer que les nombres sur les bulletins exportés."
+                          IsChecked="{Binding AfficherDevise, Mode=TwoWay}"/>
             </StackPanel>
         </Border>
 
