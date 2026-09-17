@@ -26,7 +26,7 @@ namespace IUTSCalculator.Services
     public class SQLiteService : IDisposable
     {
         /// <summary>Niveau de schéma attendu par cette version de l'application.</summary>
-        private const int SchemaCible = 28;
+        private const int SchemaCible = 29;
 
         private readonly string _dbPath;
         private readonly string _connectionString;
@@ -275,6 +275,12 @@ namespace IUTSCalculator.Services
                         Migration28_ServiceEtColonnesManquantes(connection);
                         EnregistrerVersion(connection, 28);
                     }
+
+                    if (version < 29)
+                    {
+                        Migration29_OrganigrammeEtPostes(connection);
+                        EnregistrerVersion(connection, 29);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -390,7 +396,9 @@ namespace IUTSCalculator.Services
                     Echelon               TEXT,
                     DateSortie            TEXT,
                     MotifDepart           TEXT,
-                    StatutSalarie         INTEGER NOT NULL DEFAULT 0
+                    StatutSalarie         INTEGER NOT NULL DEFAULT 0,
+                    PosteId               INTEGER,
+                    ManagerMatricule      TEXT
                 );");
 
             Executer(connection, @"
@@ -470,6 +478,7 @@ namespace IUTSCalculator.Services
             Migration24_SaisiesOppositionsEtCessions(connection);
             Migration25_RappelsEtRegularisations(connection);
             Migration26_AvantagesEnNature(connection);
+            Migration29_OrganigrammeEtPostes(connection);
         }
 
         /// <summary>
@@ -1703,6 +1712,63 @@ namespace IUTSCalculator.Services
             AjouterColonneSiAbsente(connection, "Employees", "DateSortie", "TEXT");
             AjouterColonneSiAbsente(connection, "Employees", "MotifDepart", "TEXT");
             AjouterColonneSiAbsente(connection, "Employees", "StatutSalarie", "INTEGER NOT NULL DEFAULT 0");
+        }
+
+        /// <summary>
+        /// Migration 29 — Organigramme d'entreprise : Directions, services, postes et rattachements hiérarchiques (module RH-01).
+        /// </summary>
+        private void Migration29_OrganigrammeEtPostes(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS UnitesOrganisationnelles (
+                    Id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code                 TEXT NOT NULL UNIQUE,
+                    Libelle              TEXT NOT NULL,
+                    TypeUnite            INTEGER NOT NULL DEFAULT 0,
+                    ParentId             INTEGER,
+                    ResponsableMatricule TEXT,
+                    Description          TEXT,
+                    Couleur              TEXT,
+                    Ordre                INTEGER NOT NULL DEFAULT 0,
+                    DateCreation         TEXT NOT NULL,
+                    FOREIGN KEY(ParentId) REFERENCES UnitesOrganisationnelles(Id) ON DELETE SET NULL,
+                    FOREIGN KEY(ResponsableMatricule) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS Postes (
+                    Id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code                 TEXT NOT NULL UNIQUE,
+                    Intitule             TEXT NOT NULL,
+                    UniteId              INTEGER,
+                    SuperieurPosteId     INTEGER,
+                    TitulaireMatricule   TEXT,
+                    Classification       TEXT,
+                    Missions             TEXT,
+                    EffectifRequis       INTEGER NOT NULL DEFAULT 1,
+                    Actif                INTEGER NOT NULL DEFAULT 1,
+                    Ordre                INTEGER NOT NULL DEFAULT 0,
+                    DateCreation         TEXT NOT NULL,
+                    FOREIGN KEY(UniteId) REFERENCES UnitesOrganisationnelles(Id) ON DELETE SET NULL,
+                    FOREIGN KEY(SuperieurPosteId) REFERENCES Postes(Id) ON DELETE SET NULL,
+                    FOREIGN KEY(TitulaireMatricule) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+                );");
+
+            AjouterColonneSiAbsente(connection, "Employees", "PosteId", "INTEGER");
+            AjouterColonneSiAbsente(connection, "Employees", "ManagerMatricule", "TEXT");
+
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_UnitesOrganisationnelles_Code ON UnitesOrganisationnelles(Code);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_UnitesOrganisationnelles_ParentId ON UnitesOrganisationnelles(ParentId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_Postes_Code ON Postes(Code);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_Postes_UniteId ON Postes(UniteId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_Postes_Superieur ON Postes(SuperieurPosteId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_Postes_Titulaire ON Postes(TitulaireMatricule);");
         }
 
         /// <summary>

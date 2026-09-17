@@ -95,6 +95,11 @@ namespace IUTSCalculator.ViewModels
         private readonly AvantageNatureExportService _avantageNatureExportService;
         private readonly AvantageNatureViewModel _avantageNatureViewModel;
 
+        // Organigramme d'entreprise et rattachements hiérarchiques (module RH-01)
+        private readonly OrganigrammeService _organigrammeService;
+        private readonly OrganigrammeExportService _organigrammeExportService;
+        private readonly OrganigrammeViewModel _organigrammeViewModel;
+
         public BaseViewModel CurrentViewModel
         {
             get => _currentViewModel;
@@ -160,6 +165,7 @@ namespace IUTSCalculator.ViewModels
         public ICommand NavigateToSaisiesCommand { get; private set; }
         public ICommand NavigateToRappelsCommand { get; private set; }
         public ICommand NavigateToAvantagesNatureCommand { get; private set; }
+        public ICommand NavigateToOrganigrammeCommand { get; private set; }
 
         /// <summary>
         /// Indique si la barre de menu latéral (rail de navigation) est affichée.
@@ -238,6 +244,7 @@ namespace IUTSCalculator.ViewModels
         public bool IsNavControleMoteurVisible => IsItemVisible("ControleMoteur");
         public bool IsNavBaremeVisible => IsItemVisible("Bareme");
         public bool IsNavConventionsVisible => IsItemVisible("Conventions");
+        public bool IsNavOrganigrammeVisible => IsItemVisible("Organigramme");
 
         public bool IsNavAuditVisible => IsItemVisible("Audit");
         public bool IsNavSettingsVisible => IsItemVisible("Parametres");
@@ -250,6 +257,7 @@ namespace IUTSCalculator.ViewModels
         public bool IsNavGroupParametrageVisible => IsGroupVisible("PARAMETRAGE");
         public bool IsNavGroupAuditVisible => IsGroupVisible("AUDIT");
         public bool IsNavGroupPilotageVisible => IsGroupVisible("PILOTAGE");
+        public bool IsNavGroupRhVisible => IsGroupVisible("RH");
 
         private bool IsItemVisible(string key) => _visibleNavItems.Contains(key);
         private bool IsGroupVisible(string groupKey) => _visibleNavGroups.Contains(groupKey);
@@ -560,6 +568,16 @@ namespace IUTSCalculator.ViewModels
                 _soldeToutCompteExportService,
                 _currentDossier);
 
+            // Organigramme d'entreprise et rattachements hiérarchiques (module RH-01)
+            var sqliteOrganigramme = new SQLiteService(_currentDossier.DbFileName);
+            _organigrammeService = new OrganigrammeService(sqliteOrganigramme);
+            _organigrammeExportService = new OrganigrammeExportService();
+            _organigrammeViewModel = new OrganigrammeViewModel(
+                _organigrammeService,
+                _organigrammeExportService,
+                _dataService,
+                _currentDossier);
+
             // Navigation par défaut
             CurrentViewModel = _calculationViewModel;
 
@@ -723,6 +741,14 @@ namespace IUTSCalculator.ViewModels
                 {
                     _ = _avantageNatureViewModel.ChargerDonneesAsync();
                     NavigateTo(_avantageNatureViewModel);
+                },
+                canExecute: () => true);
+
+            NavigateToOrganigrammeCommand = new RelayCommand(
+                execute: () =>
+                {
+                    _ = _organigrammeViewModel.ChargerToutAsync();
+                    NavigateTo(_organigrammeViewModel);
                 },
                 canExecute: () => true);
 
@@ -941,6 +967,10 @@ namespace IUTSCalculator.ViewModels
             // ───── PILOTAGE ─────
             _navMenuItems.Add(new NavMenuItemDefinition("TableauBordMasseSalariale", "PILOTAGE", "Tableau de bord masse salariale",
                 "tableau de bord masse salariale evolution mensuelle brut net cout employeur service categorie graphique dashboard pilotage", NavigateToTableauBordMasseSalarialeCommand));
+
+            // ───── RESSOURCES HUMAINES ─────
+            _navMenuItems.Add(new NavMenuItemDefinition("Organigramme", "RH", "Organigramme",
+                "organigramme directions services postes fonctions rattachements hierarchiques n+1 structure organisation ressources humaines rh", NavigateToOrganigrammeCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("EcriturePaie", "DECLARATIONS", "Écritures de paie",
                 "ecritures de paie comptabilite compta syscohada od pieces debits credits 66 42 43 44 journal comptable", NavigateToEcriturePaieCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("OrdreVirement", "DECLARATIONS", "Ordres de virement",

@@ -203,6 +203,7 @@
     <Compile Include="Models\RappelPaie.cs" />
     <Compile Include="Models\ApportRappels.cs" />
     <Compile Include="Models\AvantageNature.cs" />
+    <Compile Include="Models\Organigramme.cs" />
     <Compile Include="Models\Dossier.cs" />
     <Compile Include="Models\PayslipMonthly.cs" />
     <Compile Include="Models\UserAccount.cs" />
@@ -255,6 +256,8 @@
     <Compile Include="Services\RappelPaieExportService.cs" />
     <Compile Include="Services\AvantageNatureService.cs" />
     <Compile Include="Services\AvantageNatureExportService.cs" />
+    <Compile Include="Services\OrganigrammeService.cs" />
+    <Compile Include="Services\OrganigrammeExportService.cs" />
     <Compile Include="Services\RattrapageCnssService.cs" />
     <Compile Include="Services\SQLiteService.cs" />
     <Compile Include="Services\TaxCalculatorService.cs" />
@@ -300,6 +303,7 @@
     <Compile Include="ViewModels\SaisieOppositionViewModel.cs" />
     <Compile Include="ViewModels\RappelPaieViewModel.cs" />
     <Compile Include="ViewModels\AvantageNatureViewModel.cs" />
+    <Compile Include="ViewModels\OrganigrammeViewModel.cs" />
     <Compile Include="ViewModels\SettingsViewModel.cs" />
     <Compile Include="Views\BaseSalaryEstimatorView.xaml.cs">
       <DependentUpon>BaseSalaryEstimatorView.xaml</DependentUpon>
@@ -402,6 +406,9 @@
     </Compile>
     <Compile Include="Views\AvantageNatureView.xaml.cs">
       <DependentUpon>AvantageNatureView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\OrganigrammeView.xaml.cs">
+      <DependentUpon>OrganigrammeView.xaml</DependentUpon>
     </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -552,6 +559,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\AvantageNatureView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\OrganigrammeView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

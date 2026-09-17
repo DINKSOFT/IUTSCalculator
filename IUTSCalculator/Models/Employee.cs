@@ -45,6 +45,10 @@ namespace IUTSCalculator.Models
         private DateTime? _dateSortie;
         private string _motifDepart;
         private int _statutSalarie;
+        private int? _posteId;
+        private string _managerMatricule;
+        private string _posteLibelle;
+        private string _managerNom;
 
         /// <summary>
         /// Prénom de l'employé
@@ -735,8 +739,48 @@ namespace IUTSCalculator.Models
                 Echelon = Echelon,
                 DateSortie = DateSortie,
                 MotifDepart = MotifDepart,
-                StatutSalarie = StatutSalarie
+                StatutSalarie = StatutSalarie,
+                PosteId = PosteId,
+                ManagerMatricule = ManagerMatricule,
+                PosteLibelle = PosteLibelle,
+                ManagerNom = ManagerNom
             };
+        }
+
+        /// <summary>
+        /// Identifiant du poste dans l'organigramme (module RH-01).
+        /// </summary>
+        public int? PosteId
+        {
+            get => _posteId;
+            set { if (_posteId != value) { _posteId = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// Matricule du supérieur hiérarchique direct N+1 (module RH-01).
+        /// </summary>
+        public string ManagerMatricule
+        {
+            get => _managerMatricule;
+            set { if (_managerMatricule != value) { _managerMatricule = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// Intitulé du poste occupé (propriété d'affichage résolue depuis l'organigramme).
+        /// </summary>
+        public string PosteLibelle
+        {
+            get => _posteLibelle;
+            set { if (_posteLibelle != value) { _posteLibelle = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// Nom du supérieur hiérarchique direct (propriété d'affichage).
+        /// </summary>
+        public string ManagerNom
+        {
+            get => _managerNom;
+            set { if (_managerNom != value) { _managerNom = value; OnPropertyChanged(); } }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

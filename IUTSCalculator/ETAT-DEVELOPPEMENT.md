@@ -4,15 +4,13 @@ Ce fichier sert à **reprendre le travail dans une nouvelle conversation** sans 
 zéro. Il dit où en est le projet, quelles décisions ont été prises et pourquoi, et ce qui
 reste en dette. Il se met à jour à chaque module livré.
 
-Dernière mise à jour : 17 septembre 2026 — après **PIL-01** (« Tableau de bord masse salariale » :
-évolution mensuelle du brut, du net et du coût employeur, ventilée par catégorie et par service, alimentée
-par les mois clôturés). Ce module a exigé l'ajout d'un champ **Service** sur la fiche salarié (absent du
-modèle jusqu'ici — seule la catégorie existait), d'où une migration de schéma (`SchemaCible` passe à **28**)
-qui corrige au passage un oubli distinct : les colonnes `DateSortie`/`MotifDepart`/`StatutSalarie` (migration
-23) n'avaient jamais été reportées dans le schéma complet d'un dossier tout neuf, qui se serait donc retrouvé
-sans elles. Juste avant, un oubli de câblage sur **DEC-05** a été corrigé le même jour (l'écran existait mais
-son bouton de menu manquait dans la barre de navigation, car chaque bouton y est déclaré à la main plutôt que
-généré depuis la liste de recherche). La Phase 4 (« Pilotage, automatisation et conventionnel ») progresse à plein régime.
+Dernière mise à jour : 17 septembre 2026 — après **RH-01** (« Organigramme d'entreprise » :
+directions, services, postes et rattachements hiérarchiques N+1, visualisation arborescente dynamique WPF,
+affectation rapide des salariés, exports ClosedXML 3 feuilles et PDF officiel). Ce module a exigé l'ajout de
+deux tables (`UnitesOrganisationnelles` et `Postes`) ainsi que de colonnes de rattachement hiérarchique
+(`PosteId`, `ManagerMatricule`) sur la table `Employees`, d'où une migration de schéma (`SchemaCible` passe à **29**).
+Le module s'intègre sous une nouvelle section de menu « RESSOURCES HUMAINES » dans la barre de navigation.
+La Phase 4 (« Pilotage, automatisation et conventionnel » / Volet Ressources humaines) progresse à plein régime.
 
 ---
 
@@ -58,19 +56,19 @@ chaque phase ouvre les suivantes.
 | PAI-08 | Avantages en nature (évaluation forfaitaire logement/véhicule/domesticité/eau/électricité/nourriture, réintégration dans la base IUTS/CNSS/TPA, déduction en bas de bulletin, intégration bulletin/masse/Calcul d'IUTS/Calcul en lot) |
 | DEC-05 | État annuel des salaires — DADS (cumuls annuels par salarié et par rubrique : brut, base imposable, IUTS retenu, cotisations CNSS/TPA, alimentés par les mois clôturés) |
 | PIL-01 | Tableau de bord masse salariale (évolution mensuelle du brut, du net et du coût employeur ; ventilation par catégorie et par service ; alimenté par les mois clôturés ; export Excel 3 feuilles) |
+| RH-01 | Organigramme d'entreprise (directions, services, postes et rattachements hiérarchiques N+1, détection de cycles, visualisation arborescente WPF, affectations, double export Excel 3 feuilles et PDF officiel) |
 
 ### Prochain
 
 **Phase 4 — Pilotage, automatisation et conventionnel.**
 Ordre strict de la feuille de route (« Feuille de route Sigma Paie & RH.pdf », 53 modules) : SAL-05, PAI-03,
-PAI-08, DEC-05 et PIL-01 sont désormais tous livrés. Le prochain module est **RH-01** (premier du volet
-Ressources humaines, RH-01 à RH-08).
+PAI-08, DEC-05, PIL-01 et RH-01 sont désormais tous livrés. Le prochain module est **RH-02** (« Postes & fiches de poste : missions, compétences requises, classification conventionnelle, effectif budgété vs pourvu »).
 
 ---
 
 ## 3. Schéma de base
 
-`SQLiteService.SchemaCible` vaut **28**. Chaque montée de version fait une sauvegarde
+`SQLiteService.SchemaCible` vaut **29**. Chaque montée de version fait une sauvegarde
 `.avant-vN.bak` à côté du fichier avant de migrer.
 
 | N° | Objet |
@@ -99,11 +97,13 @@ Ressources humaines, RH-01 à RH-08).
 | 25 | Rappels et régularisations de paie (`RappelsPaie`, `RegularisationsIUTSAnnuel`, `DetailsSimulationRetroactive`, index `EmployeeId`/`AnneeImputation`/`MoisImputation`) |
 | 26 | Avantages en nature (`AvantagesNature`, module PAI-08) |
 | 27 | Rubrique « Avance sur salaire » (`AVANCE`, 4221/4270) — dette n°7 : donne enfin à l'avance sur salaire (PAI-05) un compte distinct de la retenue générique 422100 |
+| 28 | Service d'affectation (`Department`) sur la fiche employé et synchronisation du schéma vierge |
+| 29 | Organigramme d'entreprise et postes (`UnitesOrganisationnelles`, `Postes`, colonnes `PosteId`, `ManagerMatricule` dans `Employees`) |
 
 **Bases vierges.** `CreerSchemaComplet` rejoue désormais les migrations qui CRÉENT quelque
-chose (12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26). Un dossier neuf est enregistré directement au niveau cible et
+chose (12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29). Un dossier neuf est enregistré directement au niveau cible et
 saute toute la chaîne : il naît avec toutes les tables nécessaires (`Absences`, `Prets`,
-`ProfilsPaie`, `JournalAudit`, `HeuresSupplementaires`, `ConventionsCollectives`, `SoldesToutCompte`, `SaisiesOppositions`, etc.).
+`ProfilsPaie`, `JournalAudit`, `HeuresSupplementaires`, `ConventionsCollectives`, `SoldesToutCompte`, `SaisiesOppositions`, `UnitesOrganisationnelles`, `Postes`, etc.).
 La migration 27 n'y figure pas : elle ne fait qu'insérer une rubrique, déjà couverte pour un
 dossier neuf par `RubriqueService.RubriquesDeSaisie()` (même principe que la migration 11).
 
@@ -1162,6 +1162,41 @@ la feuille de route à partir d'ici — après avoir confirmé le prochain modul
     salarié pose problème.
     Aucun changement dans `AbsenceView.xaml`, déjà correcte : uniquement `AbsenceViewModel.cs`
     complété pour la servir.
+
+26. **Livré le 17 septembre 2026 : RH-01 — Organigramme d'entreprise** :
+    Premier module du volet Ressources Humaines (Phase 4).
+    — *Modèle relationnel et hiérarchique* (`Models/Organigramme.cs`) : `TypeUniteOrganisationnelle`
+    (DirectionGenerale, Direction, Departement, Service, Bureau, Equipe), `UniteOrganisationnelle`
+    avec code, libellé, rattachement parent `ParentId`, responsable actuel ; `Poste` avec code,
+    intitulé, rattachement structurel `UniteId`, rattachement hiérarchique N+1 `SuperviseurPosteId`,
+    effectif cible et effectif actuel ; `NoeudOrganigramme` pour la projection arborescente WPF
+    avec calcul récursif des effectifs (directs et consolidés sous-arbre), code couleur/badge par
+    type d'unité, avatars graphiques de direction.
+    — *Détection stricte de cycles hiérarchiques* (`OrganigrammeService.cs`) : méthodes
+    `DetecterCycleUnite(uniteId, parentCandidatId)` et `DetecterCyclePoste(posteId, superviseurCandidatId)`
+    empêchant toute boucle hiérarchique (un parent ne pouvant devenir son propre descendant,
+    auto-référence interdite).
+    — *Base de données et persistance* (`SQLiteService.cs` migration 29 + `DataService.cs`) :
+    création des tables `UnitesOrganisationnelles` et `Postes`, ajout des colonnes `PosteId` et
+    `ManagerMatricule` dans `Employees`. `CreerSchemaComplet` intègre directement ces structures
+    pour les nouveaux dossiers. Initialisation automatique d'une structure organisationnelle
+    type burkinabè (DG, DAF, DRH, Direction Commerciale, Services Comptabilité & Paie).
+    — *Double export* (`OrganigrammeExportService.cs`) :
+    (1) Export Excel ClosedXML à 3 feuilles : « Structure Organisationnelle » (tableau hiérarchique
+    des directions/services), « Référentiel des Postes » (liste des postes, unités, N+1 et effectifs),
+    « Salariés & Affectations » (liste nominative avec poste, service et supérieur hiérarchique).
+    (2) Export PDF iTextSharp A4 officiel : cartouche employeur avec IFU et raison sociale du dossier
+    courant, synthèse des unités avec effectifs directs et consolidés, hiérarchie N+1 des postes et
+    blocs de signature de validation RH.
+    — *Interface graphique WPF moderne* (`OrganigrammeView.xaml`, `OrganigrammeViewModel.cs`) :
+    4 onglets de navigation : (0) Arbre hiérarchique interactif avec zoom (50% à 200%), recherche et
+    mise en surbrillance, badges colorés et avatars ; (1) Gestion des Directions & Services (CRUD,
+    sélection du parent avec filtrage anti-cycle) ; (2) Référentiel des Postes & Fonctions (CRUD,
+    sélection du service et du superviseur N+1) ; (3) Affectation rapide des salariés (modification
+    directe du service, du poste et du manager).
+    — *Navigation globale et anti-staleness* : nouvelle section « RESSOURCES HUMAINES » dans la barre
+    latérale de `MainWindow.xaml`, intégration dans le moteur de recherche du menu avec mots-clés RH,
+    et respect du cycle de vie `OnIsActiveChanged` pour le rafraîchissement temps réel des effectifs.
 
 ---
 

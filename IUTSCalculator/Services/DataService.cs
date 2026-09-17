@@ -54,7 +54,7 @@ namespace IUTSCalculator.Services
             "EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, " +
             "FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, " +
             "Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, " +
-            "DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie";
+            "DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie, PosteId, ManagerMatricule";
 
         /// <summary>
         /// Construit un employé à partir de la ligne courante du lecteur. Point de passage
@@ -102,7 +102,9 @@ namespace IUTSCalculator.Services
                 Echelon = DbValue.TextFromDb(reader["Echelon"]),
                 DateSortie = DbValue.DateNullableFromDb(reader["DateSortie"]),
                 MotifDepart = DbValue.TextFromDb(reader["MotifDepart"]),
-                StatutSalarie = DbValue.IntFromDb(reader["StatutSalarie"])
+                StatutSalarie = DbValue.IntFromDb(reader["StatutSalarie"]),
+                PosteId = DbValue.IntNullableFromDb(reader["PosteId"]),
+                ManagerMatricule = DbValue.TextFromDb(reader["ManagerMatricule"])
             };
         }
 
@@ -243,9 +245,9 @@ namespace IUTSCalculator.Services
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
                     INSERT OR REPLACE INTO Employees
-                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie)
+                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie, PosteId, ManagerMatricule)
                     VALUES
-                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @Service, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie);";
+                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @Service, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie, @PosteId, @ManagerMatricule);";
 
                 cmd.Parameters.AddWithValue("@EmployeeId", employee.EmployeeId);
                 cmd.Parameters.AddWithValue("@FirstName", employee.FirstName ?? "");
@@ -285,6 +287,8 @@ namespace IUTSCalculator.Services
                 cmd.Parameters.AddWithValue("@DateSortie", DbValue.DateNullableToDb(employee.DateSortie));
                 cmd.Parameters.AddWithValue("@MotifDepart", employee.MotifDepart ?? "");
                 cmd.Parameters.AddWithValue("@StatutSalarie", employee.StatutSalarie);
+                cmd.Parameters.AddWithValue("@PosteId", employee.PosteId.HasValue ? (object)employee.PosteId.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@ManagerMatricule", employee.ManagerMatricule ?? "");
 
                 await cmd.ExecuteNonQueryAsync();
             }
