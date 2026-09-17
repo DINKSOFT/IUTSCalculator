@@ -315,9 +315,12 @@ namespace IUTSCalculator.Services
         /// donc l'impôt et les cotisations — elle ne se modélise pas comme une retenue sur
         /// le net. C'est l'objet du module « Congés et absences », qui vient ensuite.
         ///
-        /// ATTENTION : cette liste est reprise à l'identique par la migration 11 de
-        /// <see cref="SQLiteService"/>, qui l'ajoute aux dossiers créés avant ce module.
-        /// Toute modification ici doit être reportée là-bas.
+        /// ATTENTION : cette liste a été reprise à l'identique par la migration 11 de
+        /// <see cref="SQLiteService"/>, au moment où ce module est arrivé — elle ne s'exécute
+        /// plus pour les dossiers déjà passés par elle. Une rubrique ajoutée ICI après coup
+        /// (comme <c>AVANCE</c>, migration 27) doit donc recevoir sa PROPRE migration
+        /// <c>INSERT OR IGNORE</c>, pas une modification de la migration 11 : les dossiers
+        /// déjà migrés ne la rejoueraient jamais.
         /// </summary>
         public static List<Rubrique> RubriquesDeSaisie()
         {
@@ -405,6 +408,15 @@ namespace IUTSCalculator.Services
                 },
 
                 // ── Retenues sur le net à payer ──────────────────────────────
+                new Rubrique
+                {
+                    Code = "AVANCE", Libelle = "Avance sur salaire",
+                    Sens = SensRubrique.Retenue, ModeCalcul = ModeCalculRubrique.MontantFixe,
+                    Ordre = 119, Active = true, EstSysteme = false,
+                    CompteComptable = "4221", CompteContrepartie = "4270",
+                    Commentaire = "Somme versée avant l'échéance, récupérée sur le net. L'échéancier automatique " +
+                                  "relève du module PAI-05 (type « Avance sur salaire », distinct de l'acompte)."
+                },
                 new Rubrique
                 {
                     Code = "ACOMPTE", Libelle = "Acompte sur salaire",

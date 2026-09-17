@@ -454,6 +454,7 @@ namespace IUTSCalculator.ViewModels
                           || (emp.FirstName != null && emp.FirstName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
                           || (emp.EmployeeId != null && emp.EmployeeId.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
                           || (emp.Fonction != null && emp.Fonction.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (emp.Service != null && emp.Service.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
                           || (emp.NumeroCnss != null && emp.NumeroCnss.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
                           || (emp.NumeroIfu != null && emp.NumeroIfu.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
                           || (emp.Telephone != null && emp.Telephone.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -630,16 +631,42 @@ namespace IUTSCalculator.ViewModels
             {
                 var dialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    Filter = "Fichiers JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                    Filter = "Fichiers CSV (*.csv)|*.csv|Fichiers JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
                     Title = "Importer des employés"
                 };
                 if (dialog.ShowDialog() == true)
                 {
                     IsBusy = true;
                     StatusMessage = "Importation en cours...";
-                    await _dataService.ImportEmployeesFromFileAsync(dialog.FileName);
+
+                    // ConventionsDisponibles résout la colonne CSV "ConventionCollective" (Code ou
+                    // Libelle) vers son Id ; déjà chargée par LoadEmployeesAsync au démarrage de l'écran.
+                    var rapport = await _dataService.ImportEmployeesFromFileAsync(dialog.FileName, ConventionsDisponibles);
                     await LoadEmployeesAsync();
-                    StatusMessage = "Importation terminée avec succès.";
+
+                    StatusMessage = $"Import terminé : {rapport.Ajoutes} ajouté(s), {rapport.MisAJour} mis à jour" +
+                        (rapport.LignesIgnorees > 0 ? $", {rapport.LignesIgnorees} ligne(s) ignorée(s)." : ".");
+
+                    // Une erreur ou un avertissement mérite un détail complet : le StatusMessage
+                    // n'affiche qu'une ligne, insuffisant dès qu'une ligne du CSV pose problème.
+                    if (rapport.Erreurs.Count > 0 || rapport.Avertissements.Count > 0)
+                    {
+                        var detail = new System.Text.StringBuilder();
+                        if (rapport.Erreurs.Count > 0)
+                        {
+                            detail.AppendLine("Lignes ignorées :");
+                            foreach (var e in rapport.Erreurs) detail.AppendLine("• " + e);
+                        }
+                        if (rapport.Avertissements.Count > 0)
+                        {
+                            if (detail.Length > 0) detail.AppendLine();
+                            detail.AppendLine("Avertissements :");
+                            foreach (var a in rapport.Avertissements) detail.AppendLine("• " + a);
+                        }
+                        MessageBox.Show(detail.ToString(), "Détail de l'import",
+                            MessageBoxButton.OK,
+                            rapport.Erreurs.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+                    }
                 }
             }
             catch (Exception ex)

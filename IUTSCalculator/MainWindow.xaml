@@ -75,6 +75,14 @@
                 <views:LivrePaieView />
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type viewModels:EtatAnnuelSalairesViewModel}">
+                <views:EtatAnnuelSalairesView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:TableauBordMasseSalarialeViewModel}">
+                <views:TableauBordMasseSalarialeView />
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type viewModels:EcriturePaieViewModel}">
                 <views:EcriturePaieView />
             </DataTemplate>
@@ -536,6 +544,22 @@
                             </Button.Style>
                         </Button>
 
+                        <Button Tag="{StaticResource IconExport}" Content="État annuel des salaires (DADS)"
+                                Command="{Binding NavigateToEtatAnnuelSalairesCommand}"
+                                Visibility="{Binding IsNavEtatAnnuelSalairesVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="État annuel des salaires">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <Button Tag="{StaticResource IconExport}" Content="Écritures de paie"
                                 Command="{Binding NavigateToEcriturePaieCommand}"
                                 Visibility="{Binding IsNavEcriturePaieVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -559,6 +583,26 @@
                                 <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Ordres de virement">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- ───── PILOTAGE ───── -->
+                        <TextBlock Text="PILOTAGE" Style="{StaticResource NavGroupHeaderStyle}"
+                                   Visibility="{Binding IsNavGroupPilotageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <Button Tag="{StaticResource IconExport}" Content="Tableau de bord masse salariale"
+                                Command="{Binding NavigateToTableauBordMasseSalarialeCommand}"
+                                Visibility="{Binding IsNavTableauBordMasseSalarialeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Tableau de bord masse salariale">
                                             <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
                                             <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
                                             <Setter Property="FontWeight" Value="SemiBold"/>

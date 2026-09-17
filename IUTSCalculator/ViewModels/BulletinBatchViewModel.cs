@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -245,6 +246,19 @@ namespace IUTSCalculator.ViewModels
         }
 
         /// <summary>
+        /// Ce ViewModel n'est créé qu'une seule fois (voir MainViewModel) et ne recharge
+        /// jamais Employees après ce premier chargement : sans ce rafraîchissement, revenir
+        /// sur cet écran après avoir modifié une fiche ailleurs continuait d'afficher les
+        /// anciennes données tant que le dossier n'était pas fermé puis rouvert (signalé le
+        /// 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 21).
+        /// </summary>
+        protected override void OnIsActiveChanged()
+        {
+            if (IsActive)
+                _ = LoadEmployeesAsync();
+        }
+
+        /// <summary>
         /// Reconstruit la liste à cocher des mois entre <see cref="Periode"/> et
         /// <see cref="PeriodeFin"/>, tous cochés par défaut — une plage redéfinie repart
         /// d'une sélection complète plutôt que de deviner quels mois garder de l'ancienne.
@@ -335,11 +349,27 @@ namespace IUTSCalculator.ViewModels
             {
                 IsBusy = true;
                 StatusMessage = "Chargement des employés...";
+
+                // Cet écran se rafraîchit désormais aussi au retour sur l'écran (voir
+                // OnIsActiveChanged ci-dessous), pas seulement à l'ouverture : conserver les
+                // cases cochées par matricule évite de décocher toute la sélection de
+                // l'utilisateur à chaque fois qu'il revient sur cet écran sans rien avoir à y
+                // refaire.
+                var idsCochesAvant = new HashSet<string>(
+                    Employees.Where(e => e.IsSelected).Select(e => e.Employee.EmployeeId));
+
                 Employees.Clear();
                 var list = await _dataService.LoadEmployeesAsync();
-                foreach (var emp in list)
+                // Une génération en masse est une paie de masse : un employé sorti (ou
+                // suspendu) n'a plus vocation à y figurer — son solde de tout compte se
+                // traite via l'écran dédié (signalé le 16 septembre 2026, voir
+                // ETAT-DEVELOPPEMENT.md item 20).
+                foreach (var emp in list.Where(e => e.EstActif))
                 {
-                    var selectable = new SelectableEmployee(emp);
+                    var selectable = new SelectableEmployee(emp)
+                    {
+                        IsSelected = idsCochesAvant.Contains(emp.EmployeeId)
+                    };
                     selectable.PropertyChanged += (s, e) =>
                     {
                         if (e.PropertyName == nameof(SelectableEmployee.IsSelected))
@@ -351,7 +381,7 @@ namespace IUTSCalculator.ViewModels
                     };
                     Employees.Add(selectable);
                 }
-                StatusMessage = $"{Employees.Count} employés chargés.";
+                StatusMessage = $"{Employees.Count} employés actifs chargés.";
             }
             catch (Exception ex)
             {
@@ -409,7 +439,29 @@ namespace IUTSCalculator.ViewModels
         /// </summary>
         private async Task GenererEtExporterAsync()
         {
-            var selected = Employees.Where(e => e.IsSelected).Select(e => e.Employee).ToList();
+            var idsSelectionnes = Employees.Where(e => e.IsSelected).Select(e => e.Employee.EmployeeId).ToList();
+            if (!idsSelectionnes.Any())
+            {
+                StatusMessage = "Veuillez sélectionner au moins un employé.";
+                return;
+            }
+
+            // Toujours relire les fiches depuis la base plutôt que d'utiliser Employees tel
+            // qu'affiché : cette liste ne se recharge jamais après l'ouverture de l'écran
+            // (aucun bouton d'actualisation ici), et générer des bulletins avec des fiches
+            // périmées réenregistrerait sinon l'ancienne fiche par-dessus toute modification
+            // faite depuis ailleurs — fiche salarié ou import CSV (signalé le 16 septembre
+            // 2026, voir ETAT-DEVELOPPEMENT.md item 19). La sélection elle-même (qui est
+            // coché) reste celle de l'écran ; seules les données de chaque fiche sont
+            // rafraîchies.
+            var employesActuels = await _dataService.LoadEmployeesAsync();
+            // Un employé sorti (ou suspendu) entre-temps ne doit pas se glisser dans une
+            // génération en masse même s'il était encore coché au chargement de l'écran
+            // (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 20).
+            var selected = idsSelectionnes
+                .Select(id => employesActuels.FirstOrDefault(e => e.EmployeeId == id))
+                .Where(e => e != null && e.EstActif)
+                .ToList();
             if (!selected.Any())
             {
                 StatusMessage = "Veuillez sélectionner au moins un employé.";
@@ -449,6 +501,8 @@ namespace IUTSCalculator.ViewModels
                 int avecVariables = 0;
 
                 var baseRetenue = await BaseRetenueAsync();
+                var moisNonOuverts = new List<string>();
+                int doublonsPossibles = 0;
 
                 foreach (var mois in moisChoisis)
                 {
@@ -456,6 +510,23 @@ namespace IUTSCalculator.ViewModels
 
                     bool clos = _periodePaieService != null
                         && await _periodePaieService.EstClotureeAsync(mois.Mois);
+
+                    // Avertissement indicatif (PAI-01) : rien n'empêche le calcul, mais on
+                    // signale les mois jamais ouverts — un blocage strict casserait tout
+                    // dossier existant, dont aucun mois n'a jamais été ouvert explicitement.
+                    if (!clos && _periodePaieService != null)
+                    {
+                        try
+                        {
+                            var periodePaie = await _periodePaieService.LirePeriodeAsync(mois.Mois.Year, mois.Mois.Month);
+                            if (periodePaie == null)
+                                moisNonOuverts.Add(mois.Libelle);
+                        }
+                        catch
+                        {
+                            // Contrôle indicatif seulement
+                        }
+                    }
 
                     // Une seule lecture des variables par mois pour tout l'effectif : les
                     // relire employé par employé recommencerait la lecture autant de fois
@@ -518,6 +589,15 @@ namespace IUTSCalculator.ViewModels
                                     employee, mois.Mois, congesPris, modeReglement, numeroCompte: null, apport: apport));
 
                                 if (bulletin.ADesVariables) avecVariables++;
+
+                                // Doublon possible entre une retenue saisie à la main et une
+                                // retenue automatique d'un module (dette connue n°9) : signalé
+                                // dans le journal, sans bloquer la génération.
+                                foreach (var avertissement in apport.Avertissements)
+                                {
+                                    doublonsPossibles++;
+                                    Journal.Add($"⚠ {prefixeMois}{employee.LastName} {employee.FirstName} — {avertissement}");
+                                }
 
                                 // Même règle que sur l'écran individuel : le bulletin entre
                                 // dans la paie du mois, en remplaçant celui qui s'y trouverait
@@ -593,9 +673,18 @@ namespace IUTSCalculator.ViewModels
                     ? $" — variables du mois reprises sur {avecVariables} bulletin(s)"
                     : string.Empty;
 
-                StatusMessage = TotalEchecs == 0
+                string mentionPeriode = moisNonOuverts.Count > 0
+                    ? $" Attention : période(s) non ouverte(s) — {string.Join(", ", moisNonOuverts)} (écran « Périodes de paie »)."
+                    : string.Empty;
+
+                string mentionDoublons = doublonsPossibles > 0
+                    ? $" {doublonsPossibles} doublon(s) possible(s) retenue/prêt — voir le journal."
+                    : string.Empty;
+
+                StatusMessage = (TotalEchecs == 0
                     ? $"{TotalGeneres} bulletin(s) généré(s) avec succès dans {folder}{mentionVariables}"
-                    : $"{TotalGeneres} bulletin(s) généré(s), {TotalEchecs} ignoré(s) ou en échec — voir le journal.";
+                    : $"{TotalGeneres} bulletin(s) généré(s), {TotalEchecs} ignoré(s) ou en échec — voir le journal.")
+                    + mentionPeriode + mentionDoublons;
             }
             finally
             {
@@ -621,7 +710,21 @@ namespace IUTSCalculator.ViewModels
         /// </summary>
         private async Task ExporterRegistreAsync()
         {
-            var selected = Employees.Where(e => e.IsSelected).Select(e => e.Employee).ToList();
+            var idsSelectionnes = Employees.Where(e => e.IsSelected).Select(e => e.Employee.EmployeeId).ToList();
+            if (!idsSelectionnes.Any())
+            {
+                StatusMessage = "Veuillez sélectionner au moins un employé.";
+                return;
+            }
+
+            // Même précaution que dans GenererEtExporterAsync : on relit les fiches depuis
+            // la base plutôt que d'utiliser Employees tel qu'affiché, qui ne se recharge
+            // jamais après l'ouverture de l'écran.
+            var employesActuelsRegistre = await _dataService.LoadEmployeesAsync();
+            var selected = idsSelectionnes
+                .Select(id => employesActuelsRegistre.FirstOrDefault(e => e.EmployeeId == id))
+                .Where(e => e != null && e.EstActif)
+                .ToList();
             if (!selected.Any())
             {
                 StatusMessage = "Veuillez sélectionner au moins un employé.";
@@ -661,6 +764,8 @@ namespace IUTSCalculator.ViewModels
                 var baseRetenueRegistre = await BaseRetenueAsync();
                 var heuresSupRegistre = await ChargerHeuresSupAsync(periode, selected);
                 var conventionsRegistre = await ChargerConventionsAsync(periode, selected);
+                var rappelsRegistre = await ChargerRappelsAsync(periode);
+                var avantagesRegistre = await ChargerAvantagesNatureAsync(periode);
                 var saisiesRegistre = await ChargerSaisiesAsync(periode, selected, apportsRegistre, absencesRegistre, baseRetenueRegistre, pretsRegistre, profilsRegistre, heuresSupRegistre, conventionsRegistre);
 
                 var bulletins = await Task.Run(() => selected
@@ -673,6 +778,8 @@ namespace IUTSCalculator.ViewModels
                             .AvecHeuresSupplementaires(HeuresSupDe(heuresSupRegistre, e.EmployeeId))
                             .AvecConventionCollective(ConventionDe(conventionsRegistre, e.EmployeeId))
                             .AvecProfil(ProfilPaieService.ApportDe(profilsRegistre, e.EmployeeId))
+                            .AvecRappels(RappelPaieService.ApportDe(rappelsRegistre, e.EmployeeId))
+                            .AvecAvantagesNature(AvantageNatureService.ApportDe(avantagesRegistre, e.EmployeeId, periode.Year, periode.Month))
                             .AvecSaisies(SaisieOppositionService.ApportDe(saisiesRegistre, e.EmployeeId))))
                     .ToList());
 

@@ -341,6 +341,20 @@ namespace IUTSCalculator.ViewModels
             _ = ChargerAffichageDeviseAsync();
         }
 
+        /// <summary>
+        /// Ce ViewModel n'est créé qu'une seule fois (voir MainViewModel) et ne recharge
+        /// jamais SelectedEmployee/EmployeesFiltres après ce premier chargement : sans ce
+        /// rafraîchissement, revenir sur cet écran après avoir modifié une fiche ailleurs
+        /// (Gestion des employés, import CSV) continuait d'afficher les anciennes données
+        /// tant que le dossier n'était pas fermé puis rouvert (signalé le 16 septembre 2026,
+        /// voir ETAT-DEVELOPPEMENT.md item 21).
+        /// </summary>
+        protected override void OnIsActiveChanged()
+        {
+            if (IsActive)
+                _ = LoadEmployeesAsync();
+        }
+
 
         private bool _afficherDevise = true;
         /// <summary>
@@ -401,11 +415,26 @@ namespace IUTSCalculator.ViewModels
             {
                 IsBusy = true;
                 StatusMessage = "Chargement des employés...";
+
+                // Cet écran se rafraîchit désormais aussi au retour sur l'écran (voir
+                // OnIsActiveChanged ci-dessous), pas seulement à l'ouverture : conserver
+                // l'employé sélectionné par matricule évite de le désélectionner à chaque
+                // fois que l'utilisateur revient sur cet écran sans avoir rien à y refaire.
+                string idSelectionne = SelectedEmployee?.EmployeeId;
+
                 Employees.Clear();
                 var list = await _dataService.LoadEmployeesAsync();
                 foreach (var emp in list)
                     Employees.Add(emp);
                 AppliquerFiltreSalaries();
+
+                if (!string.IsNullOrEmpty(idSelectionne))
+                {
+                    var correspondance = EmployeesFiltres.FirstOrDefault(e => e.EmployeeId == idSelectionne);
+                    if (correspondance != null)
+                        SelectedEmployee = correspondance;
+                }
+
                 StatusMessage = $"{Employees.Count} employés chargés.";
             }
             catch (Exception ex)
@@ -415,6 +444,29 @@ namespace IUTSCalculator.ViewModels
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        /// <summary>
+        /// Avertissement indicatif si le mois n'a jamais été ouvert (module PAI-01). Rien
+        /// n'empêche le calcul — signalé par le client le 13 septembre 2026 comme une
+        /// lacune, mais un blocage strict casserait tout dossier existant, dont aucun mois
+        /// n'a jamais été ouvert explicitement. On prévient donc, sans bloquer.
+        /// </summary>
+        private async Task<string> AvertissementPeriodeAsync(int annee, int mois)
+        {
+            if (_periodePaieService == null) return string.Empty;
+
+            try
+            {
+                var periodePaie = await _periodePaieService.LirePeriodeAsync(annee, mois);
+                return periodePaie == null
+                    ? " Attention : cette période n'a pas été ouverte (écran « Périodes de paie »)."
+                    : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 
@@ -431,7 +483,14 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 StatusMessage = "Génération du bulletin en cours...";
 
-                var employee = SelectedEmployee;
+                // Toujours relire la fiche depuis la base avant de calculer : SelectedEmployee
+                // vient de la liste chargée une seule fois à l'ouverture de cet écran (aucun
+                // bouton d'actualisation ici) et reste donc périmée si la fiche a été modifiée
+                // depuis (écran Gestion des employés, import CSV). Sans cette relecture, le
+                // bulletin affichait l'ancienne valeur ET, pire, son enregistrement réécrivait
+                // ensuite la fiche employé avec cette copie périmée, annulant la modification
+                // (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 19).
+                var employee = await _dataService.GetEmployeeByIdAsync(SelectedEmployee.EmployeeId) ?? SelectedEmployee;
                 var periode = Periode;
                 var congesPris = CongesPrisJours;
                 var modeReglement = ModeReglement;
@@ -454,7 +513,9 @@ namespace IUTSCalculator.ViewModels
                 //
                 // L'enregistrement remplace celui du même salarié pour le même mois :
                 // régénérer ne crée pas de doublon.
-                string mention = string.Empty;
+                string mention = await AvertissementPeriodeAsync(periode.Year, periode.Month);
+                foreach (var avertissement in apport.Avertissements)
+                    mention += " Attention : " + avertissement + ".";
                 try
                 {
                     var calcul = _bulletinService.DernierCalcul;
@@ -488,17 +549,17 @@ namespace IUTSCalculator.ViewModels
                             }
                         }
 
-                        mention = " Enregistré dans la paie du mois.";
+                        mention += " Enregistré dans la paie du mois.";
                     }
                 }
                 catch (InvalidOperationException ex)
                 {
                     // Période clôturée : le bulletin reste affichable, il n'est pas enregistré.
-                    mention = " " + ex.Message;
+                    mention += " " + ex.Message;
                 }
                 catch (Exception ex)
                 {
-                    mention = " Affiché mais NON enregistré : " + ex.Message;
+                    mention += " Affiché mais NON enregistré : " + ex.Message;
                 }
 
                 StatusMessage = (bulletin.ADesVariables

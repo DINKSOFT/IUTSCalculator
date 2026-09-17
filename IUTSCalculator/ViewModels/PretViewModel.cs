@@ -80,120 +80,10 @@ namespace IUTSCalculator.ViewModels
         public ObservableCollection<SituationPret> Situations { get; } = new ObservableCollection<SituationPret>();
         public ObservableCollection<EcheancePret> Echeancier { get; } = new ObservableCollection<EcheancePret>();
         public ObservableCollection<Employee> Salaries { get; } = new ObservableCollection<Employee>();
-        public ObservableCollection<Employee> SalariesFiltres { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<string> Avertissements { get; } = new ObservableCollection<string>();
 
+        /// <summary>Vue filtrée de Situations (recherche texte + filtres nature/statut) pour la grille.</summary>
         public ICollectionView SituationsView { get; }
-
-        private string _searchText;
-        public string SearchText
-        {
-            get { return _searchText; }
-            set
-            {
-                if (SetProperty(ref _searchText, value))
-                {
-                    SituationsView?.Refresh();
-                    OnPropertyChanged(nameof(HasSearchText));
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombrePretsAffiches));
-                }
-            }
-        }
-
-        public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
-
-        private TypePret? _selectedTypeFilter;
-        public TypePret? SelectedTypeFilter
-        {
-            get { return _selectedTypeFilter; }
-            set
-            {
-                if (SetProperty(ref _selectedTypeFilter, value))
-                {
-                    SituationsView?.Refresh();
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombrePretsAffiches));
-                }
-            }
-        }
-
-        private string _selectedStatutFilter = "Tous les états";
-        public string SelectedStatutFilter
-        {
-            get { return _selectedStatutFilter; }
-            set
-            {
-                if (SetProperty(ref _selectedStatutFilter, value))
-                {
-                    SituationsView?.Refresh();
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombrePretsAffiches));
-                }
-            }
-        }
-
-        public bool HasActiveFilters => HasSearchText || SelectedTypeFilter.HasValue || (!string.IsNullOrEmpty(SelectedStatutFilter) && SelectedStatutFilter != "Tous les états");
-
-        public List<KeyValuePair<TypePret?, string>> TypesPretFiltreOptions { get; } =
-            new List<KeyValuePair<TypePret?, string>>
-            {
-                new KeyValuePair<TypePret?, string>(null, "Toutes natures"),
-                new KeyValuePair<TypePret?, string>(TypePret.Pret, "Prêt"),
-                new KeyValuePair<TypePret?, string>(TypePret.AvanceSurSalaire, "Avance sur salaire"),
-                new KeyValuePair<TypePret?, string>(TypePret.Acompte, "Acompte")
-            };
-
-        public List<string> StatutsPretFiltreOptions { get; } = new List<string>
-        {
-            "Tous les états",
-            "Actifs uniquement",
-            "Soldés uniquement",
-            "Suspendus",
-            "Annulés"
-        };
-
-        public int NombrePretsAffiches => SituationsView?.Cast<SituationPret>().Count() ?? Situations.Count;
-
-        public ICommand ClearSearchCommand { get; }
-        public ICommand ResetFiltersCommand { get; }
-
-        private string _filtreSalarie;
-        public string FiltreSalarie
-        {
-            get { return _filtreSalarie; }
-            set
-            {
-                if (SetProperty(ref _filtreSalarie, value))
-                {
-                    AppliquerFiltreSalaries();
-                    OnPropertyChanged(nameof(HasFiltreSalarie));
-                }
-            }
-        }
-
-        public bool HasFiltreSalarie => !string.IsNullOrWhiteSpace(FiltreSalarie);
-        public ICommand ClearFiltreSalarieCommand { get; }
-
-        public void AppliquerFiltreSalaries()
-        {
-            SalariesFiltres.Clear();
-            var q = string.IsNullOrWhiteSpace(FiltreSalarie)
-                ? (IEnumerable<Employee>)Salaries
-                : Salaries.Where(e =>
-                    (!string.IsNullOrEmpty(e.LastName) && e.LastName.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.FirstName) && e.FirstName.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.EmployeeId) && e.EmployeeId.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.Fonction) && e.Fonction.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0));
-
-            foreach (var e in q)
-                SalariesFiltres.Add(e);
-
-            if (SalariesFiltres.Count == 1 && SalarieSelectionne == null)
-            {
-                SalarieSelectionne = SalariesFiltres[0];
-            }
-        }
 
         public PretViewModel(PretService pretService, DataService dataService)
         {
@@ -205,22 +95,12 @@ namespace IUTSCalculator.ViewModels
 
             Title = "Prêts et avances";
 
-            SituationsView = CollectionViewSource.GetDefaultView(Situations);
-            SituationsView.Filter = FiltrerSituation;
-
-            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
-            ResetFiltersCommand = new RelayCommand(() =>
-            {
-                SearchText = string.Empty;
-                SelectedTypeFilter = null;
-                SelectedStatutFilter = "Tous les états";
-            });
-
-            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
-
             var reference = DateTime.Today;
             _annee = reference.Year;
             _moisSelectionne = MoisOption.Tous.FirstOrDefault(m => m.Numero == reference.Month);
+
+            SituationsView = CollectionViewSource.GetDefaultView(Situations);
+            SituationsView.Filter = FiltrerSituation;
 
             ChargerCommand = new RelayCommand(async () => await ChargerAsync(), () => !IsBusy);
             NouveauCommand = new RelayCommand(Nouveau, () => !IsBusy);
@@ -241,41 +121,30 @@ namespace IUTSCalculator.ViewModels
                 async () => await AnnulerPretAsync(),
                 () => !IsBusy && PretSelectionne != null && PretSelectionne.Statut != StatutPret.Annule);
             CalculerEcheanceCommand = new RelayCommand(CalculerEcheance, () => PretEnCours != null);
+            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+            ResetFiltersCommand = new RelayCommand(() =>
+            {
+                SearchText = string.Empty;
+                SelectedTypeFilter = null;
+                SelectedStatutFilter = null;
+            });
+            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
 
             _ = ChargerAsync();
         }
 
-        private bool FiltrerSituation(object obj)
+        /// <summary>
+        /// Ce ViewModel n'est créé qu'une seule fois (voir MainViewModel) et ne recharge
+        /// jamais automatiquement après ce premier chargement : sans ce rafraîchissement,
+        /// revenir sur cet écran après avoir modifié une fiche employé ailleurs continuait
+        /// d'afficher les anciennes données tant que le dossier n'était pas fermé puis
+        /// rouvert (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 21). Sans
+        /// risque pour une saisie en cours : ChargerAsync ne touche pas PretEnCours.
+        /// </summary>
+        protected override void OnIsActiveChanged()
         {
-            var item = obj as SituationPret;
-            if (item == null) return false;
-
-            if (SelectedTypeFilter.HasValue && item.Type != SelectedTypeFilter.Value)
-                return false;
-
-            if (!string.IsNullOrEmpty(SelectedStatutFilter) && SelectedStatutFilter != "Tous les états")
-            {
-                if (SelectedStatutFilter == "Actifs uniquement" && (item.EstSolde || item.Statut == StatutPret.Annule))
-                    return false;
-                if (SelectedStatutFilter == "Soldés uniquement" && !item.EstSolde)
-                    return false;
-                if (SelectedStatutFilter == "Suspendus" && item.Statut != StatutPret.Suspendu)
-                    return false;
-                if (SelectedStatutFilter == "Annulés" && item.Statut != StatutPret.Annule)
-                    return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(SearchText))
-            {
-                string term = SearchText.Trim();
-                bool match = (item.NomSalarie != null && item.NomSalarie.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.EmployeeId != null && item.EmployeeId.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.Reference != null && item.Reference.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.TypeLibelle != null && item.TypeLibelle.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (!match) return false;
-            }
-
-            return true;
+            if (IsActive)
+                _ = ChargerAsync();
         }
 
         // ── Période consultée ────────────────────────────────────────────────
@@ -380,12 +249,22 @@ namespace IUTSCalculator.ViewModels
             get { return _pretSelectionne; }
             private set
             {
+                // ChargerAsync() réaffecte cette propriété après chaque rechargement (y
+                // compris le rechargement automatique à la réactivation de l'écran, voir
+                // OnIsActiveChanged) avec une NOUVELLE instance représentant le MÊME prêt,
+                // pour rafraîchir les totaux affichés. Cloner PretEnCours à chaque fois
+                // écraserait alors une saisie en cours dès qu'on revient sur cet écran —
+                // signalé le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22). On ne
+                // clone donc que lorsque le prêt sélectionné a réellement changé.
+                bool memePret = _pretSelectionne != null && value != null && _pretSelectionne.Id == value.Id;
+
                 if (SetProperty(ref _pretSelectionne, value))
                 {
                     // La ligne s'ouvre à l'édition sur une COPIE : tant que
                     // l'enregistrement n'est pas demandé, la liste affichée reste celle de
                     // la base, et une modification abandonnée ne laisse aucune trace.
-                    PretEnCours = value != null ? value.Clone() : null;
+                    if (!memePret)
+                        PretEnCours = value != null ? value.Clone() : null;
 
                     SalarieSelectionne = value != null
                         ? Salaries.FirstOrDefault(s => string.Equals(
@@ -503,6 +382,174 @@ namespace IUTSCalculator.ViewModels
             set { SetProperty(ref _motifSaisi, value); }
         }
 
+        // ── Recherche et filtres sur la liste des prêts ─────────────────────────
+
+        private string _searchText;
+        public string SearchText
+        {
+            get { return _searchText; }
+            set
+            {
+                if (SetProperty(ref _searchText, value))
+                {
+                    SituationsView?.Refresh();
+                    OnPropertyChanged(nameof(HasSearchText));
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombrePretsAffiches));
+                }
+            }
+        }
+
+        public bool HasSearchText
+        {
+            get { return !string.IsNullOrWhiteSpace(SearchText); }
+        }
+
+        private TypePret? _selectedTypeFilter;
+        public TypePret? SelectedTypeFilter
+        {
+            get { return _selectedTypeFilter; }
+            set
+            {
+                if (SetProperty(ref _selectedTypeFilter, value))
+                {
+                    SituationsView?.Refresh();
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombrePretsAffiches));
+                }
+            }
+        }
+
+        public List<KeyValuePair<TypePret?, string>> TypesPretFiltreOptions
+        {
+            get
+            {
+                var options = new List<KeyValuePair<TypePret?, string>>
+                {
+                    new KeyValuePair<TypePret?, string>(null, "Tous les types")
+                };
+                options.AddRange(TypePretOption.Tous
+                    .Select(t => new KeyValuePair<TypePret?, string>(t.Valeur, t.Libelle)));
+                return options;
+            }
+        }
+
+        private string _selectedStatutFilter;
+        public string SelectedStatutFilter
+        {
+            get { return _selectedStatutFilter; }
+            set
+            {
+                if (SetProperty(ref _selectedStatutFilter, value))
+                {
+                    SituationsView?.Refresh();
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombrePretsAffiches));
+                }
+            }
+        }
+
+        public List<string> StatutsPretFiltreOptions { get; } = new List<string>
+        {
+            "Tous les statuts",
+            "En cours uniquement",
+            "Soldés uniquement",
+            "Suspendus uniquement",
+            "Annulés uniquement"
+        };
+
+        public bool HasActiveFilters
+        {
+            get
+            {
+                return HasSearchText
+                    || SelectedTypeFilter.HasValue
+                    || (!string.IsNullOrWhiteSpace(SelectedStatutFilter) && SelectedStatutFilter != "Tous les statuts");
+            }
+        }
+
+        public int NombrePretsAffiches
+        {
+            get { return SituationsView != null ? SituationsView.Cast<SituationPret>().Count() : Situations.Count; }
+        }
+
+        private bool FiltrerSituation(object obj)
+        {
+            var situation = obj as SituationPret;
+            if (situation == null) return false;
+
+            if (SelectedTypeFilter.HasValue && situation.Type != SelectedTypeFilter.Value)
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(SelectedStatutFilter) && SelectedStatutFilter != "Tous les statuts")
+            {
+                switch (SelectedStatutFilter)
+                {
+                    case "En cours uniquement":
+                        if (situation.EstSolde || situation.Statut != StatutPret.EnCours) return false;
+                        break;
+                    case "Soldés uniquement":
+                        if (!situation.EstSolde) return false;
+                        break;
+                    case "Suspendus uniquement":
+                        if (situation.Statut != StatutPret.Suspendu) return false;
+                        break;
+                    case "Annulés uniquement":
+                        if (situation.Statut != StatutPret.Annule) return false;
+                        break;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                string q = SearchText.Trim();
+                bool match = (situation.NomSalarie != null && situation.NomSalarie.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (situation.EmployeeId != null && situation.EmployeeId.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (situation.Reference != null && situation.Reference.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (situation.TypeLibelle != null && situation.TypeLibelle.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (!match) return false;
+            }
+
+            return true;
+        }
+
+        // ── Recherche rapide du salarié dans le formulaire d'édition ────────────
+
+        private string _filtreSalarie;
+        public string FiltreSalarie
+        {
+            get { return _filtreSalarie; }
+            set
+            {
+                if (SetProperty(ref _filtreSalarie, value))
+                {
+                    OnPropertyChanged(nameof(HasFiltreSalarie));
+                    OnPropertyChanged(nameof(SalariesFiltres));
+                }
+            }
+        }
+
+        public bool HasFiltreSalarie
+        {
+            get { return !string.IsNullOrWhiteSpace(FiltreSalarie); }
+        }
+
+        public IList<Employee> SalariesFiltres
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(FiltreSalarie)) return Salaries;
+
+                string q = FiltreSalarie.Trim();
+                return Salaries.Where(s =>
+                    (s.LastName != null && s.LastName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.FirstName != null && s.FirstName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Matricule != null && s.Matricule.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Fonction != null && s.Fonction.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0))
+                    .ToList();
+            }
+        }
+
         // ── Commandes ────────────────────────────────────────────────────────
 
         public ICommand ChargerCommand { get; }
@@ -514,6 +561,9 @@ namespace IUTSCalculator.ViewModels
         public ICommand ReprendreCommand { get; }
         public ICommand AnnulerPretCommand { get; }
         public ICommand CalculerEcheanceCommand { get; }
+        public ICommand ClearSearchCommand { get; }
+        public ICommand ResetFiltersCommand { get; }
+        public ICommand ClearFiltreSalarieCommand { get; }
 
         private void RafraichirCommandes()
         {
@@ -540,7 +590,7 @@ namespace IUTSCalculator.ViewModels
                 Salaries.Clear();
                 foreach (var salarie in await _dataService.LoadEmployeesAsync())
                     Salaries.Add(salarie);
-                AppliquerFiltreSalaries();
+                OnPropertyChanged(nameof(SalariesFiltres));
 
                 _prets = await _pretService.ChargerAsync();
 
@@ -562,8 +612,6 @@ namespace IUTSCalculator.ViewModels
                     ? Situations.FirstOrDefault(s => s.PretId == idRetenu)
                     : null;
 
-                SituationsView?.Refresh();
-                OnPropertyChanged(nameof(NombrePretsAffiches));
                 NotifierTotaux();
 
                 StatusMessage = Situations.Count == 0
@@ -587,6 +635,7 @@ namespace IUTSCalculator.ViewModels
         {
             OnPropertyChanged(nameof(NombrePrets));
             OnPropertyChanged(nameof(NombrePretsActifs));
+            OnPropertyChanged(nameof(NombrePretsAffiches));
             OnPropertyChanged(nameof(TotalRetenueDuMois));
             OnPropertyChanged(nameof(TotalRestantDu));
             OnPropertyChanged(nameof(ADesAvertissements));
@@ -630,7 +679,6 @@ namespace IUTSCalculator.ViewModels
                 Statut = StatutPret.EnCours
             };
 
-            FiltreSalarie = string.Empty;
             SalarieSelectionne = null;
             MotifSaisi = null;
 

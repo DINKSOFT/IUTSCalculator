@@ -644,6 +644,12 @@ namespace IUTSCalculator.Services
                 var apport = ApportProfil.Aucun();
                 apport.Nommer(profil.Designation);
 
+                // Une rubrique « base × taux » peut prendre pour base une autre ligne DE CE
+                // MÊME PROFIL (ex. une prime à 10 % d'une indemnité elle-même saisie plus haut
+                // dans l'ordre) : on retient au fil de la boucle ce qui a déjà été valorisé,
+                // pour que Valoriser puisse s'y référer sans tout recalculer.
+                var montantsResolus = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var ligne in lignes.Where(l => l.Active))
                 {
                     Rubrique rubrique;
@@ -653,7 +659,8 @@ namespace IUTSCalculator.Services
                     if (!EstApplicable(rubrique))
                         continue;
 
-                    decimal montant = Valoriser(ligne, rubrique, salarie);
+                    decimal montant = Valoriser(ligne, rubrique, salarie, plan, montantsResolus);
+                    montantsResolus[Cle(rubrique.Code)] = montant;
                     if (montant == 0m) continue;
 
                     apport.Ajouter(new LigneApport(
@@ -781,13 +788,28 @@ namespace IUTSCalculator.Services
         ///
         /// Le montant saisi sur la ligne prime : c'est la valeur arrêtée pour cette
         /// population. À défaut, la rubrique se valorise elle-même — pourcentage du
-        /// salaire de base, ou montant fixe du plan de paie. Si aucune des deux sources
-        /// ne dit rien, la ligne ne produit rien, et l'écran le signale.
+        /// salaire de base, montant fixe du plan de paie, ou base × taux. Si aucune de
+        /// ces sources ne dit rien, la ligne ne produit rien, et l'écran le signale.
         ///
-        /// Le mode « base × taux » n'est pas valorisé ici : il suppose de résoudre une
-        /// autre rubrique, ce que seul le moteur sait faire.
+        /// Le mode « base × taux » prend pour base (<see cref="Rubrique.CodeBase"/>) :
+        ///   • une rubrique SYSTÈME (salaire de base, une des quatre indemnités) — lue
+        ///     directement sur la fiche du salarié ;
+        ///   • une autre ligne DU MÊME PROFIL, à condition qu'elle ait déjà été valorisée
+        ///     plus haut dans l'ordre d'affichage — <paramref name="montantsResolus"/> les
+        ///     accumule au fil de la boucle appelante, dans cet ordre-là précisément ;
+        ///   • à défaut de code, le salaire brut de la fiche (salaire de base + les
+        ///     quatre indemnités) — l'équivalent de l'ancien calcul, AVANT le branchement
+        ///     des variables du mois : les apports saisis à part (heures sup, primes du
+        ///     mois...) n'y entrent pas, faute de pouvoir les connaître ici sans boucler
+        ///     sur le moteur lui-même.
+        /// Un code qui ne se résout par aucune de ces trois voies (rubrique inconnue,
+        /// ou pas encore rencontrée dans ce profil) vaut base 0 — pas de résolution
+        /// circulaire ni d'ordre implicite au-delà de celui déjà donné par le profil.
         /// </summary>
-        public static decimal Valoriser(LigneProfil ligne, Rubrique rubrique, Employee salarie)
+        public static decimal Valoriser(
+            LigneProfil ligne, Rubrique rubrique, Employee salarie,
+            IDictionary<string, Rubrique> planDePaie = null,
+            IDictionary<string, decimal> montantsResolus = null)
         {
             if (ligne == null || rubrique == null) return 0m;
 
@@ -799,10 +821,60 @@ namespace IUTSCalculator.Services
                 return Math.Round(salarie.BaseSalary * rubrique.TauxSalarial, 0, MidpointRounding.AwayFromZero);
             }
 
+            if (rubrique.ModeCalcul == ModeCalculRubrique.BaseParTaux)
+            {
+                if (salarie == null || rubrique.TauxSalarial == 0m) return 0m;
+
+                decimal? base_ = BaseDeCalcul(rubrique.CodeBase, salarie, planDePaie, montantsResolus);
+                if (base_ == null) return 0m;
+
+                return Math.Round(base_.Value * rubrique.TauxSalarial, 0, MidpointRounding.AwayFromZero);
+            }
+
             if (rubrique.ModeCalcul == ModeCalculRubrique.MontantFixe)
                 return rubrique.MontantFixe;
 
             return 0m;
+        }
+
+        /// <summary>
+        /// Base d'une rubrique « base × taux ». Voir <see cref="Valoriser"/> pour les trois
+        /// voies de résolution. Renvoie null quand le code ne se résout par aucune d'elles,
+        /// pour distinguer « base connue et nulle » de « base introuvable » — dans les deux
+        /// cas, Valoriser renvoie 0, mais seul le second mérite, à terme, d'être signalé.
+        /// </summary>
+        private static decimal? BaseDeCalcul(
+            string codeBase, Employee salarie,
+            IDictionary<string, Rubrique> planDePaie, IDictionary<string, decimal> montantsResolus)
+        {
+            string code = Cle(codeBase);
+
+            if (code.Length == 0)
+                return salarie.BaseSalary + salarie.TotalIndemnites;
+
+            switch (code)
+            {
+                case RubriqueService.CodeSalaireBase: return salarie.BaseSalary;
+                case RubriqueService.CodeIndemniteLogement: return salarie.HousingAllowance;
+                case RubriqueService.CodeIndemniteTransport: return salarie.TransportAllowance;
+                case RubriqueService.CodeIndemniteFonction: return salarie.FunctionAllowance;
+                case RubriqueService.CodeIndemniteSujetion: return salarie.SujetionAllowance;
+            }
+
+            decimal montantConnu;
+            if (montantsResolus != null && montantsResolus.TryGetValue(code, out montantConnu))
+                return montantConnu;
+
+            // Rubrique pas encore rencontrée dans CE profil (ordre, ou profil différent) :
+            // à défaut, son montant fixe par défaut dans le plan de paie, s'il en a un.
+            Rubrique baseRubrique;
+            if (planDePaie != null && planDePaie.TryGetValue(code, out baseRubrique) && baseRubrique != null
+                && baseRubrique.ModeCalcul == ModeCalculRubrique.MontantFixe)
+            {
+                return baseRubrique.MontantFixe;
+            }
+
+            return null;
         }
 
         // ── Contrôles ────────────────────────────────────────────────────────
@@ -880,6 +952,7 @@ namespace IUTSCalculator.Services
 
                 if (ligne.Montant == 0m
                     && rubrique.ModeCalcul != ModeCalculRubrique.PourcentageSalaireBase
+                    && rubrique.ModeCalcul != ModeCalculRubrique.BaseParTaux
                     && !(rubrique.ModeCalcul == ModeCalculRubrique.MontantFixe && rubrique.MontantFixe != 0m))
                 {
                     sansValeur.Add(rubrique.Code);

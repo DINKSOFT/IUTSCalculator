@@ -24,8 +24,8 @@ namespace IUTSCalculator.Tests
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestInitialize]
         public void SetUp()
         {
-            string dir = Path.GetDirectoryName(typeof(SearchAndFilterTests).Assembly.Location) 
-                         ?? AppDomain.CurrentDomain.BaseDirectory;
+            string loc = typeof(SearchAndFilterTests).Assembly.Location;
+            string dir = string.IsNullOrWhiteSpace(loc) ? Path.GetTempPath() : Path.GetDirectoryName(loc);
             _dbPath = Path.Combine(dir, "test_search_" + Guid.NewGuid().ToString("N") + ".db");
             _sqliteService = new SQLiteService(_dbPath);
             _dataService = new DataService(_dbPath);
@@ -295,7 +295,7 @@ namespace IUTSCalculator.Tests
         public void Absence_FiltresEtSelectionSalarie()
         {
             var absenceService = new AbsenceService(_sqliteService);
-            var vm = new AbsenceViewModel(absenceService, _dataService);
+            var vm = new AbsenceViewModel(absenceService, _dataService, new AbsenceExcelService());
 
             vm.Absences.Clear();
             var a1 = new Absence { EmployeeId = "EMP001", NomSalarie = "Moussa TRAORE", Type = TypeAbsence.CongePaye, DateDebut = DateTime.Today, DateFin = DateTime.Today.AddDays(5), NombreJours = 5m, Commentaire = "Vacances annuelles" };

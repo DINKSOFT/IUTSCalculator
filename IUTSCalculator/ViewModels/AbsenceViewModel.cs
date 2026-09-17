@@ -2,12 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
-using Microsoft.Win32;
 using IUTSCalculator.Helpers;
 using IUTSCalculator.Models;
 using IUTSCalculator.Services;
@@ -35,6 +34,11 @@ namespace IUTSCalculator.ViewModels
             get { return Absence.EstRemunereParNature(Valeur) ? "Rémunérée" : "Non rémunérée"; }
         }
 
+        /// <summary>
+        /// Liste construite UNE fois. Si le getter fabriquait de nouvelles instances à
+        /// chaque appel, l'option renvoyée par le ViewModel n'appartiendrait pas à la
+        /// liste affichée par le sélecteur, qui ne montrerait alors aucune sélection.
+        /// </summary>
         private static readonly List<TypeAbsenceOption> _tous =
             Enum.GetValues(typeof(TypeAbsence))
                 .Cast<TypeAbsence>()
@@ -48,7 +52,14 @@ namespace IUTSCalculator.ViewModels
     }
 
     /// <summary>
-    /// ViewModel de l'écran « Congés et absences » (module PAI-04).
+    /// Écran « Congés et absences » (module PAI-04).
+    ///
+    /// Deux choses s'y jouent. À gauche, les absences de la période : qui, quand, à quel
+    /// titre. À droite, le compteur de congés de tout l'effectif — acquis, pris, solde —
+    /// qui est ce que réclame un salarié quand il demande « combien me reste-t-il ? ».
+    ///
+    /// Le champ « congés pris » du bulletin était jusqu'ici saisi à la main, sans rien
+    /// derrière. Il vient désormais d'ici.
     /// </summary>
     public class AbsenceViewModel : BaseViewModel
     {
@@ -58,163 +69,41 @@ namespace IUTSCalculator.ViewModels
 
         private List<Absence> _toutesLesAbsences = new List<Absence>();
 
+        /// <summary>Libellé sentinelle du groupe cible « tout l'effectif » (attribution groupée).</summary>
+        private const string TousLesSalariesLibelle = "Tous les salariés";
+
         public ObservableCollection<Absence> Absences { get; } = new ObservableCollection<Absence>();
         public ObservableCollection<SoldeConges> Soldes { get; } = new ObservableCollection<SoldeConges>();
         public ObservableCollection<Employee> Salaries { get; } = new ObservableCollection<Employee>();
-        public ObservableCollection<Employee> SalariesFiltres { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<string> Avertissements { get; } = new ObservableCollection<string>();
+        public ObservableCollection<string> CategoriesFiltre { get; } = new ObservableCollection<string> { TousLesSalariesLibelle };
 
+        /// <summary>Vue filtrée d'Absences (recherche texte + filtres type/rémunérée) pour la grille.</summary>
         public ICollectionView AbsencesView { get; }
+
+        /// <summary>Vue du compteur de congés — pas de filtre propre, juste le même style de liaison que la grille de gauche.</summary>
         public ICollectionView SoldesView { get; }
-
-        private string _searchText;
-        public string SearchText
-        {
-            get { return _searchText; }
-            set
-            {
-                if (SetProperty(ref _searchText, value))
-                {
-                    AbsencesView?.Refresh();
-                    SoldesView?.Refresh();
-                    OnPropertyChanged(nameof(HasSearchText));
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombreAbsencesAffichees));
-                }
-            }
-        }
-
-        public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
-
-        private TypeAbsence? _selectedTypeFilter;
-        public TypeAbsence? SelectedTypeFilter
-        {
-            get { return _selectedTypeFilter; }
-            set
-            {
-                if (SetProperty(ref _selectedTypeFilter, value))
-                {
-                    AbsencesView?.Refresh();
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombreAbsencesAffichees));
-                }
-            }
-        }
-
-        private bool? _selectedRemunereeFilter;
-        public bool? SelectedRemunereeFilter
-        {
-            get { return _selectedRemunereeFilter; }
-            set
-            {
-                if (SetProperty(ref _selectedRemunereeFilter, value))
-                {
-                    AbsencesView?.Refresh();
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombreAbsencesAffichees));
-                }
-            }
-        }
-
-        public bool HasActiveFilters => HasSearchText || SelectedTypeFilter.HasValue || SelectedRemunereeFilter.HasValue;
-
-        public List<KeyValuePair<TypeAbsence?, string>> TypesAbsenceFiltreOptions { get; } =
-            new List<KeyValuePair<TypeAbsence?, string>> { new KeyValuePair<TypeAbsence?, string>(null, "Tous les types") };
-
-        public List<KeyValuePair<bool?, string>> RemunereeFiltreOptions { get; } =
-            new List<KeyValuePair<bool?, string>>
-            {
-                new KeyValuePair<bool?, string>(null, "Toutes"),
-                new KeyValuePair<bool?, string>(true, "Payées"),
-                new KeyValuePair<bool?, string>(false, "Non payées")
-            };
-
-        public int NombreAbsencesAffichees => AbsencesView?.Cast<Absence>().Count() ?? Absences.Count;
-
-        public ICommand ClearSearchCommand { get; }
-        public ICommand ResetFiltersCommand { get; }
-
-        private string _filtreSalarie;
-        public string FiltreSalarie
-        {
-            get { return _filtreSalarie; }
-            set
-            {
-                if (SetProperty(ref _filtreSalarie, value))
-                {
-                    AppliquerFiltreSalaries();
-                    OnPropertyChanged(nameof(HasFiltreSalarie));
-                }
-            }
-        }
-
-        public bool HasFiltreSalarie => !string.IsNullOrWhiteSpace(FiltreSalarie);
-        public ICommand ClearFiltreSalarieCommand { get; }
-
-        public void AppliquerFiltreSalaries()
-        {
-            SalariesFiltres.Clear();
-            var q = string.IsNullOrWhiteSpace(FiltreSalarie)
-                ? (IEnumerable<Employee>)Salaries
-                : Salaries.Where(e =>
-                    (!string.IsNullOrEmpty(e.LastName) && e.LastName.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.FirstName) && e.FirstName.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.EmployeeId) && e.EmployeeId.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.Fonction) && e.Fonction.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0));
-
-            foreach (var e in q)
-                SalariesFiltres.Add(e);
-
-            if (SalariesFiltres.Count == 1 && SalarieSelectionne == null)
-            {
-                SalarieSelectionne = SalariesFiltres[0];
-            }
-        }
-
-        public AbsenceViewModel(AbsenceService absenceService, DataService dataService)
-            : this(absenceService, dataService, new AbsenceExcelService())
-        {
-        }
 
         public AbsenceViewModel(AbsenceService absenceService, DataService dataService, AbsenceExcelService absenceExcelService)
         {
             if (absenceService == null) throw new ArgumentNullException("absenceService");
             if (dataService == null) throw new ArgumentNullException("dataService");
+            if (absenceExcelService == null) throw new ArgumentNullException("absenceExcelService");
 
             _absenceService = absenceService;
             _dataService = dataService;
-            _absenceExcelService = absenceExcelService ?? new AbsenceExcelService();
+            _absenceExcelService = absenceExcelService;
 
             Title = "Congés et absences";
-
-            foreach (TypeAbsence t in Enum.GetValues(typeof(TypeAbsence)))
-            {
-                TypesAbsenceFiltreOptions.Add(new KeyValuePair<TypeAbsence?, string>(t, Absence.Libelle(t)));
-            }
-
-            AbsencesView = CollectionViewSource.GetDefaultView(Absences);
-            AbsencesView.Filter = FiltrerAbsence;
-
-            SoldesView = CollectionViewSource.GetDefaultView(Soldes);
-            SoldesView.Filter = FiltrerSolde;
-
-            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
-            ResetFiltersCommand = new RelayCommand(() =>
-            {
-                SearchText = string.Empty;
-                SelectedTypeFilter = null;
-                SelectedRemunereeFilter = null;
-            });
-
-            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
 
             var reference = DateTime.Today;
             _annee = reference.Year;
             _moisSelectionne = MoisOption.Tous.FirstOrDefault(m => m.Numero == reference.Month);
+            _categorieFiltreSelectionnee = TousLesSalariesLibelle;
 
-            _dateDebutGroupee = new DateTime(_annee, Mois, 1);
-            _dateFinGroupee = _dateDebutGroupee.AddMonths(1).AddDays(-1);
-            _joursGroupee = 1m;
+            AbsencesView = CollectionViewSource.GetDefaultView(Absences);
+            AbsencesView.Filter = FiltrerAbsence;
+            SoldesView = CollectionViewSource.GetDefaultView(Soldes);
 
             ChargerCommand = new RelayCommand(async () => await ChargerAsync(), () => !IsBusy);
             NouvelleCommand = new RelayCommand(Nouvelle, () => PeriodeOuverte);
@@ -226,55 +115,39 @@ namespace IUTSCalculator.ViewModels
                 () => !IsBusy && PeriodeOuverte && AbsenceSelectionnee != null && AbsenceSelectionnee.Id > 0);
             AnnulerCommand = new RelayCommand(Annuler, () => AbsenceEnCours != null);
             CalculerJoursCommand = new RelayCommand(CalculerJours, () => AbsenceEnCours != null);
-
-            // Commandes de traitement en masse et Excel
-            ExporterModeleCommand = new RelayCommand(async () => await ExporterModeleAsync(), () => !IsBusy && Salaries.Count > 0);
+            ExporterModeleCommand = new RelayCommand(async () => await ExporterModeleAsync(), () => !IsBusy);
             ImporterExcelCommand = new RelayCommand(async () => await ImporterExcelAsync(), () => !IsBusy && PeriodeOuverte);
-            ToggleAttributionGroupeeCommand = new RelayCommand(ToggleAttributionGroupee, () => PeriodeOuverte);
-            AppliquerAttributionGroupeeCommand = new RelayCommand(async () => await AppliquerAttributionGroupeeAsync(), () => !IsBusy && PeriodeOuverte && NombreSalariesCibles > 0);
-            CalculerJoursGroupeeCommand = new RelayCommand(CalculerJoursGroupee);
+            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+            ResetFiltersCommand = new RelayCommand(() =>
+            {
+                SearchText = string.Empty;
+                SelectedTypeFilter = null;
+                SelectedRemunereeFilter = null;
+            });
+            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
+            ToggleAttributionGroupeeCommand = new RelayCommand(ToggleAttributionGroupee, () => !IsBusy);
+            CalculerJoursGroupeeCommand = new RelayCommand(CalculerJoursGroupee,
+                () => DateDebutGroupee.HasValue && DateFinGroupee.HasValue);
+            AppliquerAttributionGroupeeCommand = new RelayCommand(
+                async () => await AppliquerAttributionGroupeeAsync(),
+                () => !IsBusy && PeriodeOuverte && NombreSalariesCibles > 0 && JoursGroupee > 0m
+                      && DateDebutGroupee.HasValue && DateFinGroupee.HasValue);
 
             _ = ChargerAsync();
         }
 
-        private bool FiltrerAbsence(object obj)
+        /// <summary>
+        /// Ce ViewModel n'est créé qu'une seule fois (voir MainViewModel) et ne recharge
+        /// jamais automatiquement après ce premier chargement : sans ce rafraîchissement,
+        /// revenir sur cet écran après avoir modifié une fiche employé ailleurs continuait
+        /// d'afficher les anciennes données tant que le dossier n'était pas fermé puis
+        /// rouvert (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 21). Sans
+        /// risque pour une saisie en cours : ChargerAsync ne touche pas AbsenceEnCours.
+        /// </summary>
+        protected override void OnIsActiveChanged()
         {
-            var item = obj as Absence;
-            if (item == null) return false;
-
-            if (SelectedTypeFilter.HasValue && item.Type != SelectedTypeFilter.Value)
-                return false;
-
-            if (SelectedRemunereeFilter.HasValue && item.EstRemuneree != SelectedRemunereeFilter.Value)
-                return false;
-
-            if (!string.IsNullOrWhiteSpace(SearchText))
-            {
-                string term = SearchText.Trim();
-                bool match = (item.NomSalarie != null && item.NomSalarie.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.EmployeeId != null && item.EmployeeId.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.Commentaire != null && item.Commentaire.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.TypeLibelle != null && item.TypeLibelle.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (!match) return false;
-            }
-
-            return true;
-        }
-
-        private bool FiltrerSolde(object obj)
-        {
-            var item = obj as SoldeConges;
-            if (item == null) return false;
-
-            if (!string.IsNullOrWhiteSpace(SearchText))
-            {
-                string term = SearchText.Trim();
-                bool match = (item.NomSalarie != null && item.NomSalarie.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.EmployeeId != null && item.EmployeeId.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (!match) return false;
-            }
-
-            return true;
+            if (IsActive)
+                _ = ChargerAsync();
         }
 
         // ── Période ──────────────────────────────────────────────────────────
@@ -364,10 +237,6 @@ namespace IUTSCalculator.ViewModels
                     // l'enregistrement n'est pas demandé, la liste affichée reste celle de
                     // la base, et une modification abandonnée ne laisse pas de trace.
                     AbsenceEnCours = value != null ? value.Clone() : null;
-                    if (value != null && !string.IsNullOrEmpty(value.EmployeeId))
-                    {
-                        SalarieSelectionne = Salaries.FirstOrDefault(s => s.EmployeeId == value.EmployeeId);
-                    }
                     RafraichirCommandes();
                 }
             }
@@ -437,6 +306,151 @@ namespace IUTSCalculator.ViewModels
             get { return Avertissements.Count > 0; }
         }
 
+        // ── Recherche et filtres sur la liste des absences ──────────────────────
+
+        private string _searchText;
+        public string SearchText
+        {
+            get { return _searchText; }
+            set
+            {
+                if (SetProperty(ref _searchText, value))
+                {
+                    AbsencesView?.Refresh();
+                    OnPropertyChanged(nameof(HasSearchText));
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombreAbsencesAffichees));
+                }
+            }
+        }
+
+        public bool HasSearchText
+        {
+            get { return !string.IsNullOrWhiteSpace(SearchText); }
+        }
+
+        private TypeAbsence? _selectedTypeFilter;
+        public TypeAbsence? SelectedTypeFilter
+        {
+            get { return _selectedTypeFilter; }
+            set
+            {
+                if (SetProperty(ref _selectedTypeFilter, value))
+                {
+                    AbsencesView?.Refresh();
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombreAbsencesAffichees));
+                }
+            }
+        }
+
+        public List<KeyValuePair<TypeAbsence?, string>> TypesAbsenceFiltreOptions
+        {
+            get
+            {
+                var options = new List<KeyValuePair<TypeAbsence?, string>>
+                {
+                    new KeyValuePair<TypeAbsence?, string>(null, "Tous les types")
+                };
+                options.AddRange(TypeAbsenceOption.Tous
+                    .Select(t => new KeyValuePair<TypeAbsence?, string>(t.Valeur, t.Libelle)));
+                return options;
+            }
+        }
+
+        private bool? _selectedRemunereeFilter;
+        public bool? SelectedRemunereeFilter
+        {
+            get { return _selectedRemunereeFilter; }
+            set
+            {
+                if (SetProperty(ref _selectedRemunereeFilter, value))
+                {
+                    AbsencesView?.Refresh();
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombreAbsencesAffichees));
+                }
+            }
+        }
+
+        public List<KeyValuePair<bool?, string>> RemunereeFiltreOptions { get; } = new List<KeyValuePair<bool?, string>>
+        {
+            new KeyValuePair<bool?, string>(null, "Rémunérée ou non"),
+            new KeyValuePair<bool?, string>(true, "Rémunérées seulement"),
+            new KeyValuePair<bool?, string>(false, "Non rémunérées seulement")
+        };
+
+        public bool HasActiveFilters
+        {
+            get { return HasSearchText || SelectedTypeFilter.HasValue || SelectedRemunereeFilter.HasValue; }
+        }
+
+        public int NombreAbsencesAffichees
+        {
+            get { return AbsencesView != null ? AbsencesView.Cast<Absence>().Count() : Absences.Count; }
+        }
+
+        private bool FiltrerAbsence(object obj)
+        {
+            var absence = obj as Absence;
+            if (absence == null) return false;
+
+            if (SelectedTypeFilter.HasValue && absence.Type != SelectedTypeFilter.Value)
+                return false;
+
+            if (SelectedRemunereeFilter.HasValue && absence.EstRemuneree != SelectedRemunereeFilter.Value)
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                string q = SearchText.Trim();
+                bool match = (absence.NomSalarie != null && absence.NomSalarie.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (absence.TypeLibelle != null && absence.TypeLibelle.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (absence.Commentaire != null && absence.Commentaire.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (absence.EmployeeId != null && absence.EmployeeId.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (!match) return false;
+            }
+
+            return true;
+        }
+
+        // ── Recherche du salarié dans le formulaire d'édition ───────────────────
+
+        private string _filtreSalarie;
+        public string FiltreSalarie
+        {
+            get { return _filtreSalarie; }
+            set
+            {
+                if (SetProperty(ref _filtreSalarie, value))
+                {
+                    OnPropertyChanged(nameof(HasFiltreSalarie));
+                    OnPropertyChanged(nameof(SalariesFiltres));
+                }
+            }
+        }
+
+        public bool HasFiltreSalarie
+        {
+            get { return !string.IsNullOrWhiteSpace(FiltreSalarie); }
+        }
+
+        public IList<Employee> SalariesFiltres
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(FiltreSalarie)) return Salaries;
+
+                string q = FiltreSalarie.Trim();
+                return Salaries.Where(s =>
+                    (s.LastName != null && s.LastName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.FirstName != null && s.FirstName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Matricule != null && s.Matricule.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Fonction != null && s.Fonction.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0))
+                    .ToList();
+            }
+        }
+
         /// <summary>Droit mensuel appliqué, tel que le dossier l'a réglé.</summary>
         private decimal _droitMensuel = AbsenceService.DroitMensuelLegal;
         public decimal DroitMensuel
@@ -471,11 +485,16 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        // ── Propriétés pour l'attribution groupée ──────────────────────────────
+        // ── Attribution groupée de congés (panneau rétractable) ─────────────────
 
-        public ObservableCollection<string> CategoriesFiltre { get; } = new ObservableCollection<string>();
+        private bool _attributionGroupeeOuverte;
+        public bool AttributionGroupeeOuverte
+        {
+            get { return _attributionGroupeeOuverte; }
+            set { SetProperty(ref _attributionGroupeeOuverte, value); }
+        }
 
-        private string _categorieFiltreSelectionnee = "Toutes les catégories";
+        private string _categorieFiltreSelectionnee;
         public string CategorieFiltreSelectionnee
         {
             get { return _categorieFiltreSelectionnee; }
@@ -484,79 +503,68 @@ namespace IUTSCalculator.ViewModels
                 if (SetProperty(ref _categorieFiltreSelectionnee, value))
                 {
                     OnPropertyChanged(nameof(NombreSalariesCibles));
-                    (AppliquerAttributionGroupeeCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                }
-            }
-        }
-
-        private bool _attributionGroupeeOuverte;
-        public bool AttributionGroupeeOuverte
-        {
-            get { return _attributionGroupeeOuverte; }
-            set
-            {
-                if (SetProperty(ref _attributionGroupeeOuverte, value))
-                {
-                    if (value)
-                    {
-                        AbsenceEnCours = null;
-                        DateDebutGroupee = new DateTime(Annee, Mois, 1);
-                        DateFinGroupee = DateDebutGroupee.AddMonths(1).AddDays(-1);
-                        CalculerJoursGroupee();
-                    }
                     RafraichirCommandes();
                 }
             }
         }
 
-        private DateTime _dateDebutGroupee;
-        public DateTime DateDebutGroupee
+        private DateTime? _dateDebutGroupee;
+        public DateTime? DateDebutGroupee
         {
             get { return _dateDebutGroupee; }
             set
             {
                 if (SetProperty(ref _dateDebutGroupee, value))
-                {
-                    CalculerJoursGroupee();
-                }
+                    RafraichirCommandes();
             }
         }
 
-        private DateTime _dateFinGroupee;
-        public DateTime DateFinGroupee
+        private DateTime? _dateFinGroupee;
+        public DateTime? DateFinGroupee
         {
             get { return _dateFinGroupee; }
             set
             {
                 if (SetProperty(ref _dateFinGroupee, value))
-                {
-                    CalculerJoursGroupee();
-                }
+                    RafraichirCommandes();
             }
         }
 
-        private decimal _joursGroupee = 1m;
+        private decimal _joursGroupee;
         public decimal JoursGroupee
         {
             get { return _joursGroupee; }
-            set { SetProperty(ref _joursGroupee, value); }
+            set
+            {
+                if (SetProperty(ref _joursGroupee, value))
+                    RafraichirCommandes();
+            }
         }
 
-        private string _commentaireGroupe = "Congé annuel collectif";
+        private string _commentaireGroupe;
         public string CommentaireGroupe
         {
             get { return _commentaireGroupe; }
             set { SetProperty(ref _commentaireGroupe, value); }
         }
 
+        /// <summary>
+        /// Salariés visés par l'attribution groupée : ceux de la catégorie choisie (ou tout
+        /// l'effectif), limités aux salariés actifs — un salarié sorti ou suspendu n'a rien à
+        /// faire dans une attribution collective de congés, comme pour les écrans de lot
+        /// (dette n°20, ETAT-DEVELOPPEMENT.md).
+        /// </summary>
+        private IEnumerable<Employee> SalariesCibles()
+        {
+            return Salaries.Where(s =>
+                s.EstActif &&
+                (CategorieFiltreSelectionnee == TousLesSalariesLibelle
+                    || string.Equals(s.Category, CategorieFiltreSelectionnee, StringComparison.OrdinalIgnoreCase)));
+        }
+
         public int NombreSalariesCibles
         {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(CategorieFiltreSelectionnee) || CategorieFiltreSelectionnee == "Toutes les catégories")
-                    return Salaries.Count;
-                return Salaries.Count(s => string.Equals(s.Category, CategorieFiltreSelectionnee, StringComparison.OrdinalIgnoreCase));
-            }
+            get { return SalariesCibles().Count(); }
         }
 
         // ── Commandes ────────────────────────────────────────────────────────
@@ -567,11 +575,16 @@ namespace IUTSCalculator.ViewModels
         public ICommand SupprimerCommand { get; }
         public ICommand AnnulerCommand { get; }
         public ICommand CalculerJoursCommand { get; }
+        /// <summary>Génère un fichier Excel de saisie en masse des congés du mois affiché.</summary>
         public ICommand ExporterModeleCommand { get; }
+        /// <summary>Relit un fichier Excel rempli et enregistre les congés qu'il contient.</summary>
         public ICommand ImporterExcelCommand { get; }
+        public ICommand ClearSearchCommand { get; }
+        public ICommand ResetFiltersCommand { get; }
+        public ICommand ClearFiltreSalarieCommand { get; }
         public ICommand ToggleAttributionGroupeeCommand { get; }
-        public ICommand AppliquerAttributionGroupeeCommand { get; }
         public ICommand CalculerJoursGroupeeCommand { get; }
+        public ICommand AppliquerAttributionGroupeeCommand { get; }
 
         private void RafraichirCommandes()
         {
@@ -584,6 +597,7 @@ namespace IUTSCalculator.ViewModels
             (ExporterModeleCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (ImporterExcelCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (ToggleAttributionGroupeeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (CalculerJoursGroupeeCommand as RelayCommand)?.RaiseCanExecuteChanged();
             (AppliquerAttributionGroupeeCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
 
@@ -609,21 +623,22 @@ namespace IUTSCalculator.ViewModels
                 Salaries.Clear();
                 foreach (var salarie in await _dataService.LoadEmployeesAsync())
                     Salaries.Add(salarie);
-                AppliquerFiltreSalaries();
+                OnPropertyChanged(nameof(SalariesFiltres));
 
                 CategoriesFiltre.Clear();
-                CategoriesFiltre.Add("Toutes les catégories");
-                var cats = Salaries
+                CategoriesFiltre.Add(TousLesSalariesLibelle);
+                foreach (var categorie in Salaries
                     .Select(s => s.Category)
                     .Where(c => !string.IsNullOrWhiteSpace(c))
-                    .Distinct()
-                    .OrderBy(c => c);
-                foreach (var c in cats) CategoriesFiltre.Add(c);
-                if (string.IsNullOrEmpty(CategorieFiltreSelectionnee) || !CategoriesFiltre.Contains(CategorieFiltreSelectionnee))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(c => c))
                 {
-                    CategorieFiltreSelectionnee = "Toutes les catégories";
+                    CategoriesFiltre.Add(categorie);
                 }
-                OnPropertyChanged(nameof(NombreSalariesCibles));
+                if (string.IsNullOrEmpty(CategorieFiltreSelectionnee) || !CategoriesFiltre.Contains(CategorieFiltreSelectionnee))
+                    CategorieFiltreSelectionnee = TousLesSalariesLibelle;
+                else
+                    OnPropertyChanged(nameof(NombreSalariesCibles));
 
                 _toutesLesAbsences = await _absenceService.ChargerToutAsync();
 
@@ -636,10 +651,8 @@ namespace IUTSCalculator.ViewModels
 
                 RafraichirSoldes();
 
-                AbsencesView?.Refresh();
-                SoldesView?.Refresh();
-                OnPropertyChanged(nameof(NombreAbsencesAffichees));
                 OnPropertyChanged(nameof(NombreAbsences));
+                OnPropertyChanged(nameof(NombreAbsencesAffichees));
                 OnPropertyChanged(nameof(PeriodeLibelle));
 
                 StatusMessage = PeriodeCloturee
@@ -703,7 +716,6 @@ namespace IUTSCalculator.ViewModels
                 Type = TypeAbsence.CongePaye
             };
 
-            FiltreSalarie = string.Empty;
             SalarieSelectionne = null;
             AbsenceSelectionnee = null;
             StatusMessage = "Nouvelle absence : choisissez le salarié, le type et les dates.";
@@ -802,77 +814,39 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        // ── Saisie groupée et Import/Export Excel ──────────────────────────────
+        // ── Import / export Excel (saisie en masse des congés) ─────────────────
 
-        private void ToggleAttributionGroupee()
+        /// <summary>
+        /// Génère, pour la période affichée, un classeur Excel pré-rempli avec l'effectif et
+        /// son solde de congés, prêt à être complété par un gestionnaire RH puis réimporté.
+        /// </summary>
+        private async Task ExporterModeleAsync()
         {
-            AttributionGroupeeOuverte = !AttributionGroupeeOuverte;
-            if (AttributionGroupeeOuverte)
+            var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                AbsenceEnCours = null;
-                DateDebutGroupee = new DateTime(Annee, Mois, 1);
-                DateFinGroupee = DateDebutGroupee.AddMonths(1).AddDays(-1);
-                CalculerJoursGroupee();
-            }
-        }
-
-        private void CalculerJoursGroupee()
-        {
-            JoursGroupee = Absence.JoursEntre(DateDebutGroupee, DateFinGroupee, true);
-        }
-
-        private async Task AppliquerAttributionGroupeeAsync()
-        {
-            if (!PeriodeOuverte) return;
-
-            var cibles = (string.IsNullOrWhiteSpace(CategorieFiltreSelectionnee) || CategorieFiltreSelectionnee == "Toutes les catégories")
-                ? Salaries.ToList()
-                : Salaries.Where(s => string.Equals(s.Category, CategorieFiltreSelectionnee, StringComparison.OrdinalIgnoreCase)).ToList();
-
-            if (cibles.Count == 0)
+                Filter = "Fichiers Excel (*.xlsx)|*.xlsx",
+                DefaultExt = "xlsx",
+                FileName = string.Format("Modele_Conges_{0:D4}_{1:D2}.xlsx", Annee, Mois)
+            };
+            if (dialog.ShowDialog() != true)
             {
-                StatusMessage = "Aucun salarié ne correspond aux critères sélectionnés.";
-                return;
-            }
-
-            if (JoursGroupee <= 0m)
-            {
-                StatusMessage = "Veuillez spécifier un nombre de jours supérieur à zéro.";
+                StatusMessage = "Export annulé.";
                 return;
             }
 
             try
             {
                 IsBusy = true;
-                StatusMessage = string.Format("Attribution en cours pour {0} salarié(s)...", cibles.Count);
+                StatusMessage = "Génération du modèle Excel...";
 
-                var absences = cibles.Select(s => new Absence
-                {
-                    EmployeeId = s.EmployeeId,
-                    NomSalarie = string.Format("{0} {1}", s.LastName, s.FirstName).Trim(),
-                    Type = TypeAbsence.CongePaye,
-                    DateDebut = DateDebutGroupee,
-                    DateFin = DateFinGroupee,
-                    NombreJours = JoursGroupee,
-                    NombreHeures = 0m,
-                    Commentaire = string.IsNullOrWhiteSpace(CommentaireGroupe)
-                        ? string.Format("Congé collectif ({0:D2}/{1})", Mois, Annee)
-                        : CommentaireGroupe,
-                    DateSaisie = DateTime.Now
-                }).ToList();
+                await _absenceExcelService.ExporterModeleAsync(
+                    Salaries, Soldes, DossierSession.Instance.CurrentDossier, Annee, Mois, dialog.FileName);
 
-                int count = await _absenceService.EnregistrerEnMasseAsync(absences);
-
-                AttributionGroupeeOuverte = false;
-                await ChargerAsync();
-
-                StatusMessage = string.Format(
-                    "Attribution groupée réussie : {0} congé(s) enregistré(s) pour la période de {1}.",
-                    count, PeriodeLibelle);
+                StatusMessage = "Modèle Excel généré : " + dialog.FileName;
             }
             catch (Exception ex)
             {
-                StatusMessage = "Erreur lors de l'attribution groupée : " + ex.Message;
+                StatusMessage = "Erreur lors de la génération du modèle : " + ex.Message;
             }
             finally
             {
@@ -881,105 +855,181 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
-        private async Task ExporterModeleAsync()
+        /// <summary>
+        /// Relit un classeur Excel rempli (voir ExporterModeleAsync) et enregistre en masse les
+        /// congés qu'il contient, via AbsenceService.EnregistrerEnMasseAsync — qui valide et
+        /// rejette tout le lot (rien n'est écrit) si une seule ligne pose problème, y compris un
+        /// chevauchement avec une absence déjà enregistrée.
+        /// </summary>
+        private async Task ImporterExcelAsync()
         {
-            if (Salaries.Count == 0)
+            var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                StatusMessage = "Aucun salarié dans le dossier.";
-                return;
-            }
-
-            var dialog = new SaveFileDialog
-            {
-                Filter = "Classeur Excel (*.xlsx)|*.xlsx",
-                FileName = string.Format("Modele_Conges_{0}_{1:D2}.xlsx", Annee, Mois),
-                Title = "Exporter le modèle de saisie des congés"
+                Filter = "Fichiers Excel (*.xlsx)|*.xlsx",
+                Title = "Importer les congés saisis en masse"
             };
+            if (dialog.ShowDialog() != true) return;
 
-            if (dialog.ShowDialog() == true)
+            try
             {
-                try
-                {
-                    IsBusy = true;
-                    StatusMessage = "Exportation du modèle Excel en cours...";
+                IsBusy = true;
+                StatusMessage = "Lecture du fichier...";
 
-                    var dossier = DossierSession.Instance.CurrentDossier;
-                    await _absenceExcelService.ExporterModeleAsync(Salaries, Soldes, dossier, Annee, Mois, dialog.FileName);
+                var resultat = await _absenceExcelService.ImporterCongesAsync(dialog.FileName, Annee, Mois, Salaries);
 
-                    StatusMessage = string.Format("Modèle Excel exporté avec succès : {0}", Path.GetFileName(dialog.FileName));
-                }
-                catch (Exception ex)
+                if (resultat.AbsencesValides.Count == 0)
                 {
-                    StatusMessage = "Erreur lors de l'export du modèle : " + ex.Message;
+                    StatusMessage = resultat.Erreurs.Count > 0
+                        ? string.Format("Import annulé : {0} erreur(s), aucune ligne valide.", resultat.Erreurs.Count)
+                        : "Aucun congé à importer (toutes les lignes étaient vides ou à 0 jour).";
+                    if (resultat.Erreurs.Count > 0)
+                    {
+                        MessageBox.Show(string.Join(Environment.NewLine, resultat.Erreurs),
+                            "Erreurs d'import", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    return;
                 }
-                finally
+
+                int enregistres = await _absenceService.EnregistrerEnMasseAsync(resultat.AbsencesValides);
+                await ChargerAsync();
+
+                StatusMessage = string.Format(
+                    "{0} congé(s) importé(s) sur {1} ligne(s) lue(s){2}.",
+                    enregistres, resultat.TotalLignesLues,
+                    resultat.LignesIgnorees > 0
+                        ? string.Format(", {0} ligne(s) ignorée(s)", resultat.LignesIgnorees)
+                        : "");
+
+                if (resultat.Erreurs.Count > 0)
                 {
-                    IsBusy = false;
+                    MessageBox.Show(string.Join(Environment.NewLine, resultat.Erreurs),
+                        "Lignes ignorées à l'import", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
+            }
+            catch (InvalidOperationException ex)
+            {
+                // EnregistrerEnMasseAsync valide tout le lot avant d'écrire quoi que ce soit :
+                // rien n'est enregistré tant que cette erreur n'est pas corrigée dans le fichier.
+                StatusMessage = "Import interrompu : " + ex.Message;
+                MessageBox.Show(ex.Message, "Import interrompu — rien n'a été enregistré",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Erreur lors de l'import : " + ex.Message;
+            }
+            finally
+            {
+                IsBusy = false;
+                RafraichirCommandes();
             }
         }
 
-        private async Task ImporterExcelAsync()
+        // ── Attribution groupée de congés ───────────────────────────────────────
+
+        private void ToggleAttributionGroupee()
         {
-            if (!PeriodeOuverte)
+            AttributionGroupeeOuverte = !AttributionGroupeeOuverte;
+            if (!AttributionGroupeeOuverte) return;
+
+            // Valeurs par défaut à l'ouverture : la période affichée, rien de saisi.
+            var debut = new DateTime(Annee, Mois, 1);
+            DateDebutGroupee = debut;
+            DateFinGroupee = debut;
+            JoursGroupee = 0m;
+            CommentaireGroupe = string.Empty;
+            if (string.IsNullOrEmpty(CategorieFiltreSelectionnee) || !CategoriesFiltre.Contains(CategorieFiltreSelectionnee))
+                CategorieFiltreSelectionnee = TousLesSalariesLibelle;
+            else
+                OnPropertyChanged(nameof(NombreSalariesCibles));
+        }
+
+        /// <summary>Même règle de décompte que CalculerJours, appliquée à la période du groupe.</summary>
+        private void CalculerJoursGroupee()
+        {
+            if (!DateDebutGroupee.HasValue || !DateFinGroupee.HasValue) return;
+
+            JoursGroupee = Absence.JoursEntre(DateDebutGroupee.Value, DateFinGroupee.Value, true);
+
+            StatusMessage = string.Format(
+                "{0:0.##} jour(s) ouvrable(s) calculé(s) pour le groupe, dimanches exclus.", JoursGroupee);
+        }
+
+        /// <summary>
+        /// Attribue le même congé à tous les salariés actifs de la cible choisie, en un seul
+        /// lot via AbsenceService.EnregistrerEnMasseAsync — qui valide tout avant d'écrire quoi
+        /// que ce soit : un seul salarié en anomalie (chevauchement, période close...) annule
+        /// l'attribution pour tout le groupe plutôt que d'en enregistrer une partie.
+        /// </summary>
+        private async Task AppliquerAttributionGroupeeAsync()
+        {
+            if (!DateDebutGroupee.HasValue || !DateFinGroupee.HasValue)
             {
-                StatusMessage = "La période est clôturée : import impossible.";
+                StatusMessage = "Renseignez les dates « Du » et « Au » du groupe.";
+                return;
+            }
+            if (JoursGroupee <= 0m)
+            {
+                StatusMessage = "Le nombre de jours ouvrables doit être supérieur à 0.";
                 return;
             }
 
-            var dialog = new OpenFileDialog
+            var cibles = SalariesCibles().ToList();
+            if (cibles.Count == 0)
             {
-                Filter = "Classeur Excel (*.xlsx)|*.xlsx|Tous les fichiers (*.*)|*.*",
-                Title = "Importer les congés depuis un fichier Excel"
-            };
+                StatusMessage = "Aucun salarié actif ne correspond au groupe sélectionné.";
+                return;
+            }
 
-            if (dialog.ShowDialog() == true)
+            try
             {
-                try
+                IsBusy = true;
+                StatusMessage = string.Format("Attribution en cours pour {0} salarié(s)...", cibles.Count);
+
+                string commentaire = string.IsNullOrWhiteSpace(CommentaireGroupe)
+                    ? string.Format("Congé collectif attribué le {0:dd/MM/yyyy}", DateTime.Now)
+                    : CommentaireGroupe;
+
+                var absences = cibles.Select(s => new Absence
                 {
-                    IsBusy = true;
-                    StatusMessage = "Lecture et validation du fichier Excel...";
+                    EmployeeId = s.EmployeeId,
+                    NomSalarie = string.Format("{0} {1}", s.LastName, s.FirstName).Trim(),
+                    Type = TypeAbsence.CongePaye,
+                    DateDebut = DateDebutGroupee.Value,
+                    DateFin = DateFinGroupee.Value,
+                    NombreJours = JoursGroupee,
+                    NombreHeures = 0m,
+                    Commentaire = commentaire,
+                    DateSaisie = DateTime.Now
+                }).ToList();
 
-                    var resultat = await _absenceExcelService.ImporterCongesAsync(dialog.FileName, Annee, Mois, Salaries);
+                int enregistres = await _absenceService.EnregistrerEnMasseAsync(absences);
+                await ChargerAsync();
 
-                    if (resultat.Erreurs.Count > 0 && resultat.CongesImportes == 0)
-                    {
-                        StatusMessage = "Échec de l'import : " + string.Join(" | ", resultat.Erreurs.Take(3));
-                        return;
-                    }
-
-                    if (resultat.AbsencesValides.Count > 0)
-                    {
-                        StatusMessage = string.Format("Enregistrement de {0} congés en base...", resultat.AbsencesValides.Count);
-                        int count = await _absenceService.EnregistrerEnMasseAsync(resultat.AbsencesValides);
-
-                        await ChargerAsync();
-
-                        string msg = string.Format("Import terminé : {0} congé(s) importé(s) avec succès pour {1}.", count, PeriodeLibelle);
-                        if (resultat.LignesIgnorees > 0)
-                        {
-                            msg += string.Format(" ({0} ligne(s) vide(s) ignorée(s))", resultat.LignesIgnorees);
-                        }
-                        if (resultat.Erreurs.Count > 0)
-                        {
-                            msg += string.Format(" — {0} avertissement(s) : {1}", resultat.Erreurs.Count, resultat.Erreurs.First());
-                        }
-                        StatusMessage = msg;
-                    }
-                    else
-                    {
-                        StatusMessage = string.Format("Aucun jour de congé à importer dans ce fichier ({0} lignes ignorées).", resultat.LignesIgnorees);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Erreur lors de l'import Excel : " + ex.Message;
-                }
-                finally
-                {
-                    IsBusy = false;
-                    RafraichirCommandes();
-                }
+                AttributionGroupeeOuverte = false;
+                StatusMessage = string.Format(
+                    "{0} congé(s) attribué(s) à {1}.",
+                    enregistres,
+                    CategorieFiltreSelectionnee == TousLesSalariesLibelle
+                        ? "tout l'effectif actif"
+                        : "la catégorie « " + CategorieFiltreSelectionnee + " »");
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Comme pour l'import Excel : rien n'a été écrit tant que cette erreur n'est
+                // pas résolue (salarié en anomalie, chevauchement, ou période close).
+                StatusMessage = "Attribution interrompue : " + ex.Message;
+                MessageBox.Show(ex.Message, "Attribution interrompue — rien n'a été enregistré",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Erreur lors de l'attribution : " + ex.Message;
+            }
+            finally
+            {
+                IsBusy = false;
+                RafraichirCommandes();
             }
         }
     }

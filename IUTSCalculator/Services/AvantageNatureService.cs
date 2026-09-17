@@ -434,24 +434,30 @@ namespace IUTSCalculator.Services
             string empId = reader.GetString(reader.GetOrdinal("EmployeeId"));
             string nomComplet = string.Format("{0} {1} ({2})", nom, prenom, empId).Trim();
 
+            // Les dates sont écrites avec CultureInfo.InvariantCulture (voir EnregistrerAsync
+            // ci-dessous) ; les relire sans préciser la même culture utilise la culture
+            // courante du poste, ce qui peut échouer à parser une date ISO sur un Windows
+            // configuré différemment et faire silencieusement retomber la date sur
+            // DateTime.Today — décalant alors EstEnCours(annee, mois) — signalé le 16
+            // septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22).
             DateTime dateDebut;
-            if (!DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateDebut")), out dateDebut))
+            if (!DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateDebut")), CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out dateDebut))
                 dateDebut = DateTime.Today;
 
             DateTime? dateFin = null;
             if (!reader.IsDBNull(reader.GetOrdinal("DateFin")))
             {
                 DateTime dt;
-                if (DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateFin")), out dt))
+                if (DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateFin")), CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out dt))
                     dateFin = dt;
             }
 
             DateTime dateCre;
-            if (!DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateCreation")), out dateCre))
+            if (!DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateCreation")), CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out dateCre))
                 dateCre = DateTime.Now;
 
             DateTime dateMod;
-            if (!DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateModification")), out dateMod))
+            if (!DateTime.TryParse(reader.GetString(reader.GetOrdinal("DateModification")), CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out dateMod))
                 dateMod = DateTime.Now;
 
             return new AvantageNature

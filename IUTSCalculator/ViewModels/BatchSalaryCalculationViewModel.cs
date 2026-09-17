@@ -30,6 +30,19 @@ namespace IUTSCalculator.ViewModels
         private readonly ProfilPaieService _profilPaieService;
         private readonly BaremeService _baremeService;
 
+        // Heures supplémentaires (PAI-03), convention collective (SOC-05), rappels et
+        // régularisations (PAI-07), avantages en nature (PAI-08). Facultatifs, comme les
+        // autres : mêmes entrées que sur le bulletin, sans quoi cet écran et le bulletin
+        // donneraient deux résultats différents pour le même salarié et le même mois.
+        private readonly HeureSupplementaireService _heureSupplementaireService;
+        private readonly ConventionCollectiveService _conventionCollectiveService;
+        private readonly RappelPaieService _rappelPaieService;
+        private readonly AvantageNatureService _avantageNatureService;
+
+        // Périodes de paie et clôture (PAI-01). Facultatif : sans lui, aucun avertissement
+        // n'est affiché sur les mois jamais ouverts — comme avant ce contrôle.
+        private readonly PeriodePaieService _periodePaieService;
+
         public ObservableCollection<Employee> Employees { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<TaxCalculation> Calculations { get; } = new ObservableCollection<TaxCalculation>();
 
@@ -111,7 +124,12 @@ namespace IUTSCalculator.ViewModels
             AbsenceService absenceService = null,
             PretService pretService = null,
             ProfilPaieService profilPaieService = null,
-            BaremeService baremeService = null)
+            BaremeService baremeService = null,
+            HeureSupplementaireService heureSupplementaireService = null,
+            ConventionCollectiveService conventionCollectiveService = null,
+            RappelPaieService rappelPaieService = null,
+            AvantageNatureService avantageNatureService = null,
+            PeriodePaieService periodePaieService = null)
         {
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
             _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
@@ -121,6 +139,11 @@ namespace IUTSCalculator.ViewModels
             _pretService = pretService;
             _profilPaieService = profilPaieService;
             _baremeService = baremeService;
+            _heureSupplementaireService = heureSupplementaireService;
+            _conventionCollectiveService = conventionCollectiveService;
+            _rappelPaieService = rappelPaieService;
+            _avantageNatureService = avantageNatureService;
+            _periodePaieService = periodePaieService;
 
             // Le titre alimente le message de la barre d'état et signale l'écran
             // actif dans le rail de navigation : sans lui, ni l'un ni l'autre.
@@ -132,6 +155,19 @@ namespace IUTSCalculator.ViewModels
             GenerateExcelTableCommand = new RelayCommand(async () => await GenerateExcelSalaryTableAsync(), () => !IsBusy && Calculations.Any());
         }
 
+        /// <summary>
+        /// Ce ViewModel n'est créé qu'une seule fois (voir MainViewModel) : sans ce
+        /// rafraîchissement automatique, la liste Employees restait celle du dernier clic sur
+        /// « Charger les employés », potentiellement périmée si une fiche a été modifiée
+        /// ailleurs depuis (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 21).
+        /// « Charger les employés » reste disponible pour un rafraîchissement manuel.
+        /// </summary>
+        protected override void OnIsActiveChanged()
+        {
+            if (IsActive)
+                _ = LoadEmployeesAsync();
+        }
+
         private async Task LoadEmployeesAsync()
         {
             try
@@ -140,9 +176,13 @@ namespace IUTSCalculator.ViewModels
                 StatusMessage = "Chargement des employés...";
                 Employees.Clear();
                 var list = await _dataService.LoadEmployeesAsync();
-                foreach (var emp in list)
+                // Le calcul en lot est une paie de masse : un employé sorti (ou suspendu)
+                // n'a plus vocation à y figurer — son solde de tout compte se traite via
+                // l'écran dédié, pas via un bulletin mensuel ordinaire (signalé le
+                // 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 20).
+                foreach (var emp in list.Where(e => e.EstActif))
                     Employees.Add(emp);
-                StatusMessage = $"{Employees.Count} employés chargés.";
+                StatusMessage = $"{Employees.Count} employés actifs chargés.";
             }
             catch (Exception ex)
             {
@@ -171,8 +211,21 @@ namespace IUTSCalculator.ViewModels
                 var baseRetenue = await BaseRetenueAsync();
                 var periode = PeriodeDate;
 
-                var salaries = Employees.ToList();
+                // Toujours relire les fiches depuis la base ici plutôt que d'utiliser Employees
+                // tel qu'affiché à l'écran : cette liste ne se met à jour qu'au clic sur
+                // « Charger les employés », et lancer un calcul sans recliquer après une
+                // modification faite ailleurs (fiche salarié, import CSV) réenregistrerait
+                // sinon l'ancienne fiche par-dessus la nouvelle, silencieusement (signalé le
+                // 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 19).
+                // Seuls les employés actifs entrent dans un calcul en lot (signalé le
+                // 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 20) : un employé sorti
+                // ou suspendu n'a plus vocation à recevoir un bulletin mensuel ordinaire.
+                var salaries = (await _dataService.LoadEmployeesAsync()).Where(e => e.EstActif).ToList();
                 var profils = await ChargerProfilsAsync(salaries);
+                var heuresSup = await ChargerHeuresSupAsync(periode, salaries);
+                var conventions = await ChargerConventionsAsync(periode, salaries);
+                var rappels = await ChargerRappelsAsync(periode);
+                var avantages = await ChargerAvantagesNatureAsync(periode);
 
                 // Barème daté applicable à la période (module DEC-02) : appliqué une seule
                 // fois pour tout le lot, qui partage la même période.
@@ -190,6 +243,8 @@ namespace IUTSCalculator.ViewModels
                     }
                 }
 
+                int doublonsPossibles = 0;
+
                 var results = await Task.Run(() => salaries
                     .Select(emp =>
                     {
@@ -197,7 +252,15 @@ namespace IUTSCalculator.ViewModels
                             .AvecAbsences(AbsenceService.Apport(
                                 emp, absences, periode.Year, periode.Month, baseRetenue))
                             .AvecPrets(PretService.ApportDe(prets, emp.EmployeeId))
-                            .AvecProfil(ProfilPaieService.ApportDe(profils, emp.EmployeeId));
+                            .AvecProfil(ProfilPaieService.ApportDe(profils, emp.EmployeeId))
+                            .AvecHeuresSupplementaires(HeuresSupDe(heuresSup, emp.EmployeeId))
+                            .AvecConventionCollective(ConventionDe(conventions, emp.EmployeeId))
+                            .AvecRappels(RappelPaieService.ApportDe(rappels, emp.EmployeeId))
+                            .AvecAvantagesNature(AvantageNatureService.ApportDe(avantages, emp.EmployeeId, periode.Year, periode.Month));
+
+                        // Doublon possible entre une retenue saisie à la main et une retenue
+                        // automatique d'un module (dette connue n°9) : compté, sans bloquer.
+                        doublonsPossibles += apport.Avertissements.Count;
 
                         var calcul = _taxCalculatorService.CalculateMonthlyTax(emp, apport);
 
@@ -231,10 +294,16 @@ namespace IUTSCalculator.ViewModels
                     }
                 }
 
-                StatusMessage = refus.Count > 0
+                string mentionDoublons = doublonsPossibles > 0
+                    ? $" {doublonsPossibles} doublon(s) possible(s) retenue/prêt — vérifiez les variables du mois des salariés concernés."
+                    : string.Empty;
+
+                StatusMessage = (refus.Count > 0
                     ? $"{Calculations.Count} calcul(s) affiché(s), aucun enregistré — {refus[0]}"
                     : $"Calcul terminé pour {Calculations.Count} employé(s) sur {Periode} — " +
-                      $"{enregistres} enregistré(s) dans la paie du mois.";
+                      $"{enregistres} enregistré(s) dans la paie du mois.")
+                    + await AvertissementPeriodeAsync(Annee, Mois)
+                    + mentionDoublons;
             }
             catch (Exception ex)
             {
@@ -304,6 +373,121 @@ namespace IUTSCalculator.ViewModels
             {
                 StatusMessage = "Profils de paie illisibles, calcul sans eux : " + ex.Message;
                 return new Dictionary<string, ApportProfil>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Avertissement indicatif si le mois n'a jamais été ouvert (module PAI-01). Rien
+        /// n'empêche le calcul — signalé par le client le 13 septembre 2026 comme une
+        /// lacune, mais un blocage strict casserait tout dossier existant, dont aucun mois
+        /// n'a jamais été ouvert explicitement. On prévient donc, sans bloquer.
+        /// </summary>
+        private async Task<string> AvertissementPeriodeAsync(int annee, int mois)
+        {
+            if (_periodePaieService == null) return string.Empty;
+
+            try
+            {
+                var periodePaie = await _periodePaieService.LirePeriodeAsync(annee, mois);
+                return periodePaie == null
+                    ? " Attention : cette période n'a pas été ouverte (écran « Périodes de paie »)."
+                    : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>Heures supplémentaires de la période, pour tout l'effectif et en une lecture.</summary>
+        private async Task<Dictionary<string, ApportHeuresSupplementaires>> ChargerHeuresSupAsync(
+            DateTime periode, IEnumerable<Employee> salaries)
+        {
+            if (_heureSupplementaireService == null)
+                return new Dictionary<string, ApportHeuresSupplementaires>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                return await _heureSupplementaireService.ChargerApportsMoisAsync(periode.Year, periode.Month, salaries);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Heures supplémentaires illisibles, calcul sans elles : " + ex.Message;
+                return new Dictionary<string, ApportHeuresSupplementaires>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        private static ApportHeuresSupplementaires HeuresSupDe(
+            Dictionary<string, ApportHeuresSupplementaires> heuresSup, string employeeId)
+        {
+            if (heuresSup == null || string.IsNullOrWhiteSpace(employeeId))
+                return ApportHeuresSupplementaires.Vide;
+
+            return heuresSup.TryGetValue(employeeId, out var apport) && apport != null
+                ? apport
+                : ApportHeuresSupplementaires.Vide;
+        }
+
+        /// <summary>Conventions collectives et prime d'ancienneté de la période, pour tout l'effectif et en une lecture.</summary>
+        private async Task<Dictionary<string, ApportConventionnel>> ChargerConventionsAsync(
+            DateTime periode, IEnumerable<Employee> salaries)
+        {
+            if (_conventionCollectiveService == null)
+                return new Dictionary<string, ApportConventionnel>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                return await _conventionCollectiveService.ChargerApportsMoisAsync(periode, salaries);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Conventions collectives illisibles, calcul sans prime d'ancienneté : " + ex.Message;
+                return new Dictionary<string, ApportConventionnel>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        private static ApportConventionnel ConventionDe(
+            Dictionary<string, ApportConventionnel> conventions, string employeeId)
+        {
+            if (conventions == null || string.IsNullOrWhiteSpace(employeeId))
+                return ApportConventionnel.Vide;
+
+            return conventions.TryGetValue(employeeId, out var apport) && apport != null
+                ? apport
+                : ApportConventionnel.Vide;
+        }
+
+        /// <summary>Rappels et régularisations (PAI-07) en attente pour la période, en une lecture.</summary>
+        private async Task<List<RappelPaie>> ChargerRappelsAsync(DateTime periode)
+        {
+            if (_rappelPaieService == null)
+                return new List<RappelPaie>();
+
+            try
+            {
+                return await _rappelPaieService.ObtenirRappelsAsync(periode.Year, periode.Month, null, StatutRappelPaie.EnAttente);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Rappels et régularisations illisibles, calcul sans eux : " + ex.Message;
+                return new List<RappelPaie>();
+            }
+        }
+
+        /// <summary>Avantages en nature (PAI-08) actifs, en une lecture.</summary>
+        private async Task<List<AvantageNature>> ChargerAvantagesNatureAsync(DateTime periode)
+        {
+            if (_avantageNatureService == null)
+                return new List<AvantageNature>();
+
+            try
+            {
+                return await _avantageNatureService.ObtenirAvantagesAsync(null, seulementActifs: true);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Avantages en nature illisibles, calcul sans eux : " + ex.Message;
+                return new List<AvantageNature>();
             }
         }
 

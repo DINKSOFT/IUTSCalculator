@@ -46,6 +46,20 @@ namespace IUTSCalculator.ViewModels
             _ = ChargerAsync();
         }
 
+        /// <summary>
+        /// Cet écran ne se rechargeait jamais automatiquement après sa première ouverture :
+        /// revenir dessus après qu'un barème a été ajouté ou modifié ailleurs (ou par un
+        /// collègue sur le même dossier) continuait d'afficher une liste périmée tant qu'on
+        /// ne cliquait pas sur « Recharger » — signalé le 16 septembre 2026 (voir
+        /// ETAT-DEVELOPPEMENT.md item 22). Sans risque pour une fiche en cours de
+        /// modification : voir le garde « mêmeBarème » dans BaremeSelectionne.
+        /// </summary>
+        protected override void OnIsActiveChanged()
+        {
+            if (IsActive)
+                _ = ChargerAsync();
+        }
+
         // ── Sélection et fiche ───────────────────────────────────────────────
 
         private BaremeLegal _baremeSelectionne;
@@ -54,11 +68,19 @@ namespace IUTSCalculator.ViewModels
             get { return _baremeSelectionne; }
             set
             {
+                // ChargerAsync() réaffecte cette propriété après chaque rechargement avec
+                // une NOUVELLE instance représentant le MÊME barème. Recloner FicheCourante
+                // à chaque fois écraserait alors une modification en cours de saisie dès
+                // qu'on revient sur cet écran.
+                bool memeBareme = _baremeSelectionne != null && value != null
+                    && _baremeSelectionne.Id == value.Id;
+
                 if (SetProperty(ref _baremeSelectionne, value))
                 {
                     // Copie de travail : tant qu'on n'a pas enregistré, la liste — et donc
                     // la base — restent intactes.
-                    FicheCourante = value != null ? value.Clone() : null;
+                    if (!memeBareme)
+                        FicheCourante = value != null ? value.Clone() : null;
                 }
             }
         }
@@ -233,11 +255,17 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 StatusMessage = "Chargement des barèmes...";
 
+                int idRetenu = BaremeSelectionne != null ? BaremeSelectionne.Id : 0;
+
                 var liste = await _baremeService.ChargerAsync();
 
                 Baremes.Clear();
                 foreach (var b in liste)
                     Baremes.Add(b);
+
+                BaremeSelectionne = idRetenu > 0
+                    ? Baremes.FirstOrDefault(b => b.Id == idRetenu)
+                    : null;
 
                 OnPropertyChanged(nameof(NombreBaremes));
                 OnPropertyChanged(nameof(BaremeApplicableLibelle));
@@ -276,39 +304,17 @@ namespace IUTSCalculator.ViewModels
                 "modifiées par le texte, puis enregistrez.", source.Designation);
         }
 
+        /// <summary>
+        /// Ajout, suppression et recollage des bornes délégués à
+        /// <see cref="EditionTranches"/>, partagée avec l'écran « Paramètres »
+        /// (SettingsViewModel) — voir sa documentation pour le détail du geste.
+        /// </summary>
         private void AjouterTranche()
         {
             if (FicheCourante == null) return;
 
-            var tranches = FicheCourante.Tranches;
+            var nouvelle = EditionTranches.Ajouter(FicheCourante.Tranches);
 
-            // La nouvelle tranche s'insère juste avant la tranche ouverte, en partant de
-            // sa borne basse : c'est ainsi que s'ajoute un palier dans un barème réel.
-            var ouverte = tranches.LastOrDefault(t => t.EstDerniereTranche);
-
-            decimal depart = ouverte != null
-                ? ouverte.BorneInferieure
-                : (tranches.Count > 0 ? tranches.Max(t => t.BorneSuperieure) : 0m);
-
-            var nouvelle = new TrancheBareme
-            {
-                BorneInferieure = depart,
-                BorneSuperieure = depart,
-                Taux = 0m
-            };
-
-            if (ouverte != null)
-            {
-                int position = tranches.IndexOf(ouverte);
-                tranches.Insert(position, nouvelle);
-                ouverte.BorneInferieure = depart;
-            }
-            else
-            {
-                tranches.Add(nouvelle);
-            }
-
-            Renumeroter();
             TrancheSelectionnee = nouvelle;
             StatusMessage = "Tranche ajoutée : renseignez sa borne supérieure et son taux.";
         }
@@ -317,49 +323,16 @@ namespace IUTSCalculator.ViewModels
         {
             if (FicheCourante == null || TrancheSelectionnee == null) return;
 
-            var tranches = FicheCourante.Tranches;
-            var cible = TrancheSelectionnee;
-            int position = tranches.IndexOf(cible);
+            EditionTranches.Supprimer(FicheCourante.Tranches, TrancheSelectionnee);
 
-            tranches.Remove(cible);
-
-            // Recoller les bornes : sans cela, la largeur de la tranche supprimée ne
-            // serait imposée nulle part.
-            if (position > 0 && position < tranches.Count)
-                tranches[position].BorneInferieure = tranches[position - 1].BorneSuperieure;
-            else if (position == 0 && tranches.Count > 0)
-                tranches[0].BorneInferieure = 0m;
-
-            Renumeroter();
             TrancheSelectionnee = null;
             StatusMessage = "Tranche supprimée ; les bornes voisines ont été recollées.";
         }
 
-        /// <summary>
-        /// Renumérote les tranches et recolle leurs bornes.
-        ///
-        /// La borne inférieure n'est jamais saisie : elle vaut, par construction, la borne
-        /// supérieure de la tranche précédente. La grille l'affiche en lecture seule pour
-        /// cette raison — on ne peut pas se tromper sur une valeur qu'on ne tape pas, et
-        /// un trou de 100 FCFA entre deux paliers passerait inaperçu.
-        /// </summary>
         private void Renumeroter()
         {
             if (FicheCourante == null) return;
-
-            int ordre = 1;
-            decimal precedente = 0m;
-
-            foreach (var tranche in FicheCourante.Tranches)
-            {
-                tranche.Ordre = ordre;
-                tranche.BorneInferieure = precedente;
-
-                if (!tranche.EstDerniereTranche)
-                    precedente = tranche.BorneSuperieure;
-
-                ordre++;
-            }
+            EditionTranches.Renumeroter(FicheCourante.Tranches);
         }
 
         private async Task EnregistrerAsync()

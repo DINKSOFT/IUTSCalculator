@@ -179,6 +179,22 @@ namespace IUTSCalculator.Services
             }
         }
 
+        /// <summary>Valeur lue en base → entier nullable, null si la colonne est NULL ou illisible.</summary>
+        public static int? IntNullableFromDb(object valeur)
+        {
+            if (valeur == null || valeur == DBNull.Value)
+                return null;
+
+            try
+            {
+                return Convert.ToInt32(valeur, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         /// <summary>Valeur lue en base → entier long, 0 si la colonne est NULL ou illisible.</summary>
         public static long LongFromDb(object valeur)
         {

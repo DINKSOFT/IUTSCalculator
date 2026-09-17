@@ -52,6 +52,9 @@ namespace IUTSCalculator.ViewModels
         private readonly ProfilPaieViewModel _profilPaieViewModel;
         // Livre de paie (module ETA-01)
         private readonly LivrePaieViewModel _livrePaieViewModel;
+        // État annuel des salaires — DADS (module DEC-05)
+        private readonly EtatAnnuelSalairesViewModel _etatAnnuelSalairesViewModel;
+        private readonly TableauBordMasseSalarialeViewModel _tableauBordMasseSalarialeViewModel;
 
         // Écritures de paie SYSCOHADA (module CPT-01)
         private readonly EcriturePaieViewModel _ecriturePaieViewModel;
@@ -141,6 +144,8 @@ namespace IUTSCalculator.ViewModels
         public ICommand NavigateToDeclarationCnssCommand { get; private set; }
         public ICommand NavigateToDeclarationIutsTpaCommand { get; private set; }
         public ICommand NavigateToLivrePaieCommand { get; private set; }
+        public ICommand NavigateToEtatAnnuelSalairesCommand { get; private set; }
+        public ICommand NavigateToTableauBordMasseSalarialeCommand { get; private set; }
         public ICommand NavigateToEcriturePaieCommand { get; private set; }
         public ICommand NavigateToOrdreVirementCommand { get; private set; }
         public ICommand NavigateToControleMoteurCommand { get; private set; }
@@ -215,6 +220,8 @@ namespace IUTSCalculator.ViewModels
         public bool IsNavCnssVisible => IsItemVisible("DeclarationCnss");
         public bool IsNavIutsTpaVisible => IsItemVisible("DeclarationIutsTpa");
         public bool IsNavLivrePaieVisible => IsItemVisible("LivrePaie");
+        public bool IsNavEtatAnnuelSalairesVisible => IsItemVisible("EtatAnnuelSalaires");
+        public bool IsNavTableauBordMasseSalarialeVisible => IsItemVisible("TableauBordMasseSalariale");
         public bool IsNavEcriturePaieVisible => IsItemVisible("EcriturePaie");
         public bool IsNavOrdreVirementVisible => IsItemVisible("OrdreVirement");
 
@@ -242,6 +249,7 @@ namespace IUTSCalculator.ViewModels
         public bool IsNavGroupDeclarationsVisible => IsGroupVisible("DECLARATIONS");
         public bool IsNavGroupParametrageVisible => IsGroupVisible("PARAMETRAGE");
         public bool IsNavGroupAuditVisible => IsGroupVisible("AUDIT");
+        public bool IsNavGroupPilotageVisible => IsGroupVisible("PILOTAGE");
 
         private bool IsItemVisible(string key) => _visibleNavItems.Contains(key);
         private bool IsGroupVisible(string groupKey) => _visibleNavGroups.Contains(groupKey);
@@ -270,27 +278,25 @@ namespace IUTSCalculator.ViewModels
             // deux résultats pour le même salarié et le même mois.
             var sqliteCalculs = new SQLiteService(_currentDossier.DbFileName);
 
-            _calculationViewModel = new CalculationViewModel(
-                _taxCalculatorService,
-                _dataService,
-                new VariablePaieService(sqliteCalculs),
-                new RubriqueService(sqliteCalculs),
-                new AbsenceService(sqliteCalculs),
-                new PretService(sqliteCalculs),
-                new ProfilPaieService(sqliteCalculs),
-                new BaremeService(sqliteCalculs));
+            // _calculationViewModel et _batchSalaryCalculationViewModel sont construits plus
+            // bas (après les services PAI-03/SOC-05/PAI-07/PAI-08), pour recevoir les mêmes
+            // quatre modules que les écrans de bulletin — voir ce bloc pour le détail.
             _historyViewModel = new HistoryViewModel(_dataService, _taxCalculatorService);
-            _settingsViewModel = new SettingsViewModel(_dataService);
-            _baseSalaryEstimatorViewModel = new BaseSalaryEstimatorViewModel(_dataService, _taxCalculatorService);
-            _batchSalaryCalculationViewModel = new BatchSalaryCalculationViewModel(
+
+            // Paramètres : édite désormais le même barème IUTS daté que l'écran « Barèmes
+            // légaux » (voir ETAT-DEVELOPPEMENT.md item 23), d'où sa propre instance de
+            // BaremeService — même schéma que RubriqueViewModel/BaremeViewModel ci-dessous :
+            // chaque écran ouvre sa propre connexion, l'ouverture porte le schéma à niveau.
+            //
+            // RattrapageCnssService (dette connue n°3) : branché ici sur un panneau
+            // temporaire de cet écran, seul point d'entrée de l'application vers ce
+            // service — voir ETAT-DEVELOPPEMENT.md item 3 et la documentation du service
+            // lui-même pour ce qu'il corrige et pourquoi ce n'est PAS automatique.
+            _settingsViewModel = new SettingsViewModel(
                 _dataService,
-                _taxCalculatorService,
-                new VariablePaieService(sqliteCalculs),
-                new RubriqueService(sqliteCalculs),
-                new AbsenceService(sqliteCalculs),
-                new PretService(sqliteCalculs),
-                new ProfilPaieService(sqliteCalculs),
-                new BaremeService(sqliteCalculs));
+                new BaremeService(new SQLiteService(_currentDossier.DbFileName)),
+                new RattrapageCnssService(new SQLiteService(_currentDossier.DbFileName)));
+            _baseSalaryEstimatorViewModel = new BaseSalaryEstimatorViewModel(_dataService, _taxCalculatorService);
             _batchSalaryEstimationViewModel = new BatchSalaryEstimationViewModel(_taxCalculatorService);
 
             // Journal d'audit et traçabilité des opérations (module ADM-02).
@@ -344,6 +350,38 @@ namespace IUTSCalculator.ViewModels
                 _avantageNatureService,
                 _avantageNatureExportService,
                 _dataService);
+
+            // « Calcul d'IUTS » et « Calcul en lot » : mêmes quatre modules que les écrans
+            // de bulletin (heures sup, convention collective, rappels, avantages en nature),
+            // pour que les quatre écrans qui produisent la paie restent alignés (§6).
+            _calculationViewModel = new CalculationViewModel(
+                _taxCalculatorService,
+                _dataService,
+                new VariablePaieService(sqliteCalculs),
+                new RubriqueService(sqliteCalculs),
+                new AbsenceService(sqliteCalculs),
+                new PretService(sqliteCalculs),
+                new ProfilPaieService(sqliteCalculs),
+                new BaremeService(sqliteCalculs),
+                _heureSupplementaireService,
+                _conventionCollectiveService,
+                _rappelPaieService,
+                _avantageNatureService,
+                new PeriodePaieService(sqliteCalculs));
+            _batchSalaryCalculationViewModel = new BatchSalaryCalculationViewModel(
+                _dataService,
+                _taxCalculatorService,
+                new VariablePaieService(sqliteCalculs),
+                new RubriqueService(sqliteCalculs),
+                new AbsenceService(sqliteCalculs),
+                new PretService(sqliteCalculs),
+                new ProfilPaieService(sqliteCalculs),
+                new BaremeService(sqliteCalculs),
+                _heureSupplementaireService,
+                _conventionCollectiveService,
+                _rappelPaieService,
+                _avantageNatureService,
+                new PeriodePaieService(sqliteCalculs));
 
             // Initialisation du ViewModel pour le bulletin de paie
             _bulletinViewModel = new BulletinViewModel(
@@ -429,6 +467,29 @@ namespace IUTSCalculator.ViewModels
                     new PeriodePaieService(sqliteLivre),
                     new RubriqueService(sqliteLivre)),
                 new LivrePaieExportService(),
+                _currentDossier);
+
+            // État annuel des salaires — DADS (module DEC-05) : même construction que
+            // le Livre de paie, mais cumulée sur les mois clôturés de l'année plutôt
+            // qu'un seul mois — voir ETAT-DEVELOPPEMENT.md.
+            var sqliteEtatAnnuel = new SQLiteService(_currentDossier.DbFileName);
+            _etatAnnuelSalairesViewModel = new EtatAnnuelSalairesViewModel(
+                new EtatAnnuelSalairesService(
+                    sqliteEtatAnnuel,
+                    new PeriodePaieService(sqliteEtatAnnuel),
+                    new RubriqueService(sqliteEtatAnnuel)),
+                new EtatAnnuelSalairesExportService(),
+                _currentDossier);
+
+            // Tableau de bord masse salariale (module PIL-01) : évolution mensuelle du
+            // brut, du net et du coût employeur, ventilée par catégorie et par service —
+            // même construction que l'état annuel des salaires, cumulée sur l'année.
+            var sqliteTableauBord = new SQLiteService(_currentDossier.DbFileName);
+            _tableauBordMasseSalarialeViewModel = new TableauBordMasseSalarialeViewModel(
+                new TableauBordMasseSalarialeService(
+                    sqliteTableauBord,
+                    new PeriodePaieService(sqliteTableauBord)),
+                new TableauBordMasseSalarialeExportService(),
                 _currentDossier);
 
             // Écritures de paie SYSCOHADA (module CPT-01) : journal mensuel d'OD
@@ -577,6 +638,14 @@ namespace IUTSCalculator.ViewModels
                 execute: () => NavigateTo(_livrePaieViewModel),
                 canExecute: () => true);
 
+            NavigateToEtatAnnuelSalairesCommand = new RelayCommand(
+                execute: () => NavigateTo(_etatAnnuelSalairesViewModel),
+                canExecute: () => true);
+
+            NavigateToTableauBordMasseSalarialeCommand = new RelayCommand(
+                execute: () => NavigateTo(_tableauBordMasseSalarialeViewModel),
+                canExecute: () => true);
+
             NavigateToEcriturePaieCommand = new RelayCommand(
                 execute: () => NavigateTo(_ecriturePaieViewModel),
                 canExecute: () => true);
@@ -675,9 +744,9 @@ namespace IUTSCalculator.ViewModels
                 CommandManager.InvalidateRequerySuggested();
             };
 
-            _historyViewModel.CalculationSelected += (sender, calculation) =>
+            _historyViewModel.CalculationSelected += async (sender, calculation) =>
             {
-                _calculationViewModel.LoadExistingCalculation(calculation);
+                await _calculationViewModel.LoadExistingCalculationAsync(calculation);
                 NavigateTo(_calculationViewModel);
                 StatusMessage = $"Calcul chargé: {calculation.Employee.LastName} {calculation.Employee.FirstName}";
             };
@@ -805,6 +874,16 @@ namespace IUTSCalculator.ViewModels
 
         private void NavigateToEmployeeManagement()
         {
+            // Contrairement aux autres écrans, celui-ci est reconstruit à chaque visite (et
+            // non réutilisé comme les VM singletons) : voir le commentaire du constructeur.
+            // Mais comme NavigateTo(), il doit d'abord désactiver l'écran quitté — sans quoi
+            // son IsActive reste bloqué à true, et y revenir plus tard ne redéclenche jamais
+            // OnIsActiveChanged (pas de transition false→true), donc plus aucun
+            // rafraîchissement automatique sur cet écran-là — signalé le 16 septembre 2026
+            // (voir ETAT-DEVELOPPEMENT.md item 22).
+            if (CurrentViewModel != null)
+                CurrentViewModel.IsActive = false;
+
             // Le service des personnes à charge (SAL-01) ouvre la base du dossier :
             // le constructeur de SQLiteService porte le schéma à la version qui contient
             // la table, y compris pour un dossier antérieur au module.
@@ -856,6 +935,12 @@ namespace IUTSCalculator.ViewModels
                 "declaration iuts tpa impots etat fiscal impôt versements tresor retenue source", NavigateToDeclarationIutsTpaCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("LivrePaie", "DECLARATIONS", "Livre de paie",
                 "livre de paie journal registre mensuel recapitulatif etats salaire total masse salariale", NavigateToLivrePaieCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("EtatAnnuelSalaires", "DECLARATIONS", "État annuel des salaires (DADS)",
+                "etat annuel des salaires dads recapitulatif annuel cumul brut base imposable iuts cotisations cloture", NavigateToEtatAnnuelSalairesCommand));
+
+            // ───── PILOTAGE ─────
+            _navMenuItems.Add(new NavMenuItemDefinition("TableauBordMasseSalariale", "PILOTAGE", "Tableau de bord masse salariale",
+                "tableau de bord masse salariale evolution mensuelle brut net cout employeur service categorie graphique dashboard pilotage", NavigateToTableauBordMasseSalarialeCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("EcriturePaie", "DECLARATIONS", "Écritures de paie",
                 "ecritures de paie comptabilite compta syscohada od pieces debits credits 66 42 43 44 journal comptable", NavigateToEcriturePaieCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("OrdreVirement", "DECLARATIONS", "Ordres de virement",

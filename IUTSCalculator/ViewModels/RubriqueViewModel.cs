@@ -97,6 +97,20 @@ namespace IUTSCalculator.ViewModels
             _ = ChargerAsync();
         }
 
+        /// <summary>
+        /// Cet écran ne se rechargeait jamais automatiquement après sa première ouverture :
+        /// revenir dessus après qu'une rubrique a été ajoutée ou modifiée ailleurs (ou par
+        /// un collègue sur le même dossier) continuait d'afficher un plan de paie périmé
+        /// tant qu'on ne cliquait pas sur « Recharger » — signalé le 16 septembre 2026 (voir
+        /// ETAT-DEVELOPPEMENT.md item 22). Sans risque pour une fiche en cours de
+        /// modification : voir le garde « mêmeRubrique » dans RubriqueSelectionnee.
+        /// </summary>
+        protected override void OnIsActiveChanged()
+        {
+            if (IsActive)
+                _ = ChargerAsync();
+        }
+
         private bool FiltrerRubrique(object obj)
         {
             if (!(obj is Rubrique rub)) return false;
@@ -126,11 +140,21 @@ namespace IUTSCalculator.ViewModels
             get { return _rubriqueSelectionnee; }
             set
             {
+                // ChargerAsync() réaffecte cette propriété après chaque rechargement avec
+                // une NOUVELLE instance représentant la MÊME rubrique (même Code). Recloner
+                // FicheCourante à chaque fois écraserait alors une modification en cours de
+                // saisie dès qu'on revient sur cet écran.
+                bool memeRubrique = _rubriqueSelectionnee != null && value != null
+                    && string.Equals(_rubriqueSelectionnee.Code, value.Code, StringComparison.OrdinalIgnoreCase);
+
                 if (SetProperty(ref _rubriqueSelectionnee, value))
                 {
                     // Copie de travail : la liste n'est modifiée qu'à l'enregistrement.
-                    FicheCourante = value != null ? value.Clone() : null;
-                    EstEnEdition = value != null;
+                    if (!memeRubrique)
+                    {
+                        FicheCourante = value != null ? value.Clone() : null;
+                        EstEnEdition = value != null;
+                    }
                 }
             }
         }
@@ -235,11 +259,17 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 StatusMessage = "Chargement du plan de paie...";
 
+                string codeRetenu = RubriqueSelectionnee != null ? RubriqueSelectionnee.Code : null;
+
                 var liste = await _rubriqueService.ChargerAsync();
 
                 Rubriques.Clear();
                 foreach (var r in liste)
                     Rubriques.Add(r);
+
+                RubriqueSelectionnee = !string.IsNullOrEmpty(codeRetenu)
+                    ? Rubriques.FirstOrDefault(r => string.Equals(r.Code, codeRetenu, StringComparison.OrdinalIgnoreCase))
+                    : null;
 
                 RafraichirTotaux();
                 StatusMessage = string.Format("{0} rubriques dans le plan de paie.", Rubriques.Count);

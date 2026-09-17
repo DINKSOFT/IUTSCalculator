@@ -505,41 +505,52 @@ namespace IUTSCalculator.ViewModels
 
         private async void OnSelectedSaisieChanged()
         {
-            if (SelectedSaisie != null)
+            // ChargerDonneesAsync() réaffecte SelectedSaisie après chaque rechargement (y
+            // compris le rechargement automatique à la réactivation de l'écran) pour
+            // retrouver la même ligne, ce qui invoque ce gestionnaire. Si une édition est en
+            // cours (IsEditing), réécraser les champs Form* depuis la base effacerait alors
+            // la saisie de l'utilisateur en plein milieu d'une modification — signalé le 16
+            // septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22). Annuler() reste le seul
+            // chemin qui doit resynchroniser Form* pendant une édition, et il le fait après
+            // avoir remis IsEditing à false, donc sans passer par ce garde-fou.
+            if (!IsEditing)
             {
-                FormEmployee = Salaries.FirstOrDefault(e => e.EmployeeId == SelectedSaisie.EmployeeId);
-                FormTypeSaisie = SelectedSaisie.TypeSaisie;
-                FormCreancier = SelectedSaisie.Creancier;
-                FormBeneficiaire = SelectedSaisie.Beneficiaire;
-                FormNumeroDossier = SelectedSaisie.NumeroDossier;
-                FormMontantTotalDu = SelectedSaisie.MontantTotalDu;
-                FormRetenueMensuelleFixee = SelectedSaisie.RetenueMensuelleFixee;
-                FormDateDebut = SelectedSaisie.DateDebut;
-                FormDateFin = SelectedSaisie.DateFin;
-                FormDateNotification = SelectedSaisie.DateNotification;
-                FormTribunalOuAutorite = SelectedSaisie.TribunalOuAutorite;
-                FormReferenceJugement = SelectedSaisie.ReferenceJugement;
-                FormStatut = SelectedSaisie.Statut;
-                FormPrioriteOrdre = SelectedSaisie.PrioriteOrdre;
-                FormCommentaire = SelectedSaisie.Commentaire;
+                if (SelectedSaisie != null)
+                {
+                    FormEmployee = Salaries.FirstOrDefault(e => e.EmployeeId == SelectedSaisie.EmployeeId);
+                    FormTypeSaisie = SelectedSaisie.TypeSaisie;
+                    FormCreancier = SelectedSaisie.Creancier;
+                    FormBeneficiaire = SelectedSaisie.Beneficiaire;
+                    FormNumeroDossier = SelectedSaisie.NumeroDossier;
+                    FormMontantTotalDu = SelectedSaisie.MontantTotalDu;
+                    FormRetenueMensuelleFixee = SelectedSaisie.RetenueMensuelleFixee;
+                    FormDateDebut = SelectedSaisie.DateDebut;
+                    FormDateFin = SelectedSaisie.DateFin;
+                    FormDateNotification = SelectedSaisie.DateNotification;
+                    FormTribunalOuAutorite = SelectedSaisie.TribunalOuAutorite;
+                    FormReferenceJugement = SelectedSaisie.ReferenceJugement;
+                    FormStatut = SelectedSaisie.Statut;
+                    FormPrioriteOrdre = SelectedSaisie.PrioriteOrdre;
+                    FormCommentaire = SelectedSaisie.Commentaire;
 
-                await ChargerHistoriqueRetenuesAsync(SelectedSaisie.Id);
-            }
-            else
-            {
-                FormEmployee = null;
-                FormCreancier = string.Empty;
-                FormBeneficiaire = string.Empty;
-                FormNumeroDossier = string.Empty;
-                FormMontantTotalDu = 0m;
-                FormRetenueMensuelleFixee = 0m;
-                FormDateDebut = null;
-                FormDateFin = null;
-                FormDateNotification = null;
-                FormTribunalOuAutorite = string.Empty;
-                FormReferenceJugement = string.Empty;
-                FormCommentaire = string.Empty;
-                HistoriqueRetenues.Clear();
+                    await ChargerHistoriqueRetenuesAsync(SelectedSaisie.Id);
+                }
+                else
+                {
+                    FormEmployee = null;
+                    FormCreancier = string.Empty;
+                    FormBeneficiaire = string.Empty;
+                    FormNumeroDossier = string.Empty;
+                    FormMontantTotalDu = 0m;
+                    FormRetenueMensuelleFixee = 0m;
+                    FormDateDebut = null;
+                    FormDateFin = null;
+                    FormDateNotification = null;
+                    FormTribunalOuAutorite = string.Empty;
+                    FormReferenceJugement = string.Empty;
+                    FormCommentaire = string.Empty;
+                    HistoriqueRetenues.Clear();
+                }
             }
 
             OnPropertyChanged(nameof(BasculerStatutLibelle));

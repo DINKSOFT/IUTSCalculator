@@ -185,7 +185,13 @@ namespace IUTSCalculator.ViewModels
         protected override void OnIsActiveChanged()
         {
             base.OnIsActiveChanged();
-            if (IsActive && Entrees.Count == 0)
+            // La condition Entrees.Count == 0 limitait le rechargement automatique à la
+            // toute première visite de l'écran : revenir plus tard sur le journal d'audit
+            // affichait une liste figée au moment de ce premier chargement, alors même que
+            // c'est l'écran où la fraîcheur des données compte le plus — signalé le 16
+            // septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22). ChargerAsync() ne fait
+            // que rejouer les filtres actuels, sans état de saisie à perdre.
+            if (IsActive)
             {
                 _ = ChargerAsync();
             }

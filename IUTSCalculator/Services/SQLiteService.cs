@@ -26,7 +26,7 @@ namespace IUTSCalculator.Services
     public class SQLiteService : IDisposable
     {
         /// <summary>Niveau de schéma attendu par cette version de l'application.</summary>
-        private const int SchemaCible = 26;
+        private const int SchemaCible = 28;
 
         private readonly string _dbPath;
         private readonly string _connectionString;
@@ -263,6 +263,18 @@ namespace IUTSCalculator.Services
                         Migration26_AvantagesEnNature(connection);
                         EnregistrerVersion(connection, 26);
                     }
+
+                    if (version < 27)
+                    {
+                        Migration27_RubriqueAvance(connection);
+                        EnregistrerVersion(connection, 27);
+                    }
+
+                    if (version < 28)
+                    {
+                        Migration28_ServiceEtColonnesManquantes(connection);
+                        EnregistrerVersion(connection, 28);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -354,6 +366,7 @@ namespace IUTSCalculator.Services
                     IsSpouseWorking       INTEGER NOT NULL DEFAULT 0,
                     PensionContribution   INTEGER NOT NULL DEFAULT 0,
                     Category              TEXT,
+                    Service               TEXT,
                     IsHigherCategory      INTEGER NOT NULL DEFAULT 0,
                     Fonction              TEXT,
                     DateEntree            TEXT,
@@ -374,7 +387,10 @@ namespace IUTSCalculator.Services
                     NumeroCompte          TEXT,
                     ModeReglement         TEXT,
                     ConventionId          INTEGER,
-                    Echelon               TEXT
+                    Echelon               TEXT,
+                    DateSortie            TEXT,
+                    MotifDepart           TEXT,
+                    StatutSalarie         INTEGER NOT NULL DEFAULT 0
                 );");
 
             Executer(connection, @"
@@ -1630,6 +1646,63 @@ namespace IUTSCalculator.Services
                  Ordre, Active, EstSysteme, CompteComptable, CompteContrepartie, Commentaire)
                 VALUES ('RETSYND', 'Cotisation syndicale', 1, 0, 0, '0', '0', '', 0, 0, 0, 0, '0',
                         123, 1, 0, '4221', '4274', 'Précomptée sur le net, reversée au syndicat.');");
+        }
+
+        /// <summary>
+        /// Migration 27 — rubrique « avance sur salaire » (dette n°7).
+        ///
+        /// Le module PAI-05 (Prêts) sait déjà retenir une avance sur salaire, avec son
+        /// propre code de retenue (<c>AVANCE</c>) distinct de l'acompte — mais aucune
+        /// rubrique de ce code n'existait dans le plan de paie : l'écriture comptable
+        /// (CPT-01) la classait donc dans le compte générique 422100, mêlée à tout ce qui
+        /// n'a pas de compte configuré, alors que l'acompte (4271) et le prêt (4272) ont
+        /// chacun le leur depuis la migration 11.
+        ///
+        /// Un dossier créé après ce module reçoit déjà <c>AVANCE</c> par
+        /// <see cref="RubriqueService.RubriquesDeSaisie"/> (appelée dès que le plan de paie
+        /// est vide) ; celle-ci rattrape les dossiers déjà en service, dont le plan de paie
+        /// n'est justement plus vide.
+        ///
+        /// Le compte de contrepartie (4270) est une proposition, pas un compte imposé : il
+        /// se corrige comme tout autre, depuis l'écran « Plan de paie ».
+        /// </summary>
+        private void Migration27_RubriqueAvance(SQLiteConnection connection)
+        {
+            if (!TableExiste(connection, "Rubriques"))
+                return;
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO Rubriques
+                (Code, Libelle, Sens, ModeCalcul, MontantFixe, TauxSalarial, TauxPatronal,
+                 CodeBase, SoumisIUTS, SoumisCNSS, Plafonne, Plafond, PourcentagePlafond,
+                 Ordre, Active, EstSysteme, CompteComptable, CompteContrepartie, Commentaire)
+                VALUES ('AVANCE', 'Avance sur salaire', 1, 0, 0, '0', '0', '', 0, 0, 0, 0, '0',
+                        119, 1, 0, '4221', '4270',
+                        'Somme versée avant l''échéance, récupérée sur le net. Échéancier automatique : module PAI-05.');");
+        }
+
+        /// <summary>
+        /// Migration 28 — service du salarié (module PIL-01) et rattrapage d'un oubli
+        /// de <see cref="CreerSchemaComplet"/>.
+        ///
+        /// Ajoute la colonne <c>Service</c> à la fiche salarié : le tableau de bord masse
+        /// salariale (PIL-01) en a besoin comme second axe de ventilation, à côté de la
+        /// catégorie qui existait déjà. Purement déclaratif, saisi à la main sur la fiche.
+        ///
+        /// Au passage, corrige un oubli distinct : <c>DateSortie</c>, <c>MotifDepart</c> et
+        /// <c>StatutSalarie</c> avaient été ajoutés par la migration 23 pour les dossiers
+        /// déjà existants, mais jamais reportés dans <see cref="CreerSchemaComplet"/> — un
+        /// dossier tout neuf se retrouvait donc sans ces trois colonnes, et la première
+        /// lecture de la liste des salariés (qui les sélectionne toutes) aurait échoué avec
+        /// une erreur SQL « no such column ». <c>AjouterColonneSiAbsente</c> ne fait rien
+        /// sur un dossier migré où elles existent déjà.
+        /// </summary>
+        private void Migration28_ServiceEtColonnesManquantes(SQLiteConnection connection)
+        {
+            AjouterColonneSiAbsente(connection, "Employees", "Service", "TEXT");
+            AjouterColonneSiAbsente(connection, "Employees", "DateSortie", "TEXT");
+            AjouterColonneSiAbsente(connection, "Employees", "MotifDepart", "TEXT");
+            AjouterColonneSiAbsente(connection, "Employees", "StatutSalarie", "INTEGER NOT NULL DEFAULT 0");
         }
 
         /// <summary>

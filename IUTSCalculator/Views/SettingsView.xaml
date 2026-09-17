@@ -55,26 +55,56 @@
         <!-- ═══════════ Onglets ═══════════ -->
         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0,14,0,0">
 
-            <!-- ───── Tranches d'imposition ───── -->
+            <!-- ───── Tranches d'imposition ─────
+                 Édite le même barème daté que l'écran « Barèmes légaux » (celui
+                 actuellement en vigueur) — voir ETAT-DEVELOPPEMENT.md item 23. Grille
+                 et boutons mêmes que sur cet autre écran : ajouter/supprimer une
+                 tranche ne peut pas passer par CanUserAddRows/CanUserDeleteRows d'un
+                 DataGrid brut, qui ne recollerait pas les bornes voisines. -->
             <TabItem Header="Tranches d'imposition">
                 <Border Style="{StaticResource CardBorderStyle}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="BARÈME DE L'IUTS"
+                    <DockPanel DataContext="{Binding FicheBareme}">
+                        <TextBlock DockPanel.Dock="Top" Text="BARÈME DE L'IUTS EN VIGUEUR"
                                    Style="{StaticResource SectionLabelStyle}"/>
-                        <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource TabNote}"
-                                   Text="Les limites sont exprimées en FCFA et les taux en proportion : 0,125 s'affiche 12,5 %. Les tranches doivent être contiguës — une limite supérieure est immédiatement suivie de la limite inférieure de la tranche suivante."/>
+                        <TextBlock DockPanel.Dock="Top" Style="{StaticResource TabNote}" Margin="0,4,0,10"
+                                   Text="{Binding DataContext.BaremeInfoLibelle, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
 
-                        <DataGrid ItemsSource="{Binding TaxBrackets}"
-                                  Style="{StaticResource EditableGridStyle}"
-                                  CanUserAddRows="True" CanUserDeleteRows="True"
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="Ajouter une tranche"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding DataContext.AjouterTrancheCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                <Button Content="Supprimer" Margin="0"
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        Command="{Binding DataContext.SupprimerTrancheCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource TabNote}"
+                                   Text="Les bornes doivent se toucher : la borne inférieure d'une tranche est exactement la borne supérieure de la précédente. Laisser la borne supérieure vide signifie « et au-delà »."/>
+
+                        <DataGrid ItemsSource="{Binding Tranches}"
+                                  SelectedItem="{Binding DataContext.TrancheSelectionnee, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  Style="{StaticResource FormDataGridStyle}"
+                                  IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
                                   Margin="0,4,0,0">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Limite inférieure"
-                                                    Binding="{Binding LowerBound, StringFormat=N0}" Width="*"/>
-                                <DataGridTextColumn Header="Limite supérieure"
-                                                    Binding="{Binding UpperBound, StringFormat=N0}" Width="*"/>
-                                <DataGridTextColumn Header="Taux"
-                                                    Binding="{Binding Rate, StringFormat=P1}" Width="*"/>
+                                <DataGridTextColumn Header="#" Binding="{Binding Ordre}"
+                                                    IsReadOnly="True" Width="44"
+                                                    ElementStyle="{StaticResource CenterTextStyle}"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                                <DataGridTextColumn Header="De (FCFA)"
+                                                    Binding="{Binding BorneInferieure, Converter={StaticResource MontantConverter}, Mode=OneWay}"
+                                                    IsReadOnly="True" Width="*" MinWidth="110"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                                <DataGridTextColumn Header="À (FCFA)"
+                                                    Binding="{Binding BorneSuperieureSaisie, UpdateSourceTrigger=LostFocus}"
+                                                    Width="*" MinWidth="110"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
+                                <DataGridTextColumn Header="Taux (%)"
+                                                    Binding="{Binding Taux, StringFormat=N2, ConverterCulture=fr-FR, UpdateSourceTrigger=LostFocus}"
+                                                    Width="100" MinWidth="90"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
@@ -84,21 +114,27 @@
             <!-- ───── Charges familiales ───── -->
             <TabItem Header="Charges familiales">
                 <Border Style="{StaticResource CardBorderStyle}">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="ABATTEMENTS POUR CHARGES FAMILIALES"
+                    <DockPanel DataContext="{Binding FicheBareme}">
+                        <TextBlock DockPanel.Dock="Top" Text="RÉDUCTIONS POUR CHARGES DE FAMILLE (ART. 113 DU CGI)"
                                    Style="{StaticResource SectionLabelStyle}"/>
+                        <TextBlock DockPanel.Dock="Top" Style="{StaticResource TabNote}" Margin="0,4,0,10"
+                                   Text="{Binding DataContext.BaremeInfoLibelle, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                         <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource TabNote}"
-                                   Text="L'abattement s'applique sur l'impôt brut, pas sur le revenu imposable. Les taux sont exprimés en proportion : 0,10 s'affiche 10 %."/>
+                                   Text="La réduction s'applique sur l'impôt brut, pas sur le revenu imposable. Nombre de personnes à charge fixé de 0 à 7 ; seul le taux se modifie."/>
 
-                        <DataGrid ItemsSource="{Binding FamilyCharges}"
-                                  Style="{StaticResource EditableGridStyle}"
-                                  CanUserAddRows="True" CanUserDeleteRows="True"
+                        <DataGrid ItemsSource="{Binding ChargesFamille}"
+                                  Style="{StaticResource FormDataGridStyle}"
+                                  IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
                                   Margin="0,4,0,0">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Personnes à charge"
-                                                    Binding="{Binding ChargeCount}" Width="*"/>
-                                <DataGridTextColumn Header="Taux d'abattement"
-                                                    Binding="{Binding AbatementPercentage, StringFormat=P1}" Width="*"/>
+                                <DataGridTextColumn Header="Personnes à charge" Binding="{Binding NombreCharges}"
+                                                    IsReadOnly="True" Width="*" MinWidth="140"
+                                                    ElementStyle="{StaticResource CenterTextStyle}"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderCenterStyle}"/>
+                                <DataGridTextColumn Header="Réduction de l'IUTS"
+                                                    Binding="{Binding Taux, Converter={StaticResource PourcentageConverter}, UpdateSourceTrigger=LostFocus}"
+                                                    Width="*" MinWidth="140"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
@@ -165,6 +201,51 @@
                             </StackPanel>
                         </Border>
                     </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ───── Maintenance ─────
+                 Panneau TEMPORAIRE, unique point d'entrée vers RattrapageCnssService
+                 (dette connue n°3 — voir ETAT-DEVELOPPEMENT.md §7). « Analyser » ne fait
+                 que lire ; « Appliquer » ne s'active qu'après une analyse ayant trouvé des
+                 lignes, et redemande confirmation avant d'écrire. -->
+            <TabItem Header="Maintenance">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel>
+                            <TextBlock Text="RATTRAPAGE CNSS (VENTILATION PAR BRANCHE)"
+                                       Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Style="{StaticResource TabNote}" Margin="0,4,0,14"
+                                       Text="Reconstitue la ventilation par branche (prestations familiales, risques professionnels, pensions patronales) des bulletins enregistrés avant l'ajout de ce détail, sans toucher au salaire brut ni à aucun autre champ. « Analyser » se contente de lire et de proposer un rapport ; « Appliquer » écrit en base après dépôt d'une copie de sauvegarde du fichier, et ne concerne que les lignes que l'analyse a identifiées avec certitude — les lignes ambiguës sont signalées à part, pour un examen manuel."/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Button Content="Analyser" MinWidth="140"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding AnalyserRattrapageCnssCommand}"/>
+                                <Button Content="Appliquer..." MinWidth="140"
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        Command="{Binding AppliquerRattrapageCnssCommand}"/>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding HasRapportRattrapageCnss, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"
+                                           Foreground="{StaticResource InkBrush}">
+                                    <Run Text="{Binding NombreLignesARattraperCnss, Mode=OneWay}"/>
+                                    <Run Text="ligne(s) à rattraper — "/>
+                                    <Run Text="{Binding NombreLignesSuspectesCnss, Mode=OneWay}"/>
+                                    <Run Text="ligne(s) suspecte(s)"/>
+                                </TextBlock>
+                                <Border Background="{StaticResource SurfaceAltBrush}"
+                                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                        Padding="10" MaxHeight="260">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <TextBlock Text="{Binding RapportRattrapageCnssTexte}"
+                                                   TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </ScrollViewer>
             </TabItem>
         </TabControl>

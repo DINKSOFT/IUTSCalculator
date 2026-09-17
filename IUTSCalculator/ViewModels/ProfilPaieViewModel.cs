@@ -69,90 +69,10 @@ namespace IUTSCalculator.ViewModels
         public ObservableCollection<Rubrique> RubriquesDisponibles { get; } = new ObservableCollection<Rubrique>();
         public ObservableCollection<AffectationProfil> Affectations { get; } = new ObservableCollection<AffectationProfil>();
         public ObservableCollection<Employee> Salaries { get; } = new ObservableCollection<Employee>();
-        public ObservableCollection<Employee> SalariesFiltres { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<string> Avertissements { get; } = new ObservableCollection<string>();
 
+        /// <summary>Vue filtrée de Profils (recherche texte + filtre population) pour la grille.</summary>
         public ICollectionView ProfilsView { get; }
-
-        private string _searchText;
-        public string SearchText
-        {
-            get { return _searchText; }
-            set
-            {
-                if (SetProperty(ref _searchText, value))
-                {
-                    ProfilsView?.Refresh();
-                    OnPropertyChanged(nameof(HasSearchText));
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombreProfilsAffiches));
-                }
-            }
-        }
-
-        public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
-
-        private PopulationProfil? _selectedPopulationFilter;
-        public PopulationProfil? SelectedPopulationFilter
-        {
-            get { return _selectedPopulationFilter; }
-            set
-            {
-                if (SetProperty(ref _selectedPopulationFilter, value))
-                {
-                    ProfilsView?.Refresh();
-                    OnPropertyChanged(nameof(HasActiveFilters));
-                    OnPropertyChanged(nameof(NombreProfilsAffiches));
-                }
-            }
-        }
-
-        public bool HasActiveFilters => HasSearchText || SelectedPopulationFilter.HasValue;
-
-        public List<KeyValuePair<PopulationProfil?, string>> PopulationFiltreOptions { get; } =
-            new List<KeyValuePair<PopulationProfil?, string>> { new KeyValuePair<PopulationProfil?, string>(null, "Toutes populations") };
-
-        public int NombreProfilsAffiches => ProfilsView?.Cast<ProfilPaie>().Count() ?? Profils.Count;
-
-        public ICommand ClearSearchCommand { get; }
-        public ICommand ResetFiltersCommand { get; }
-
-        private string _filtreSalarie;
-        public string FiltreSalarie
-        {
-            get { return _filtreSalarie; }
-            set
-            {
-                if (SetProperty(ref _filtreSalarie, value))
-                {
-                    AppliquerFiltreSalaries();
-                    OnPropertyChanged(nameof(HasFiltreSalarie));
-                }
-            }
-        }
-
-        public bool HasFiltreSalarie => !string.IsNullOrWhiteSpace(FiltreSalarie);
-        public ICommand ClearFiltreSalarieCommand { get; }
-
-        public void AppliquerFiltreSalaries()
-        {
-            SalariesFiltres.Clear();
-            var q = string.IsNullOrWhiteSpace(FiltreSalarie)
-                ? (IEnumerable<Employee>)Salaries
-                : Salaries.Where(e =>
-                    (!string.IsNullOrEmpty(e.LastName) && e.LastName.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.FirstName) && e.FirstName.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.EmployeeId) && e.EmployeeId.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (!string.IsNullOrEmpty(e.Fonction) && e.Fonction.IndexOf(FiltreSalarie, StringComparison.OrdinalIgnoreCase) >= 0));
-
-            foreach (var e in q)
-                SalariesFiltres.Add(e);
-
-            if (SalariesFiltres.Count == 1 && SalarieAAffecter == null)
-            {
-                SalarieAAffecter = SalariesFiltres[0];
-            }
-        }
 
         public ProfilPaieViewModel(
             ProfilPaieService profilService,
@@ -169,24 +89,10 @@ namespace IUTSCalculator.ViewModels
 
             Title = "Profils de paie";
 
-            foreach (PopulationProfil p in Enum.GetValues(typeof(PopulationProfil)))
-            {
-                PopulationFiltreOptions.Add(new KeyValuePair<PopulationProfil?, string>(p, ProfilPaie.Libelle_(p)));
-            }
+            _dateEffet = DateTime.Today;
 
             ProfilsView = CollectionViewSource.GetDefaultView(Profils);
             ProfilsView.Filter = FiltrerProfil;
-
-            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
-            ResetFiltersCommand = new RelayCommand(() =>
-            {
-                SearchText = string.Empty;
-                SelectedPopulationFilter = null;
-            });
-
-            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
-
-            _dateEffet = DateTime.Today;
 
             ChargerCommand = new RelayCommand(async () => await ChargerAsync(), () => !IsBusy);
             NouveauCommand = new RelayCommand(Nouveau, () => !IsBusy);
@@ -218,28 +124,29 @@ namespace IUTSCalculator.ViewModels
                 async () => await SupprimerAffectationAsync(),
                 () => !IsBusy && AffectationSelectionnee != null);
 
+            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+            ResetFiltersCommand = new RelayCommand(() =>
+            {
+                SearchText = string.Empty;
+                SelectedPopulationFilter = null;
+            });
+            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
+
             _ = ChargerAsync();
         }
 
-        private bool FiltrerProfil(object obj)
+        /// <summary>
+        /// Ce ViewModel n'est créé qu'une seule fois (voir MainViewModel) et ne recharge
+        /// jamais automatiquement après ce premier chargement : sans ce rafraîchissement,
+        /// revenir sur cet écran après avoir modifié une fiche employé ailleurs continuait
+        /// d'afficher les anciennes données tant que le dossier n'était pas fermé puis
+        /// rouvert (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 21). Sans
+        /// risque pour une saisie en cours : ChargerAsync ne touche pas ProfilEnCours.
+        /// </summary>
+        protected override void OnIsActiveChanged()
         {
-            var item = obj as ProfilPaie;
-            if (item == null) return false;
-
-            if (SelectedPopulationFilter.HasValue && item.Population != SelectedPopulationFilter.Value)
-                return false;
-
-            if (!string.IsNullOrWhiteSpace(SearchText))
-            {
-                string term = SearchText.Trim();
-                bool match = (item.Code != null && item.Code.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.Libelle != null && item.Libelle.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.PopulationLibelle != null && item.PopulationLibelle.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                          || (item.Description != null && item.Description.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (!match) return false;
-            }
-
-            return true;
+            if (IsActive)
+                _ = ChargerAsync();
         }
 
         // ── Sélection et édition du profil ───────────────────────────────────
@@ -255,12 +162,22 @@ namespace IUTSCalculator.ViewModels
             get { return _profilSelectionne; }
             set
             {
+                // ChargerAsync() réaffecte cette propriété après chaque rechargement (y
+                // compris le rechargement automatique à la réactivation de l'écran, voir
+                // OnIsActiveChanged) avec une NOUVELLE instance représentant le MÊME profil,
+                // pour rafraîchir l'affichage. Cloner ProfilEnCours à chaque fois écraserait
+                // alors une saisie en cours dès qu'on revient sur cet écran — signalé le 16
+                // septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22). On ne clone donc que
+                // lorsque le profil sélectionné a réellement changé.
+                bool memeProfil = _profilSelectionne != null && value != null && _profilSelectionne.Id == value.Id;
+
                 if (SetProperty(ref _profilSelectionne, value))
                 {
                     // La ligne s'ouvre à l'édition sur une COPIE : tant que
                     // l'enregistrement n'est pas demandé, la liste affichée reste celle de
                     // la base, et une modification abandonnée ne laisse aucune trace.
-                    ProfilEnCours = value != null ? value.Clone() : null;
+                    if (!memeProfil)
+                        ProfilEnCours = value != null ? value.Clone() : null;
 
                     OnPropertyChanged(nameof(PorteeLibelle));
                     _ = ChargerDetailAsync();
@@ -408,6 +325,124 @@ namespace IUTSCalculator.ViewModels
             get { return Avertissements.Count > 0; }
         }
 
+        // ── Recherche et filtres sur la liste des profils ───────────────────────
+
+        private string _searchText;
+        public string SearchText
+        {
+            get { return _searchText; }
+            set
+            {
+                if (SetProperty(ref _searchText, value))
+                {
+                    ProfilsView?.Refresh();
+                    OnPropertyChanged(nameof(HasSearchText));
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombreProfilsAffiches));
+                }
+            }
+        }
+
+        public bool HasSearchText
+        {
+            get { return !string.IsNullOrWhiteSpace(SearchText); }
+        }
+
+        private PopulationProfil? _selectedPopulationFilter;
+        public PopulationProfil? SelectedPopulationFilter
+        {
+            get { return _selectedPopulationFilter; }
+            set
+            {
+                if (SetProperty(ref _selectedPopulationFilter, value))
+                {
+                    ProfilsView?.Refresh();
+                    OnPropertyChanged(nameof(HasActiveFilters));
+                    OnPropertyChanged(nameof(NombreProfilsAffiches));
+                }
+            }
+        }
+
+        public List<KeyValuePair<PopulationProfil?, string>> PopulationFiltreOptions
+        {
+            get
+            {
+                var options = new List<KeyValuePair<PopulationProfil?, string>>
+                {
+                    new KeyValuePair<PopulationProfil?, string>(null, "Toutes les populations")
+                };
+                options.AddRange(PopulationProfilOption.Tous
+                    .Select(p => new KeyValuePair<PopulationProfil?, string>(p.Valeur, p.Libelle)));
+                return options;
+            }
+        }
+
+        public bool HasActiveFilters
+        {
+            get { return HasSearchText || SelectedPopulationFilter.HasValue; }
+        }
+
+        public int NombreProfilsAffiches
+        {
+            get { return ProfilsView != null ? ProfilsView.Cast<ProfilPaie>().Count() : Profils.Count; }
+        }
+
+        private bool FiltrerProfil(object obj)
+        {
+            var profil = obj as ProfilPaie;
+            if (profil == null) return false;
+
+            if (SelectedPopulationFilter.HasValue && profil.Population != SelectedPopulationFilter.Value)
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                string q = SearchText.Trim();
+                bool match = (profil.Code != null && profil.Code.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                          || (profil.Libelle != null && profil.Libelle.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (!match) return false;
+            }
+
+            return true;
+        }
+
+        // ── Recherche rapide du salarié pour le rattachement ────────────────────
+
+        private string _filtreSalarie;
+        public string FiltreSalarie
+        {
+            get { return _filtreSalarie; }
+            set
+            {
+                if (SetProperty(ref _filtreSalarie, value))
+                {
+                    OnPropertyChanged(nameof(HasFiltreSalarie));
+                    OnPropertyChanged(nameof(SalariesFiltres));
+                }
+            }
+        }
+
+        public bool HasFiltreSalarie
+        {
+            get { return !string.IsNullOrWhiteSpace(FiltreSalarie); }
+        }
+
+        public IList<Employee> SalariesFiltres
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(FiltreSalarie)) return Salaries;
+
+                string q = FiltreSalarie.Trim();
+                return Salaries.Where(s =>
+                    (s.LastName != null && s.LastName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.FirstName != null && s.FirstName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Matricule != null && s.Matricule.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Fonction != null && s.Fonction.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0))
+                    .ToList();
+            }
+        }
+
         // ── Commandes ────────────────────────────────────────────────────────
 
         public ICommand ChargerCommand { get; }
@@ -421,6 +456,9 @@ namespace IUTSCalculator.ViewModels
         public ICommand AffecterCommand { get; }
         public ICommand RetirerProfilCommand { get; }
         public ICommand SupprimerAffectationCommand { get; }
+        public ICommand ClearSearchCommand { get; }
+        public ICommand ResetFiltersCommand { get; }
+        public ICommand ClearFiltreSalarieCommand { get; }
 
         private void RafraichirCommandes()
         {
@@ -459,7 +497,7 @@ namespace IUTSCalculator.ViewModels
                 Salaries.Clear();
                 foreach (var salarie in await _dataService.LoadEmployeesAsync())
                     Salaries.Add(salarie);
-                AppliquerFiltreSalaries();
+                OnPropertyChanged(nameof(SalariesFiltres));
 
                 _toutesAffectations = await _profilService.ChargerAffectationsAsync();
 
@@ -474,9 +512,8 @@ namespace IUTSCalculator.ViewModels
                     ? Profils.FirstOrDefault(p => p.Id == idRetenu)
                     : null;
 
-                ProfilsView?.Refresh();
-                OnPropertyChanged(nameof(NombreProfilsAffiches));
                 OnPropertyChanged(nameof(NombreProfils));
+                OnPropertyChanged(nameof(NombreProfilsAffiches));
 
                 StatusMessage = Profils.Count == 0
                     ? "Aucun profil : créez-en un par population — cadre, employé, journalier…"

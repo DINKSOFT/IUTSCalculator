@@ -52,6 +52,20 @@ namespace IUTSCalculator.ViewModels
             _ = ChargerAsync();
         }
 
+        /// <summary>
+        /// Cet écran ne se rechargeait jamais automatiquement après sa première ouverture :
+        /// revenir dessus après une clôture faite ailleurs (ou par un collègue sur le même
+        /// dossier) continuait d'afficher un état périmé tant qu'on ne cliquait pas sur
+        /// « Recharger » — signalé le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item
+        /// 22). Sans risque pour un motif de réouverture en cours de saisie : voir le garde
+        /// « mêmePériode » dans PeriodeSelectionnee.
+        /// </summary>
+        protected override void OnIsActiveChanged()
+        {
+            if (IsActive)
+                _ = ChargerAsync();
+        }
+
         // ── Sélection ────────────────────────────────────────────────────────
 
         private PeriodePaie _periodeSelectionnee;
@@ -60,9 +74,18 @@ namespace IUTSCalculator.ViewModels
             get { return _periodeSelectionnee; }
             set
             {
+                // ChargerAsync() réaffecte cette propriété après chaque rechargement avec
+                // une NOUVELLE instance représentant la MÊME période, pour rafraîchir son
+                // état. Remettre le motif de réouverture à zéro à chaque fois effacerait
+                // alors une justification en cours de saisie dès qu'on revient sur cet
+                // écran.
+                bool memePeriode = _periodeSelectionnee != null && value != null
+                    && _periodeSelectionnee.Id == value.Id;
+
                 if (SetProperty(ref _periodeSelectionnee, value))
                 {
-                    MotifReouverture = "";
+                    if (!memePeriode)
+                        MotifReouverture = "";
                     OnPropertyChanged(nameof(ALaFiche));
                     OnPropertyChanged(nameof(ConfirmationDemandee));
                     RafraichirCommandes();

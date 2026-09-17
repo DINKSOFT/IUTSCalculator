@@ -358,11 +358,15 @@ namespace IUTSCalculator.Services
 
             calculation.CnssEmployee = assietteCnss * parametres.TauxCnssSalarie;
 
-            // Report historique : la retenue CNSS alimente le champ « cotisation de
-            // retraite » du salarié, dont se sert plus bas le plafond de déduction de
-            // l'article 111. Conservé tel quel — le déloger changerait la base imposable,
-            // ce qui sort du périmètre d'une mise en conformité à équivalence stricte.
-            employee.PensionContribution = calculation.CnssEmployee;
+            // La retenue CNSS sert aussi de base au plafond de déduction retraite de
+            // l'article 111 (voir plus bas) — une variable locale suffit : rien d'autre ne
+            // lit ce nombre entre-temps. Avant dette n°1, ce report passait par
+            // employee.PensionContribution, un champ de la fiche que le moteur écrasait au
+            // passage — invisible sur tout écran (aucun XAML n'y touche), et sans risque de
+            // fuite vers une fiche enregistrée puisque chaque écran charge sa propre copie
+            // du salarié, mais un effet de bord resté sans raison dès lors qu'une variable
+            // locale donne exactement le même résultat.
+            decimal cnssEmployeePourDeductionRetraite = calculation.CnssEmployee;
 
             // Ventilation par branche, exigée sur le bordereau CNSS. Aucun arrondi n'est
             // appliqué par branche : la somme des trois est donc exactement égale à la
@@ -378,7 +382,7 @@ namespace IUTSCalculator.Services
 
             // Art.111 CGI : la déduction pour pension/retraite est plafonnée à 8% du SALAIRE DE
             // BASE uniquement (à l'exclusion des indemnités) — pas du salaire brut total.
-            decimal pensionContribution = Math.Min(employee.PensionContribution,
+            decimal pensionContribution = Math.Min(cnssEmployeePourDeductionRetraite,
                 employee.BaseSalary * _taxDataService.ConstantValues.MaxPensionContributionRate);
 
             decimal professionalDeduction = CalculateProfessionalDeduction(employee);
@@ -397,8 +401,8 @@ namespace IUTSCalculator.Services
             decimal grossTax = CalculateGrossTax(taxableIncome);
 
             int familyCharges = Math.Min(employee.FamilyCharges, 7);
-            decimal familyChargeRate = _taxDataService.FamilyChargeRates.ContainsKey(familyCharges)
-                ? _taxDataService.FamilyChargeRates[familyCharges]
+            decimal familyChargeRate = parametres.ChargesFamille.ContainsKey(familyCharges)
+                ? parametres.ChargesFamille[familyCharges]
                 : 0m;
 
             decimal familyReduction = grossTax * familyChargeRate;
@@ -492,8 +496,8 @@ namespace IUTSCalculator.Services
             decimal annualGrossTax = CalculateGrossTax(totalNetTaxableIncome);
 
             int familyCharges = Math.Min(employee.FamilyCharges, 7);
-            decimal familyChargeRate = _taxDataService.FamilyChargeRates.ContainsKey(familyCharges)
-                ? _taxDataService.FamilyChargeRates[familyCharges]
+            decimal familyChargeRate = ParametresAppliques.ChargesFamille.ContainsKey(familyCharges)
+                ? ParametresAppliques.ChargesFamille[familyCharges]
                 : 0m;
 
             decimal annualFamilyReduction = annualGrossTax * familyChargeRate;
@@ -544,10 +548,13 @@ namespace IUTSCalculator.Services
 
         private decimal CalculateProfessionalDeduction(Employee employee)
         {
+            // Suit le barème daté appliqué à la période (SOC-02), comme les taux CNSS/TPA
+            // ci-dessus — dette connue n°2. Un dossier qui n'a jamais touché ce réglage du
+            // barème obtient les mêmes valeurs qu'avant (ParametresSociaux.Historiques()).
             bool isHigherCategory = employee.IsHigherCategory;
             decimal professionalDeductionRate = isHigherCategory
-                ? _taxDataService.ConstantValues.ProfessionalDeductionHigherCategories
-                : _taxDataService.ConstantValues.ProfessionalDeductionOtherCategories;
+                ? ParametresAppliques.AbattementCategoriesSuperieures
+                : ParametresAppliques.AbattementAutresCategories;
 
             return employee.BaseSalary * professionalDeductionRate;
         }
@@ -600,35 +607,51 @@ namespace IUTSCalculator.Services
             // aux montants du bulletin de référence (validé au FCFA près sur "Option 4" et "Option 3").
             decimal salaireBrutArt106 = grossIncome;
 
+            // Plafonds d'exonération suivant le barème daté appliqué à la période (SOC-02),
+            // comme les taux CNSS/TPA — dette connue n°2. Un dossier qui n'a jamais touché
+            // ce réglage du barème obtient exactement les plafonds d'avant ce module
+            // (ParametresSociaux.Historiques() : 20 %/75 000, 5 %/50 000, 5 %/30 000).
             decimal exemptHousingAllowance = Math.Min(
                 employee.HousingAllowance,
                 Math.Min(
-                    salaireBrutArt106 * _taxDataService.ConstantValues.MaxHousingAllowanceRate,
-                    _taxDataService.ConstantValues.MaxHousingAllowanceAmount)
+                    salaireBrutArt106 * ParametresAppliques.TauxMaxIndemniteLogement,
+                    ParametresAppliques.PlafondIndemniteLogement)
             );
 
             decimal exemptFunctionAllowance = Math.Min(
                 employee.FunctionAllowance,
                 Math.Min(
-                    salaireBrutArt106 * _taxDataService.ConstantValues.MaxFunctionAllowanceRate,
-                    _taxDataService.ConstantValues.MaxFunctionAllowanceAmount)
+                    salaireBrutArt106 * ParametresAppliques.TauxMaxIndemniteFonction,
+                    ParametresAppliques.PlafondIndemniteFonction)
             );
 
             decimal exemptTransportAllowance = Math.Min(
                 employee.TransportAllowance,
                 Math.Min(
-                    salaireBrutArt106 * _taxDataService.ConstantValues.MaxTransportAllowanceRate,
-                    _taxDataService.ConstantValues.MaxTransportAllowanceAmount)
+                    salaireBrutArt106 * ParametresAppliques.TauxMaxIndemniteTransport,
+                    ParametresAppliques.PlafondIndemniteTransport)
             );
 
             return exemptHousingAllowance + exemptFunctionAllowance + exemptTransportAllowance;
         }
 
+        /// <summary>
+        /// Applique le barème progressif de l'IUTS à la base imposable.
+        ///
+        /// Les tranches viennent de <see cref="ParametresAppliques"/> — le barème daté
+        /// applicable à la période quand l'appelant l'a résolu via
+        /// <see cref="AppliquerBareme"/>, sinon la table historique de l'Art.112 CGI,
+        /// inchangée. C'était le dernier maillon du référentiel daté (module SOC-02) resté
+        /// volontairement débranché du moteur, pour ne pas le modifier en même temps que
+        /// le stockage de ses paramètres (voir la note d'architecture de BaremeLegal.cs) :
+        /// il est désormais branché, sur le même modèle que les taux CNSS/TPA (DEC-01) et
+        /// les plafonds d'exonération/abattements (dette n°2).
+        /// </summary>
         public decimal CalculateGrossTax(decimal taxableIncome)
         {
             decimal tax = 0m;
 
-            foreach (var bracket in _taxDataService.TaxBrackets)
+            foreach (var bracket in ParametresAppliques.Tranches)
             {
                 if (taxableIncome < bracket.LowerBound)
                     break;

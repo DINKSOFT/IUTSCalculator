@@ -67,11 +67,50 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <!-- Sélecteur du salarié à charger (recherche rapide + liste), au lieu de
+                     charger systématiquement le premier de la liste (ETAT-DEVELOPPEMENT.md
+                     item 18/20). -->
+                <Grid Width="140" Margin="0,0,6,0">
+                    <TextBox Text="{Binding FiltreSalarie, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource FormTextBoxStyle}"
+                             Height="34" Padding="22,2,20,2" Margin="0"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Filtrer par nom, prénom, matricule ou emploi..."/>
+                    <TextBlock Text="{StaticResource IconSearch}"
+                               FontFamily="Segoe MDL2 Assets" FontSize="11"
+                               Foreground="{StaticResource InkSubtleBrush}"
+                               HorizontalAlignment="Left" VerticalAlignment="Center"
+                               Margin="6,0,0,0" IsHitTestVisible="False"/>
+                    <Button Command="{Binding ClearFiltreSalarieCommand}"
+                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Margin="0,0,4,0" Width="16" Height="16"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            ToolTip="Effacer la recherche"
+                            Visibility="{Binding HasFiltreSalarie, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                   Foreground="{StaticResource InkSubtleBrush}"/>
+                    </Button>
+                </Grid>
+                <ComboBox Width="170" Height="34" Margin="0,0,8,0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding SalariesFiltres}"
+                          SelectedItem="{Binding SalarieASelectionner, Mode=TwoWay}"
+                          ToolTip="Salarié à charger">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock TextTrimming="CharacterEllipsis">
+                                <Run Text="{Binding LastName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                <Run Text="{Binding FirstName, Mode=OneWay}"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <Button Content="Nouveau" Tag="{StaticResource IconNew}"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Command="{Binding CreateNewEmployeeCommand}"/>
                 <Button Content="Charger un employé" Tag="{StaticResource IconEmploye}"
                         Style="{StaticResource SecondaryButtonStyle}"
+                        ToolTip="Charge la fiche du salarié sélectionné ci-contre."
                         Command="{Binding LoadEmployeeCommand}"/>
                 <Button Content="Effacer" Tag="{StaticResource IconEffaceFormulaire}" Margin="0"
                         Style="{StaticResource SecondaryButtonStyle}"

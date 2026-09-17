@@ -22,6 +22,7 @@ namespace IUTSCalculator.Models
         private bool _isSpouseWorking;
         private decimal _pensionContribution;
         private string _category;
+        private string _service;
         private bool _isHigherCategory;
         private string _situationMatrimoniale;
         private string _numeroCnss;
@@ -290,6 +291,18 @@ namespace IUTSCalculator.Models
                     OnPropertyChanged();
                 }
             }
+        }
+
+        /// <summary>
+        /// Service ou département du salarié (ex. « Comptabilité », « Production »),
+        /// utilisé comme axe de ventilation du tableau de bord masse salariale (module
+        /// PIL-01) en complément de la catégorie. Purement déclaratif : rien dans le
+        /// moteur de paie n'en dépend.
+        /// </summary>
+        public string Service
+        {
+            get => _service;
+            set { if (_service != value) { _service = value; OnPropertyChanged(); } }
         }
 
         /// <summary>
@@ -699,6 +712,7 @@ namespace IUTSCalculator.Models
                 IsSpouseWorking = IsSpouseWorking,
                 PensionContribution = PensionContribution,
                 Category = Category,
+                Service = Service,
                 Fonction = Fonction,
                 DateEntree = DateEntree,
                 SituationMatrimoniale = SituationMatrimoniale,

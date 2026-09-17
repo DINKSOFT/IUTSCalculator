@@ -195,7 +195,15 @@ namespace IUTSCalculator.Models
         public DateTime? DateFin
         {
             get => _dateFin;
-            set { if (_dateFin != value) { _dateFin = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_dateFin != value)
+                {
+                    _dateFin = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(EstActive));
+                }
+            }
         }
 
         public DateTime? DateNotification
@@ -297,8 +305,15 @@ namespace IUTSCalculator.Models
 
         /// <summary>
         /// Indique si la saisie est active et recevable pour une retenue mensuelle.
+        ///
+        /// DateFin — quand elle est renseignée (saisie à terme fixe, par exemple une
+        /// saisie-arrêt judiciaire notifiée pour une période donnée) — doit aussi être
+        /// respectée : sans ce test, une saisie continuait d'être retenue chaque mois après
+        /// sa date de fin légale tant que personne ne changeait manuellement son statut —
+        /// signalé le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22).
         /// </summary>
-        public bool EstActive => _statut == StatutSaisieOpposition.EnCours && (!EstSolde || EstIllimitee);
+        public bool EstActive => _statut == StatutSaisieOpposition.EnCours && (!EstSolde || EstIllimitee)
+            && (!_dateFin.HasValue || _dateFin.Value.Date >= DateTime.Today);
 
         /// <summary>
         /// Rang effectif d'imputation légale.

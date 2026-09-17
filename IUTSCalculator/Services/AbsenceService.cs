@@ -434,6 +434,7 @@ namespace IUTSCalculator.Services
             using (var conn = _sqliteService.CreateConnection())
             {
                 await VerifierPeriodesOuvertesAsync(conn, absence);
+                await VerifierChevauchementAsync(conn, absence);
 
                 using (var cmd = conn.CreateCommand())
                 {
@@ -512,6 +513,32 @@ namespace IUTSCalculator.Services
                         throw new InvalidOperationException(string.Format(
                             "La période de {0:MM/yyyy} est clôturée : les absences ne peuvent pas y être enregistrées.", mois));
                     }
+                }
+
+                // Chevauchement entre absences du même lot, pour un même salarié.
+                foreach (var groupe in liste.GroupBy(a => a.EmployeeId, StringComparer.OrdinalIgnoreCase))
+                {
+                    var pourEmploye = groupe.ToList();
+                    for (int i = 0; i < pourEmploye.Count; i++)
+                    {
+                        for (int j = i + 1; j < pourEmploye.Count; j++)
+                        {
+                            if (SeChevauchent(pourEmploye[i], pourEmploye[j]))
+                            {
+                                throw new InvalidOperationException(string.Format(
+                                    "Salarié {0} : deux absences du lot se chevauchent ({1:dd/MM/yyyy}-{2:dd/MM/yyyy} " +
+                                    "et {3:dd/MM/yyyy}-{4:dd/MM/yyyy}).",
+                                    groupe.Key, pourEmploye[i].DateDebut, pourEmploye[i].DateFin,
+                                    pourEmploye[j].DateDebut, pourEmploye[j].DateFin));
+                            }
+                        }
+                    }
+                }
+
+                // Chevauchement avec des absences déjà enregistrées en base.
+                foreach (var a in liste)
+                {
+                    await VerifierChevauchementAsync(conn, a);
                 }
 
                 int count = 0;
@@ -598,6 +625,48 @@ namespace IUTSCalculator.Services
 
                 mois = mois.AddMonths(1);
             }
+        }
+
+        /// <summary>
+        /// Refuse une absence qui chevauche, ne serait-ce que d'un jour, une autre absence
+        /// déjà enregistrée pour le même salarié. Sans ce garde-fou, un même jour pouvait être
+        /// compté deux fois — deux congés qui se recouvrent, ou un congé payé et une absence
+        /// non rémunérée sur la même date — faussant le compteur de congés et la retenue sur
+        /// le brut du bulletin concerné.
+        /// </summary>
+        private static async Task VerifierChevauchementAsync(SQLiteConnection conn, Absence absence)
+        {
+            if (string.IsNullOrWhiteSpace(absence.EmployeeId)) return;
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText =
+                    "SELECT DateDebut, DateFin FROM Absences " +
+                    "WHERE EmployeeId = @employe AND Id <> @id " +
+                    "AND DateDebut <= @fin AND DateFin >= @debut;";
+                cmd.Parameters.AddWithValue("@employe", absence.EmployeeId);
+                cmd.Parameters.AddWithValue("@id", absence.Id);
+                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(absence.DateDebut));
+                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(absence.DateFin));
+
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        var autreDebut = DbValue.DateFromDb(reader["DateDebut"], DateTime.Today);
+                        var autreFin = DbValue.DateFromDb(reader["DateFin"], DateTime.Today);
+                        throw new InvalidOperationException(string.Format(
+                            "Ce salarié a déjà une absence enregistrée du {0:dd/MM/yyyy} au {1:dd/MM/yyyy}, " +
+                            "qui chevauche la période saisie.", autreDebut, autreFin));
+                    }
+                }
+            }
+        }
+
+        /// <summary>Vrai si deux absences se recouvrent sur au moins un jour.</summary>
+        private static bool SeChevauchent(Absence a, Absence b)
+        {
+            return a.DateDebut.Date <= b.DateFin.Date && a.DateFin.Date >= b.DateDebut.Date;
         }
 
         /// <summary>Vrai si la période accepte encore des saisies.</summary>

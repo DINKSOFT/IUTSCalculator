@@ -41,11 +41,25 @@ namespace IUTSCalculator.Services
 
             using (var conn = _sqliteService.CreateConnection())
             {
-                // 1. Charger tous les employés actifs
+                // 1. Charger tous les employés actifs.
+                //
+                // La requête ne filtrait pas sur StatutSalarie/DateSortie malgré ce que dit
+                // le commentaire ci-dessus : un employé sorti restait proposé dans la grille
+                // de saisie et pouvait s'y voir attribuer des heures supplémentaires — signalé
+                // le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22). Le filtre
+                // reproduit Employee.EstActif (StatutSalarie = 0 et pas de DateSortie passée).
                 var employes = new List<(string Id, string Matricule, string Nom, decimal SalaireBase)>();
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT EmployeeId, LastName, FirstName, BaseSalary FROM Employees ORDER BY LastName, FirstName;";
+                    cmd.CommandText =
+                        "SELECT EmployeeId, LastName, FirstName, BaseSalary FROM Employees " +
+                        "WHERE StatutSalarie = 0 AND (DateSortie IS NULL OR DateSortie = '' OR DateSortie >= @today) " +
+                        "ORDER BY LastName, FirstName;";
+                    // DateSortie est stockée au format "yyyy-MM-dd HH:mm:ss" (voir DbValue.DateToDb) et une
+                    // date absente y est écrite comme chaîne vide, jamais comme NULL SQL (voir
+                    // DbValue.DateNullableToDb) : les deux cas sont donc couverts ci-dessus, et la
+                    // comparaison de chaînes ne reste correcte que parce que @today suit le même format.
+                    cmd.Parameters.AddWithValue("@today", DateTime.Today.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
                     using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())

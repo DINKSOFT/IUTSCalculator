@@ -68,6 +68,19 @@ namespace IUTSCalculator.Services
             get { return _lignes; }
         }
 
+        private readonly List<string> _avertissements = new List<string>();
+
+        /// <summary>
+        /// Avertissements indicatifs accumulés pendant la construction de cet apport (par
+        /// exemple un doublon probable entre une retenue saisie à la main et une retenue
+        /// automatique d'un module — dette connue n°9). Rien ne bloque le calcul : l'écran
+        /// qui affiche le résultat décide comment les montrer.
+        /// </summary>
+        public IReadOnlyList<string> Avertissements
+        {
+            get { return _avertissements; }
+        }
+
         /// <summary>
         /// Retenue pour absence non rémunérée (module PAI-04). Elle vient en déduction
         /// de la rémunération permanente AVANT tout calcul : une journée non travaillée
@@ -121,6 +134,29 @@ namespace IUTSCalculator.Services
         public ApportVariables AvecPrets(ApportPrets prets)
         {
             if (prets == null || prets.EstVide) return this;
+
+            // Doublon probable (dette connue n°9) : un dossier qui gérait ses
+            // remboursements par une retenue saisie à la main, avant de basculer sur ce
+            // module, doit la supprimer — sinon la même somme est retenue deux fois. Rien
+            // ne l'empêche ici, mais une retenue déjà saisie ce mois-ci dont le code ou le
+            // libellé évoque un prêt/une avance/un acompte, en même temps qu'une retenue
+            // automatique du module pour ce salarié, est un signal fort de doublon.
+            string[] motsClesPret = { "PRET", "PRÊT", "AVANCE", "ACOMPTE", "REMB" };
+            foreach (var ligneExistante in _lignes)
+            {
+                if (ligneExistante.Sens != SensRubrique.Retenue) continue;
+
+                string texte = ((ligneExistante.Code ?? string.Empty) + " " + (ligneExistante.Libelle ?? string.Empty))
+                    .ToUpperInvariant();
+
+                if (motsClesPret.Any(m => texte.Contains(m)))
+                {
+                    _avertissements.Add(string.Format(
+                        "doublon possible : la retenue « {0} » saisie dans les variables du mois " +
+                        "ressemble à un remboursement de prêt déjà pris en compte par le module Prêts",
+                        ligneExistante.Libelle));
+                }
+            }
 
             foreach (var ligne in prets.Lignes)
             {

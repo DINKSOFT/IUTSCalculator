@@ -499,8 +499,17 @@ namespace IUTSCalculator.Services
                 resultat.BaseUtilisee = "Salaire de base contractuel";
             }
 
-            // Recherche de la tranche d'ancienneté applicable
-            if (convention.TranchesAnciennete != null && convention.TranchesAnciennete.Count > 0 && annees >= 2)
+            // Recherche de la tranche d'ancienneté applicable.
+            //
+            // Le seuil d'éligibilité n'est PAS codé en dur ici : il vient entièrement de
+            // AnneesMin sur la tranche la plus basse de la convention (ci-dessous). Un
+            // ancien "annees >= 2" imposait un minimum de deux ans quelle que soit la
+            // convention, empêchant toute prime d'ancienneté pour une convention dont la
+            // première tranche démarre plus tôt (une tranche à partir d'un an, fréquente
+            // dans les conventions collectives burkinabè) — signalé le 16 septembre 2026
+            // (voir ETAT-DEVELOPPEMENT.md item 22). Sans tranche correspondante, la
+            // recherche ci-dessous ne trouve simplement rien et TauxPourcentage reste à 0.
+            if (convention.TranchesAnciennete != null && convention.TranchesAnciennete.Count > 0)
             {
                 // Trouver la tranche qui encadre l'ancienneté révolue
                 var tranche = convention.TranchesAnciennete

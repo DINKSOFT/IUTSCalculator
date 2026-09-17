@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,6 +34,19 @@ namespace IUTSCalculator.ViewModels
         private readonly PretService _pretService;
         private readonly ProfilPaieService _profilPaieService;
         private readonly BaremeService _baremeService;
+
+        // Heures supplémentaires (PAI-03), convention collective (SOC-05), rappels et
+        // régularisations (PAI-07), avantages en nature (PAI-08). Facultatifs, comme les
+        // autres : mêmes entrées que sur le bulletin, sans quoi cet écran et le bulletin
+        // donneraient deux résultats différents pour le même salarié et le même mois.
+        private readonly HeureSupplementaireService _heureSupplementaireService;
+        private readonly ConventionCollectiveService _conventionCollectiveService;
+        private readonly RappelPaieService _rappelPaieService;
+        private readonly AvantageNatureService _avantageNatureService;
+
+        // Périodes de paie et clôture (PAI-01). Facultatif : sans lui, aucun avertissement
+        // n'est affiché sur les mois jamais ouverts — comme avant ce contrôle.
+        private readonly PeriodePaieService _periodePaieService;
         private Employee _currentEmployee;
         private TaxCalculation _currentCalculation;
         private string _resultMessage;
@@ -186,12 +200,63 @@ namespace IUTSCalculator.ViewModels
         /// </summary>
         public bool HasCalculation => CurrentCalculation != null;
 
+        // ── Sélecteur du bouton « Charger un employé » ──────────────────────────
+        // Ce bouton chargeait jusqu'ici toujours employees[0], jamais un salarié choisi
+        // (ETAT-DEVELOPPEMENT.md item 18/20 : un vrai sélecteur manquait). Même schéma de
+        // recherche rapide que sur les écrans Absences/Prêts/Profils.
+
+        public ObservableCollection<Employee> Employees { get; } = new ObservableCollection<Employee>();
+
+        private string _filtreSalarie;
+        public string FiltreSalarie
+        {
+            get => _filtreSalarie;
+            set
+            {
+                if (SetProperty(ref _filtreSalarie, value))
+                {
+                    OnPropertyChanged(nameof(HasFiltreSalarie));
+                    OnPropertyChanged(nameof(SalariesFiltres));
+                }
+            }
+        }
+
+        public bool HasFiltreSalarie => !string.IsNullOrWhiteSpace(FiltreSalarie);
+
+        public IList<Employee> SalariesFiltres
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(FiltreSalarie)) return Employees;
+
+                string q = FiltreSalarie.Trim();
+                return Employees.Where(s =>
+                    (s.LastName != null && s.LastName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.FirstName != null && s.FirstName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Matricule != null && s.Matricule.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+                    || (s.Fonction != null && s.Fonction.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0))
+                    .ToList();
+            }
+        }
+
+        private Employee _salarieASelectionner;
+        public Employee SalarieASelectionner
+        {
+            get => _salarieASelectionner;
+            set
+            {
+                if (SetProperty(ref _salarieASelectionner, value))
+                    (LoadEmployeeCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
         // Commandes
         public ICommand CalculateTaxCommand { get; private set; }
         public ICommand SaveCalculationCommand { get; private set; }
         public ICommand CreateNewEmployeeCommand { get; private set; }
         public ICommand ClearFormCommand { get; private set; }
         public ICommand LoadEmployeeCommand { get; private set; }
+        public ICommand ClearFiltreSalarieCommand { get; private set; }
         public ICommand ExportExcelCommand { get; private set; }
 
         /// <summary>
@@ -207,7 +272,12 @@ namespace IUTSCalculator.ViewModels
             AbsenceService absenceService = null,
             PretService pretService = null,
             ProfilPaieService profilPaieService = null,
-            BaremeService baremeService = null)
+            BaremeService baremeService = null,
+            HeureSupplementaireService heureSupplementaireService = null,
+            ConventionCollectiveService conventionCollectiveService = null,
+            RappelPaieService rappelPaieService = null,
+            AvantageNatureService avantageNatureService = null,
+            PeriodePaieService periodePaieService = null)
         {
             _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
@@ -217,6 +287,11 @@ namespace IUTSCalculator.ViewModels
             _pretService = pretService;
             _profilPaieService = profilPaieService;
             _baremeService = baremeService;
+            _heureSupplementaireService = heureSupplementaireService;
+            _conventionCollectiveService = conventionCollectiveService;
+            _rappelPaieService = rappelPaieService;
+            _avantageNatureService = avantageNatureService;
+            _periodePaieService = periodePaieService;
 
             Title = "Calcul d'IUTS";
 
@@ -260,7 +335,9 @@ namespace IUTSCalculator.ViewModels
 
             LoadEmployeeCommand = new RelayCommand(
                 execute: async () => await ExecuteLoadEmployeeAsync(),
-                canExecute: () => !IsBusy);
+                canExecute: () => !IsBusy && SalarieASelectionner != null);
+
+            ClearFiltreSalarieCommand = new RelayCommand(() => FiltreSalarie = string.Empty);
 
             ExportExcelCommand = new RelayCommand(
                 execute: async () => await _dataService.ExportToExcelAsync(CurrentCalculation),
@@ -307,13 +384,25 @@ namespace IUTSCalculator.ViewModels
         /// Charge un calcul existant
         /// </summary>
         /// <param name="calculation">Calcul à charger</param>
-        public void LoadExistingCalculation(TaxCalculation calculation)
+        public async Task LoadExistingCalculationAsync(TaxCalculation calculation)
         {
             if (calculation == null)
                 throw new ArgumentNullException(nameof(calculation));
 
             CurrentCalculation = calculation;
-            CurrentEmployee = calculation.Employee;
+
+            // Ne jamais réutiliser tel quel l'instantané Employee figé au moment de ce
+            // calcul passé : cet écran permet de modifier la fiche (catégorie, salaire,
+            // charges familiales...) puis de recalculer et d'enregistrer, ce qui réécrirait
+            // sinon la fiche actuelle avec des données potentiellement périmées depuis
+            // (signalé le 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 19). On relit
+            // donc la fiche actuelle en base ; si elle n'existe plus (employé supprimé
+            // depuis), on retombe sur l'instantané conservé par le calcul.
+            Employee employeActuel = null;
+            if (calculation.Employee != null && !string.IsNullOrWhiteSpace(calculation.Employee.EmployeeId))
+                employeActuel = await _dataService.GetEmployeeByIdAsync(calculation.Employee.EmployeeId);
+
+            CurrentEmployee = employeActuel ?? calculation.Employee;
             IsAnnual = calculation.IsAnnual;
             IsRegularization = calculation.IsRegularization;
             IsNewEmployee = false;
@@ -325,10 +414,10 @@ namespace IUTSCalculator.ViewModels
         /// assurer la compatibilité avec MainWindow.xaml.cs
         /// </summary>
         /// <param name="calculation">Calcul à charger</param>
-        public void LoadFromHistory(TaxCalculation calculation)
+        public async Task LoadFromHistoryAsync(TaxCalculation calculation)
         {
-            // Réutilise la méthode LoadExistingCalculation
-            LoadExistingCalculation(calculation);
+            // Réutilise la méthode LoadExistingCalculationAsync
+            await LoadExistingCalculationAsync(calculation);
         }
 
         /// <summary>
@@ -404,6 +493,22 @@ namespace IUTSCalculator.ViewModels
                         EmployeeCategories.Add(category);
                     }
                 }
+
+                // Liste des salariés pour le sélecteur du bouton « Charger un employé ».
+                // Rechargée à chaque activation de l'écran (RefreshSettingsAsync est déjà
+                // appelée par OnIsActiveChanged) pour ne jamais présenter une fiche périmée
+                // — même principe que l'item 21 d'ETAT-DEVELOPPEMENT.md pour les autres écrans.
+                var employesActuels = await _dataService.LoadEmployeesAsync();
+                string idRetenu = SalarieASelectionner?.EmployeeId;
+
+                Employees.Clear();
+                foreach (var employe in employesActuels)
+                    Employees.Add(employe);
+                OnPropertyChanged(nameof(SalariesFiltres));
+
+                SalarieASelectionner = idRetenu != null
+                    ? Employees.FirstOrDefault(e => string.Equals(e.EmployeeId, idRetenu, StringComparison.OrdinalIgnoreCase))
+                    : null;
             }
             catch (Exception ex)
             {
@@ -460,6 +565,10 @@ namespace IUTSCalculator.ViewModels
                             ? " (variables et absences du mois prises en compte)"
                             : " (variables du mois prises en compte)";
                     }
+
+                    mentionApport += await AvertissementPeriodeAsync(Annee, Mois);
+                    foreach (var avertissement in apport.Avertissements)
+                        mentionApport += " Attention : " + avertissement + ".";
                 }
 
                 // Le résultat complet REMPLACE le calcul courant. Recopier sept champs sur
@@ -532,6 +641,29 @@ namespace IUTSCalculator.ViewModels
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        /// <summary>
+        /// Avertissement indicatif si le mois n'a jamais été ouvert (module PAI-01). Rien
+        /// n'empêche le calcul — signalé par le client le 13 septembre 2026 comme une
+        /// lacune, mais un blocage strict casserait tout dossier existant, dont aucun mois
+        /// n'a jamais été ouvert explicitement. On prévient donc, sans bloquer.
+        /// </summary>
+        private async Task<string> AvertissementPeriodeAsync(int annee, int mois)
+        {
+            if (_periodePaieService == null) return string.Empty;
+
+            try
+            {
+                var periodePaie = await _periodePaieService.LirePeriodeAsync(annee, mois);
+                return periodePaie == null
+                    ? " Attention : cette période n'a pas été ouverte (écran « Périodes de paie »)."
+                    : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 
@@ -629,6 +761,62 @@ namespace IUTSCalculator.ViewModels
                 }
             }
 
+            // Heures supplémentaires (PAI-03) : valorisation des heures majorées (115%, 130%, 150%, 200%).
+            if (_heureSupplementaireService != null)
+            {
+                try
+                {
+                    var heuresSup = await _heureSupplementaireService.ApportAsync(salarie, Annee, Mois);
+                    apport = apport.AvecHeuresSupplementaires(heuresSup);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Heures supplémentaires illisibles, calcul sans elles : " + ex.Message;
+                }
+            }
+
+            // Conventions collectives et prime d'ancienneté (SOC-05) : valorisation légale conventionnelle.
+            if (_conventionCollectiveService != null)
+            {
+                try
+                {
+                    var apportConv = await _conventionCollectiveService.ApportAsync(salarie, new DateTime(Annee, Mois, 1));
+                    apport = apport.AvecConventionCollective(apportConv);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Convention collective illisible, calcul sans prime d'ancienneté : " + ex.Message;
+                }
+            }
+
+            // Rappels & régularisations (PAI-07) : salaires rétroactifs, primes, trop-perçus, régul IUTS.
+            if (_rappelPaieService != null)
+            {
+                try
+                {
+                    var rappels = await _rappelPaieService.ApportAsync(Annee, Mois, salarie.EmployeeId);
+                    apport = apport.AvecRappels(rappels);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Rappels et régularisations illisibles, calcul sans eux : " + ex.Message;
+                }
+            }
+
+            // Avantages en nature (PAI-08) : réintégration fiscale et reprise en retenue.
+            if (_avantageNatureService != null)
+            {
+                try
+                {
+                    var avantages = await _avantageNatureService.ObtenirApportMoisAsync(salarie.EmployeeId, Annee, Mois);
+                    apport = apport.AvecAvantagesNature(avantages);
+                }
+                catch (Exception ex)
+                {
+                    ResultMessage = "Avantages en nature illisibles, calcul sans eux : " + ex.Message;
+                }
+            }
+
             return apport;
         }
 
@@ -670,41 +858,40 @@ namespace IUTSCalculator.ViewModels
             }
         }
         /// <summary>
-        /// Charge un employé existant de façon asynchrone
+        /// Charge le salarié choisi dans le sélecteur (voir ETAT-DEVELOPPEMENT.md item 18/20).
+        /// Chargeait auparavant toujours le premier employé de la liste, quel que soit le
+        /// choix affiché — un bouchon de démonstration jamais remplacé par un vrai sélecteur.
         /// </summary>
         private async Task ExecuteLoadEmployeeAsync()
         {
+            var salarieChoisi = SalarieASelectionner;
+            if (salarieChoisi == null || string.IsNullOrWhiteSpace(salarieChoisi.EmployeeId))
+            {
+                ResultMessage = "Sélectionnez d'abord un salarié dans la liste.";
+                return;
+            }
+
             try
             {
                 IsBusy = true;
 
-                // Ouvrir une boîte de dialogue pour sélectionner un employé
-                // Ici, on simule l'opération en chargeant un employé existant
+                // Relit la fiche fraîche en base plutôt que la copie affichée dans le
+                // sélecteur : même principe que LoadExistingCalculationAsync (item 19), une
+                // correction faite entre-temps sur la fiche ne doit pas être ignorée.
+                var employee = await _dataService.GetEmployeeByIdAsync(salarieChoisi.EmployeeId) ?? salarieChoisi;
+                CurrentEmployee = employee;
 
-                var employees = await _dataService.LoadEmployeesAsync();
-                if (employees.Count > 0)
+                CurrentCalculation = new TaxCalculation
                 {
-                    // Prendre le premier employé comme exemple
-                    var employee = employees[0];
-                    CurrentEmployee = employee;
+                    Id = Guid.NewGuid().ToString(),
+                    Employee = CurrentEmployee,
+                    CalculationDate = PeriodeDate,
+                    IsAnnual = IsAnnual,
+                    IsRegularization = IsRegularization
+                };
 
-                    // Créer un nouveau calcul pour cet employé
-                    CurrentCalculation = new TaxCalculation
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        Employee = CurrentEmployee,
-                        CalculationDate = PeriodeDate,
-                        IsAnnual = IsAnnual,
-                        IsRegularization = IsRegularization
-                    };
-
-                    IsNewEmployee = false;
-                    ResultMessage = $"Employé chargé: {employee.FirstName} {employee.LastName}";
-                }
-                else
-                {
-                    ResultMessage = "Aucun employé trouvé";
-                }
+                IsNewEmployee = false;
+                ResultMessage = $"Employé chargé : {employee.FirstName} {employee.LastName}";
             }
             catch (Exception ex)
             {

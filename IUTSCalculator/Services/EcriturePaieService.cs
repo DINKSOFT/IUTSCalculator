@@ -196,9 +196,28 @@ namespace IUTSCalculator.Services
                                             Rubrique rub = null;
                                             rubriqueParCode.TryGetValue(code, out rub);
 
-                                            string compte = rub != null && !string.IsNullOrWhiteSpace(rub.CompteComptable)
-                                                ? rub.CompteComptable
-                                                : (lv.EstRetenue ? "422100" : "661800");
+                                            // Un gain se crédite globalement plus bas, sur une seule ligne « Personnel,
+                                            // rémunérations dues » (422000) : CompteComptable suffit comme compte de
+                                            // charge (débit). Une retenue, elle, RÈGLE un tiers ou un organisme précis
+                                            // (l'acompte déjà versé, l'échéance de prêt, l'opposition, le syndicat...) :
+                                            // c'est CompteContrepartie qui porte ce compte-là (4271/4272/4273/4274...),
+                                            // CompteComptable valant 4221 — « Personnel » — pour toutes indifféremment.
+                                            // Créditer CompteComptable les aurait toutes fondues sur une même ligne.
+                                            string compte;
+                                            if (lv.EstRetenue)
+                                            {
+                                                compte = rub != null && !string.IsNullOrWhiteSpace(rub.CompteContrepartie)
+                                                    ? rub.CompteContrepartie
+                                                    : (rub != null && !string.IsNullOrWhiteSpace(rub.CompteComptable)
+                                                        ? rub.CompteComptable
+                                                        : "422100");
+                                            }
+                                            else
+                                            {
+                                                compte = rub != null && !string.IsNullOrWhiteSpace(rub.CompteComptable)
+                                                    ? rub.CompteComptable
+                                                    : "661800";
+                                            }
 
                                             string libelle = rub != null && !string.IsNullOrWhiteSpace(rub.Libelle)
                                                 ? rub.Libelle

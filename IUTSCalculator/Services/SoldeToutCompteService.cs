@@ -356,6 +356,12 @@ namespace IUTSCalculator.Services
 
         /// <summary>
         /// Calcule le total du capital restant dû sur l'ensemble des prêts et avances d'un salarié.
+        ///
+        /// Les prêts SUSPENDUS sont inclus au même titre que ceux en cours : une suspension
+        /// arrête temporairement les retenues, elle n'efface pas la dette. Les exclure ici
+        /// laissait cette dette hors du solde de tout compte — ni retenue sur le dernier
+        /// paiement, ni annulée avec le prêt (voir EnregistrerSoldeAsync) — signalé le 16
+        /// septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22).
         /// </summary>
         public async Task<decimal> ObtenirDettePretsRestanteAsync(string employeeId)
         {
@@ -365,7 +371,7 @@ namespace IUTSCalculator.Services
             {
                 var prets = await _pretService.ChargerAsync();
                 var pretsSalarie = prets.Where(p => string.Equals(p.EmployeeId, employeeId, StringComparison.OrdinalIgnoreCase) &&
-                                                    p.Statut == StatutPret.EnCours).ToList();
+                                                    (p.Statut == StatutPret.EnCours || p.Statut == StatutPret.Suspendu)).ToList();
 
                 decimal totalRestant = 0m;
                 foreach (var pret in pretsSalarie)
@@ -500,6 +506,47 @@ namespace IUTSCalculator.Services
                         $"Sorti ({stc.MotifLibelle})",
                         $"Enregistrement Solde de Tout Compte #{id} pour {stc.NomSalarie} - Net payé : {stc.TotalNet:N0} FCFA",
                         utilisateur);
+
+                    // Solde des prêts en cours : leur capital restant dû vient d'être
+                    // retenu en une fois sur ce solde de tout compte (DeductionsPrets,
+                    // voir PreparerSoldeAsync/ObtenirDettePretsRestanteAsync ci-dessus).
+                    // Sans ce qui suit, le prêt restait « En cours » indéfiniment en base,
+                    // avec ses échéances futures toujours actives : un rapport « Situation
+                    // des prêts » continuait de le montrer comme dû, et si le dossier était
+                    // rouvert plus tard sur ce salarié (réembauche, ou correction), rien
+                    // n'empêchait ses échéances restantes d'être retenues une seconde fois
+                    // — signalé le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22).
+                    // Fait APRÈS la validation du commit ci-dessus, et non dans la même
+                    // transaction : PretService.AnnulerAsync ouvre sa propre connexion et
+                    // sa propre transaction d'écriture, que SQLite ne peut pas imbriquer
+                    // dans celle, encore ouverte, de ce solde. Une éventuelle erreur ici
+                    // n'annule donc pas le solde déjà enregistré (qui, lui, a bien réservé
+                    // la somme due) : elle est seulement journalisée, pour ne pas laisser
+                    // croire à l'utilisateur que l'enregistrement du solde a échoué et
+                    // risquer une double saisie.
+                    if (marquerEmployeSorti)
+                    {
+                        try
+                        {
+                            var prets = await _pretService.ChargerAsync();
+                            var pretsAregler = prets.Where(p =>
+                                string.Equals(p.EmployeeId, stc.EmployeeId, StringComparison.OrdinalIgnoreCase) &&
+                                (p.Statut == StatutPret.EnCours || p.Statut == StatutPret.Suspendu)).ToList();
+
+                            string motifSolde = $"Soldé au départ — Solde de tout compte #{id}";
+                            foreach (var pret in pretsAregler)
+                            {
+                                await _pretService.AnnulerAsync(pret, motifSolde);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(
+                                $"Solde de tout compte #{id} : échec du solde automatique des prêts de " +
+                                $"{stc.NomSalarie} — à clôturer manuellement depuis l'écran « Prêts et avances ». " +
+                                $"Détail : {ex.Message}");
+                        }
+                    }
 
                     return id;
                 }

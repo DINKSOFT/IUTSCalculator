@@ -196,6 +196,10 @@
                                                 Width="*" MinWidth="130"
                                                 ElementStyle="{StaticResource CellTextStyle}"/>
 
+                            <DataGridTextColumn Header="Service" Binding="{Binding Service}"
+                                                Width="*" MinWidth="110"
+                                                ElementStyle="{StaticResource CellTextStyle}"/>
+
                             <DataGridTextColumn Header="Catégorie" Binding="{Binding Category}"
                                                 Width="Auto" MinWidth="110"
                                                 ElementStyle="{StaticResource CellTextStyle}"/>
@@ -380,6 +384,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Nom" Style="{StaticResource FieldLabel}"/>
@@ -394,51 +399,56 @@
                                 <TextBox   Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
                                            Text="{Binding Fonction, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Catégorie" Style="{StaticResource FieldLabel}"/>
-                                <ComboBox  Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Service" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           ToolTip="Service ou département (ex. Comptabilité, Production). Utilisé comme axe de ventilation du tableau de bord masse salariale."
+                                           Text="{Binding Service, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Catégorie" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
                                            ItemsSource="{Binding DataContext.EmployeeCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedItem="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Échelon" Style="{StaticResource FieldLabel}"/>
-                                <ComboBox  Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Échelon" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
                                            ItemsSource="{Binding DataContext.EchelonsDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedItem="{Binding Echelon, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Convention" Style="{StaticResource FieldLabel}"/>
-                                <ComboBox  Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Convention" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
                                            ItemsSource="{Binding DataContext.ConventionsDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedValue="{Binding ConventionId, UpdateSourceTrigger=PropertyChanged}"
                                            SelectedValuePath="Id"
                                            DisplayMemberPath="Libelle"/>
 
-                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Date d'entrée" Style="{StaticResource FieldLabel}"/>
-                                <DatePicker Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                <TextBlock Grid.Row="7" Grid.Column="0" Text="Date d'entrée" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
                                             SelectedDate="{Binding DateEntreeNullable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="7" Grid.Column="0" Text="Situation" Style="{StaticResource FieldLabel}"/>
-                                <ComboBox  Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="Situation" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="8" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
                                            ItemsSource="{Binding DataContext.SituationsMatrimoniales, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedItem="{Binding SituationMatrimoniale, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="8" Grid.Column="0" Text="Statut" Style="{StaticResource FieldLabel}"/>
-                                <ComboBox  Grid.Row="8" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                <TextBlock Grid.Row="9" Grid.Column="0" Text="Statut" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox  Grid.Row="9" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
                                            ItemsSource="{Binding DataContext.StatutsSalarieDisponibles, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            SelectedValue="{Binding StatutSalarie, UpdateSourceTrigger=PropertyChanged}"
                                            SelectedValuePath="Key"
                                            DisplayMemberPath="Value"/>
 
-                                <TextBlock Grid.Row="9" Grid.Column="0" Text="Matricule CNSS" Style="{StaticResource FieldLabel}"
+                                <TextBlock Grid.Row="10" Grid.Column="0" Text="Matricule CNSS" Style="{StaticResource FieldLabel}"
                                            TextWrapping="Wrap"/>
-                                <TextBox   Grid.Row="9" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                <TextBox   Grid.Row="10" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
                                            ToolTip="Numéro d'assuré à la CNSS. Sans lui, la ligne du salarié ne peut pas être rattachée sur la déclaration."
                                            Text="{Binding NumeroCnss, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="10" Grid.Column="0" Text="Date sortie" Style="{StaticResource FieldLabel}"/>
-                                <DatePicker Grid.Row="10" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                <TextBlock Grid.Row="11" Grid.Column="0" Text="Date sortie" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="11" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
                                             SelectedDate="{Binding DateSortie, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                                <TextBlock Grid.Row="11" Grid.Column="0" Text="Motif départ" Style="{StaticResource FieldLabel}"/>
-                                <TextBox   Grid.Row="11" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                <TextBlock Grid.Row="12" Grid.Column="0" Text="Motif départ" Style="{StaticResource FieldLabel}"/>
+                                <TextBox   Grid.Row="12" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
                                            Text="{Binding MotifDepart, UpdateSourceTrigger=PropertyChanged}"/>
                             </Grid>
 

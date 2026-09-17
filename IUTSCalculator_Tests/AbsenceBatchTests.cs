@@ -22,7 +22,8 @@ namespace IUTSCalculator.Tests
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestInitialize]
         public void SetUp()
         {
-            string dir = Path.GetDirectoryName(typeof(AbsenceBatchTests).Assembly.Location);
+            string loc = typeof(AbsenceBatchTests).Assembly.Location;
+            string dir = string.IsNullOrWhiteSpace(loc) ? Path.GetTempPath() : Path.GetDirectoryName(loc);
             _dbName = Path.Combine(dir, "test_absence_" + Guid.NewGuid().ToString("N") + ".db");
             _sqliteService = new SQLiteService(_dbName);
             _absenceService = new AbsenceService(_sqliteService);

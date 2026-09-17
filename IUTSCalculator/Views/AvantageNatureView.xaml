@@ -262,8 +262,7 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
-                                <CheckBox Content="Date fin" IsChecked="{Binding FormHasDateFin, Mode=TwoWay}"
-                                          Style="{StaticResource FieldLabel}" Margin="0,0,0,2"/>
+                                <CheckBox Content="Date fin" IsChecked="{Binding FormHasDateFin, Mode=TwoWay}" Margin="0,0,0,4"/>
                                 <DatePicker SelectedDate="{Binding FormDateFin, Mode=TwoWay}"
                                             IsEnabled="{Binding FormHasDateFin}" Height="28"/>
                             </StackPanel>

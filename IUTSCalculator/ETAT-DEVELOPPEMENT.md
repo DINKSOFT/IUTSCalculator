@@ -4,14 +4,15 @@ Ce fichier sert à **reprendre le travail dans une nouvelle conversation** sans 
 zéro. Il dit où en est le projet, quelles décisions ont été prises et pourquoi, et ce qui
 reste en dette. Il se met à jour à chaque module livré.
 
-Dernière mise à jour : 14 septembre 2026 — après **PAI-06** (« Saisies-arrêts, cessions sur salaire et oppositions » :
-calcul par tranches progressives de la quotité saisissable et cessible du salaire conforme au Code du travail burkinabè
-Loi 028-2008/AN Art. 122+ et OHADA AUPSRVE Art. 177+, protection absolue du SMIG vital (45 000 FCFA), super-privilège
-de la pension alimentaire mordant sur la fraction insaisissable au-delà du SMIG, concours de créanciers avec répartition
-proportionnelle au marc le franc, suivi des tiers bénéficiaires, des créances et des soldes, arrêt automatique des prélèvements
-à l'apurement complet ou sur mainlevée judiciaire, intégration au bulletin individuel et à la génération en masse, et
-double export Excel ClosedXML du bordereau mensuel de reversement et du registre général des créances).
-La Phase 4 (« Pilotage, automatisation et conventionnel ») progresse à plein régime.
+Dernière mise à jour : 17 septembre 2026 — après **PIL-01** (« Tableau de bord masse salariale » :
+évolution mensuelle du brut, du net et du coût employeur, ventilée par catégorie et par service, alimentée
+par les mois clôturés). Ce module a exigé l'ajout d'un champ **Service** sur la fiche salarié (absent du
+modèle jusqu'ici — seule la catégorie existait), d'où une migration de schéma (`SchemaCible` passe à **28**)
+qui corrige au passage un oubli distinct : les colonnes `DateSortie`/`MotifDepart`/`StatutSalarie` (migration
+23) n'avaient jamais été reportées dans le schéma complet d'un dossier tout neuf, qui se serait donc retrouvé
+sans elles. Juste avant, un oubli de câblage sur **DEC-05** a été corrigé le même jour (l'écran existait mais
+son bouton de menu manquait dans la barre de navigation, car chaque bouton y est déclaré à la main plutôt que
+généré depuis la liste de recherche). La Phase 4 (« Pilotage, automatisation et conventionnel ») progresse à plein régime.
 
 ---
 
@@ -54,18 +55,22 @@ chaque phase ouvre les suivantes.
 | SAL-05 | Solde de tout compte et gestion des départs (décompte de rupture légal burkinabè, indemnités préavis et licenciement, apurement prêts, reçus PDF/Excel, certificat Art. 67, attestation de service) |
 | PAI-06 | Saisies-arrêts, cessions et oppositions (calcul par tranches de la quotité saisissable, super-privilège alimentaire, répartition au marc le franc, arrêt auto, exports Excel) |
 | PAI-07 | Rappels & régularisations (salaires rétroactifs, primes, trop-perçus, assistant de calcul différentiel, régularisation annuelle d'IUTS de fin d'exercice, inviolabilité des périodes closes, double export ClosedXML) |
+| PAI-08 | Avantages en nature (évaluation forfaitaire logement/véhicule/domesticité/eau/électricité/nourriture, réintégration dans la base IUTS/CNSS/TPA, déduction en bas de bulletin, intégration bulletin/masse/Calcul d'IUTS/Calcul en lot) |
+| DEC-05 | État annuel des salaires — DADS (cumuls annuels par salarié et par rubrique : brut, base imposable, IUTS retenu, cotisations CNSS/TPA, alimentés par les mois clôturés) |
+| PIL-01 | Tableau de bord masse salariale (évolution mensuelle du brut, du net et du coût employeur ; ventilation par catégorie et par service ; alimenté par les mois clôturés ; export Excel 3 feuilles) |
 
 ### Prochain
 
 **Phase 4 — Pilotage, automatisation et conventionnel.**
-Prochain module :
-1. **PAI-08** : Avantages en nature (évaluation forfaitaire ou réelle du logement, véhicule, domesticité, eau, électricité, nourriture selon la réglementation fiscale burkinabè, réintégration dans la base IUTS/CNSS/TPA, puis déduction en bas de bulletin du net à payer).
+Ordre strict de la feuille de route (« Feuille de route Sigma Paie & RH.pdf », 53 modules) : SAL-05, PAI-03,
+PAI-08, DEC-05 et PIL-01 sont désormais tous livrés. Le prochain module est **RH-01** (premier du volet
+Ressources humaines, RH-01 à RH-08).
 
 ---
 
 ## 3. Schéma de base
 
-`SQLiteService.SchemaCible` vaut **25**. Chaque montée de version fait une sauvegarde
+`SQLiteService.SchemaCible` vaut **28**. Chaque montée de version fait une sauvegarde
 `.avant-vN.bak` à côté du fichier avant de migrer.
 
 | N° | Objet |
@@ -92,11 +97,15 @@ Prochain module :
 | 23 | Solde de tout compte et gestion des sorties (`SoldesToutCompte`, index DateSortie/Employe, colonnes `DateSortie`, `MotifDepart`, `StatutSalarie` dans `Employees`) |
 | 24 | Saisies-arrêts, cessions et oppositions (`SaisiesOppositions`, `RetenuesSaisiesMensuelles`, index `DossierId`/`EmployeeId`/`Statut`) |
 | 25 | Rappels et régularisations de paie (`RappelsPaie`, `RegularisationsIUTSAnnuel`, `DetailsSimulationRetroactive`, index `EmployeeId`/`AnneeImputation`/`MoisImputation`) |
+| 26 | Avantages en nature (`AvantagesNature`, module PAI-08) |
+| 27 | Rubrique « Avance sur salaire » (`AVANCE`, 4221/4270) — dette n°7 : donne enfin à l'avance sur salaire (PAI-05) un compte distinct de la retenue générique 422100 |
 
 **Bases vierges.** `CreerSchemaComplet` rejoue désormais les migrations qui CRÉENT quelque
-chose (12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25). Un dossier neuf est enregistré directement au niveau cible et
+chose (12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26). Un dossier neuf est enregistré directement au niveau cible et
 saute toute la chaîne : il naît avec toutes les tables nécessaires (`Absences`, `Prets`,
 `ProfilsPaie`, `JournalAudit`, `HeuresSupplementaires`, `ConventionsCollectives`, `SoldesToutCompte`, `SaisiesOppositions`, etc.).
+La migration 27 n'y figure pas : elle ne fait qu'insérer une rubrique, déjà couverte pour un
+dossier neuf par `RubriqueService.RubriquesDeSaisie()` (même principe que la migration 11).
 
 ---
 
@@ -273,6 +282,20 @@ saute toute la chaîne : il naît avec toutes les tables nécessaires (`Absences
   Calcul en lot — et prennent tous les mêmes entrées : variables du mois et absences de la
   période. Un calcul annuel ou une régularisation en est exclu : ce n'est pas la paie d'un
   mois.
+  **Correctif du 15 septembre 2026** : signalé par le client (« les avantages en nature
+  n'impactent pas le bulletin »). Le moteur (`ApportVariables.AvecAvantagesNature`,
+  `TaxCalculatorService`, `BulletinService`) et l'écran « Bulletin de paie » et la
+  génération individuelle des « Bulletins en masse » étaient déjà correctement câblés
+  sur PAI-08. Le vrai trou : l'export « Registre de paie » de `BulletinBatchViewModel`
+  (`ExporterRegistreAsync`) reconstruisait sa propre chaîne d'apports et avait été oublié
+  lors de l'ajout de PAI-08 (avantages en nature) et de PAI-07 (rappels de paie) — son
+  propre commentaire dit pourtant « le registre doit porter exactement les mêmes montants
+  que les bulletins individuels ». Corrigé en ajoutant `.AvecRappels(...)` et
+  `.AvecAvantagesNature(...)` à cette chaîne, avec le chargement correspondant
+  (`ChargerRappelsAsync`, `ChargerAvantagesNatureAsync`), pour retrouver l'invariant.
+  **Complété le 15 septembre 2026** : « Calcul d'IUTS » et « Calcul en lot » ont ensuite
+  été câblés sur ces mêmes quatre modules (dette n°16 résolue, voir §7) — les quatre
+  écrans qui produisent la paie sont désormais alignés.
 - **Le PDF du bulletin tient sur une page**, quel qu'en soit le contenu : il est composé
   sur une page de 4 000 points puis réduit juste ce qu'il faut pour entrer dans l'A4.
   Réduire le texte plutôt que couper le document — les signatures ne doivent pas se
@@ -494,38 +517,204 @@ saute toute la chaîne : il naît avec toutes les tables nécessaires (`Absences
   - *Double export ClosedXML* : Registre des rappels & régularisations, et état de régularisation annuelle d'IUTS.
   - *IHM ergonomique* : Onglets de gestion, assistant de simulation rétroactive, liquidation annuelle et formulaires de saisie assistés.
 
+- **DEC-05 — État annuel des salaires (DADS) (17 septembre 2026)** :
+  **Restitution stricte, cumulée sur l'année** : même principe que ETA-01 (Livre de paie), dont
+  `EtatAnnuelSalairesService` reprend directement la lecture de `TaxCalculations` jointe à `Employees`
+  et du JSON `BulletinArchive` pour le détail par rubrique (`PAI-02`) — étendu sur les douze mois de
+  l'année plutôt qu'un seul. Zéro nouveau champ recalculé : chaque cumul est une somme de ce que les
+  bulletins ont déjà retenu.
+  **Alimenté DIRECTEMENT par les périodes clôturées (PAI-01)** — c'est la définition même du module,
+  pas une option d'affichage : pour chacun des douze mois de l'année demandée, le service interroge
+  `PeriodePaieService.LirePeriodeAsync` et n'inclut dans le cumul que les mois dont le statut est
+  « Clôturée ». Un mois jamais ouvert ou encore ouvert est explicitement exclu et listé à part
+  (`MoisManquants`), plutôt que de laisser croire à un cumul annuel complet qui ne l'est pas.
+  **État « Partiel »** : si l'année n'a pas ses douze mois clôturés au moment de l'édition, l'écran et
+  l'export Excel le signalent nettement par un badge et un avertissement détaillé (liste des mois
+  manquants), sur le même principe que le badge « Brouillon » d'ETA-01.
+  **Portée volontairement alignée sur ETA-01 et PAI-01** : comme les totaux de période et le Livre de
+  paie, les rappels et régularisations (`IsRegularization`, PAI-07) et les calculs annuels (`IsAnnual`)
+  ne sont pas inclus dans ce cumul — l'écran le dit explicitement dans ses avertissements. Une extension
+  future pourrait les intégrer séparément si le besoin se confirme.
+  **Colonnes dynamiques des rubriques** : comme sur le Livre de paie, chaque rubrique variable apparue
+  sur au moins un bulletin d'un mois clôturé de l'année fait l'objet d'une colonne cumulée dédiée,
+  ordonnée selon le plan de paie (`RubriqueService`), montants signés (gains positifs, retenues
+  négatives).
+  **Zéro migration de schéma** : aucune table nouvelle, `SchemaCible` reste à 27 — le module ne fait que
+  lire et cumuler des données déjà en base.
+  **Export Excel** : classeur ClosedXML en feuille unique (`EtatAnnuelSalairesExportService`), même
+  charte graphique que les autres états (DEC-03, DEC-04, ETA-01), avec la liste des mois clôturés/
+  manquants dans l'en-tête et une ligne de totaux de contrôle en gras.
+  **Écran dédié** : nouvel onglet de navigation « État annuel des salaires (DADS) » (groupe
+  DÉCLARATIONS), sélecteur d'année seul (pas de mois, contrairement à ETA-01 — c'est un état annuel),
+  bandeau de synthèse et tableau croisé salariés × rubriques.
+
+- **Correctif — bouton de menu manquant sur DEC-05 (17 septembre 2026)** :
+  Signalé par le client (« je ne vois pas État annuel des salaires dans la barre de menu ») juste après
+  la livraison de DEC-05 ci-dessus. **Cause** : la barre de navigation n'est PAS générée dynamiquement
+  depuis `_navMenuItems` — cette liste ne sert qu'au filtre de recherche du menu. Chaque bouton est
+  déclaré à la main dans `MainWindow.xaml`, avec sa propre liaison `Visibility="{Binding
+  IsNavXxxVisible}"` vers une propriété calculée dédiée dans `MainViewModel.cs`. La livraison de DEC-05
+  avait bien ajouté l'entrée dans `_navMenuItems` et le `DataTemplate` de la vue, mais avait omis les
+  deux pièces qui rendent le bouton réellement visible : la propriété `IsNavEtatAnnuelSalairesVisible`
+  et le `<Button>` lui-même. **Correctif** : les deux ajoutés, calqués sur le bouton « Livre de paie ».
+  **Leçon retenue pour la suite** : toute nouvelle entrée de menu exige ces cinq pièces, pas seulement
+  les deux premières — `_navMenuItems.Add(...)` (recherche), `DataTemplate` (rendu), propriété
+  `IsNavXxxVisible` (visibilité du bouton), le `<Button>` XAML lui-même, et sa commande `NavigateToXxx`
+  câblée dans `MainViewModel.cs` — appliquée scrupuleusement pour PIL-01 ci-dessous.
+
+- **PIL-01 — Tableau de bord masse salariale (17 septembre 2026)** :
+  **Évolution mensuelle + double ventilation** : `TableauBordMasseSalarialeService` reprend le principe
+  de lecture de ETA-01/DEC-05 (`TaxCalculations` joint à `Employees`, mois clôturés uniquement via
+  `PeriodePaieService`, exclusion `IsAnnual`/`IsRegularization`), mais agrège selon TROIS axes en une
+  seule passe : par mois (évolution), par catégorie et par service — ces deux derniers cumulés sur toute
+  l'année choisie plutôt que mois par mois, pour rester lisible. « Coût employeur » est la colonne
+  `MasseSalariale` de `TaxCalculations` (brut + charges patronales), la même grandeur que
+  `PeriodePaie.CoutTotalEmployeur` / `TotalMasseSalariale`, simplement nommée d'après ce que l'écran
+  affiche.
+  **Champ Service ajouté à la fiche salarié** : absent du modèle jusqu'ici (seule la catégorie existait),
+  demandé explicitement par le client pour permettre cette ventilation. Nouvelle colonne `Employees.Service`
+  (texte libre, ex. « Comptabilité », « Production »), champ éditable sur l'écran Gestion des employés,
+  colonne dans la grille, recherche textuelle, et import CSV (colonne `Service` ajoutée au modèle
+  `EmployeeCsvService`). Un salarié sans service renseigné apparaît sous « Non renseigné » dans la
+  ventilation plutôt que d'être silencieusement omis.
+  **Migration de schéma 28** : ajoute `Employees.Service`, et corrige au passage un oubli distinct
+  découvert en touchant `CreerSchemaComplet` — `DateSortie`/`MotifDepart`/`StatutSalarie` (ajoutés par la
+  migration 23 pour les dossiers existants) n'avaient jamais été reportés dans le schéma complet d'un
+  dossier tout neuf, qui se serait donc retrouvé sans ces trois colonnes à la première lecture de sa
+  liste de salariés (erreur SQL « no such column »). Sans conséquence pour un dossier déjà migré.
+  **Graphique sans dépendance externe** : aucune bibliothèque de graphiques dans le projet ; les barres
+  de l'évolution mensuelle et les barres proportionnelles des ventilations sont de simples `Rectangle`/
+  `Border` WPF dont la hauteur/largeur en pixels est PRÉCALCULÉE par le service (qui connaît le maximum
+  de la série) plutôt que par un convertisseur XAML — même logique que les autres propriétés d'affichage
+  déjà précalculées du projet (`EstComplet`, `MoisClosLibelle`, etc.).
+  **État « Partiel »** : même bandeau d'avertissement que DEC-05 si les douze mois de l'année ne sont pas
+  tous clôturés.
+  **Export Excel** : classeur ClosedXML à trois feuilles (`TableauBordMasseSalarialeExportService`) —
+  Évolution mensuelle, Par catégorie, Par service — même charte graphique que les autres états.
+  **Écran dédié, nouveau groupe de menu** : onglet « Tableau de bord masse salariale » sous un nouveau
+  groupe **PILOTAGE** (jusqu'ici absent — ETA-01/DEC-05/CPT-01/CPT-02 étaient tous rangés sous
+  DÉCLARATIONS ; un tableau de bord n'est pas une déclaration, d'où un groupe dédié pour ce premier
+  module du domaine PIL). Sélecteur d'année seul, sur le même schéma que DEC-05.
+
 ---
 
 ## 7. Dette connue
 
 À traiter, documentée dans le code aux endroits concernés :
 
-1. `employee.PensionContribution = calculation.CnssEmployee` — le moteur **mute la fiche
+1. ~~`employee.PensionContribution = calculation.CnssEmployee` — le moteur **mute la fiche
    du salarié** pendant le calcul. Report historique conservé parce que le déloger
-   changerait la base imposable (article 111). À reprendre avec précaution.
-2. Les **plafonds de l'article 106** (logement 20 %/75 000, transport 5 %/30 000, fonction
+   changerait la base imposable (article 111). À reprendre avec précaution.~~
+   **Résolu le 15 septembre 2026.** En creusant : le champ n'est affiché ni modifiable sur
+   AUCUN écran, et chaque écran charge sa propre copie des salariés (`LoadEmployeesAsync` à
+   chaque ouverture) — la mutation ne fuyait donc jamais vers une fiche enregistrée par un
+   autre écran. Son seul usage réel : `TaxCalculatorService` écrivait la retenue CNSS dans
+   `employee.PensionContribution` puis la relisait DEUX LIGNES PLUS BAS pour plafonner la
+   déduction retraite de l'article 111 (8 % du salaire de base) — une façon de se repasser
+   une valeur à soi-même, dans la même méthode. Remplacé par une variable locale
+   (`cnssEmployeePourDeductionRetraite`) : résultat rigoureusement identique (vérifié
+   qu'aucun autre code ne lisait ce champ entre-temps), mais le moteur ne modifie plus
+   l'objet `Employee` qu'on lui passe.
+2. ~~Les **plafonds de l'article 106** (logement 20 %/75 000, transport 5 %/30 000, fonction
    5 %/50 000) et les abattements professionnels viennent encore de `TaxDataService`, pas
-   des barèmes datés de SOC-02.
-3. La **migration 7** n'a pas rétro-alimenté la ventilation CNSS des bulletins antérieurs.
+   des barèmes datés de SOC-02.~~
+   **Résolu le 15 septembre 2026.** `ParametresSociaux` porte désormais huit champs de plus
+   (`TauxMaxIndemniteLogement`/`PlafondIndemniteLogement`, `...Fonction`, `...Transport`,
+   `AbattementCategoriesSuperieures`, `AbattementAutresCategories`), sur le même principe déjà
+   utilisé pour les taux CNSS/TPA : `Historiques()` leur donne les valeurs exactement telles
+   qu'elles étaient écrites en dur (les champs correspondants existaient déjà, inutilisés, sur
+   `BaremeLegal`), et `DepuisBareme(...)` bascule vers le barème daté seulement si celui-ci
+   renseigne une valeur non nulle. `TaxCalculatorService.CalculateProfessionalDeduction` et
+   `CalculateExemptAmount` lisent maintenant `ParametresAppliques` au lieu de
+   `TaxDataService.ConstantValues`. Le contrôle d'équivalence (DEC-01) reste inchangé : il
+   réinitialise `ParametresAppliques` à `Historiques()` avant de comparer, qui vaut
+   exactement l'ancien littéral. `EstimateBaseSalaryWithConstraints`, qui sert les
+   simulateurs « Estimation du salaire »/« Estimation en lot » (dette n°5, pas une vraie
+   dette), continue volontairement de lire `TaxDataService.ConstantValues`.
+3. ~~La **migration 7** n'a pas rétro-alimenté la ventilation CNSS des bulletins antérieurs.~~
+   **Script de rattrapage écrit le 15 septembre 2026 — PAS ENCORE EXÉCUTÉ.** Choix du
+   client : écrire le script, pas le lancer sans un feu vert explicite séparé — il touche des
+   données de paie déjà déclarées. `Services/RattrapageCnssService.cs` (ajouté au `.csproj`,
+   mais appelé depuis AUCUN écran ni AUCUNE migration automatique) : `AnalyserAsync()`
+   (lecture seule) identifie les lignes de `TaxCalculations` où `CnssPartPatronale > 0` mais
+   les quatre colonnes de ventilation valent encore 0 — la signature exacte d'une ligne
+   jamais ventilée, forcément antérieure aux barèmes datés (DEC-01/DEC-02), donc calculée au
+   seul taux patronal historique (16 % pile). L'assiette s'en déduit par simple division
+   (`CnssPartPatronale / 0,16`), avec un second calcul de contrôle indépendant à partir de la
+   part salariale déjà en base et jamais touchée (`CnssEmployee / 0,055`) : une ligne où les
+   deux assiettes ne concordent pas (à 1 FCFA près) est signalée à part comme « suspecte » et
+   n'est PAS rattrapée automatiquement. `AppliquerAsync()` dépose d'abord une copie de
+   sauvegarde du fichier (même principe qu'avant une migration de schéma), puis écrit les
+   quatre colonnes dans une seule transaction.
+   **Point d'entrée ajouté le 17 septembre 2026, dans le cadre de l'apurement de la dette
+   technique avant reprise de la feuille de route.** Choix du client : un bouton temporaire
+   plutôt qu'un lancement automatique. Nouvel onglet « Maintenance » sur l'écran
+   « Paramètres » (`SettingsView.xaml`/`SettingsViewModel.cs`), branché sur une instance
+   dédiée de `RattrapageCnssService` (`MainViewModel.cs`, même schéma qu'ailleurs : une
+   connexion `SQLiteService` par service). Bouton « Analyser » (lecture seule) affiche le
+   nombre de lignes à rattraper et de lignes suspectes, avec le détail de ces dernières.
+   Bouton « Appliquer... » ne s'active qu'après une analyse ayant trouvé des lignes, redemande
+   confirmation (rappel qu'il touche des données de paie déjà déclarées) avant d'écrire, et se
+   redésactive après exécution. Reste à faire : l'utilisateur doit lui-même ouvrir
+   « Paramètres » → « Maintenance » → « Analyser » sur le dossier réel, relire le rapport, puis
+   décider séparément de cliquer sur « Appliquer... ». Ce panneau est explicitement temporaire
+   (destiné à être retiré une fois le rattrapage exécuté sur tous les dossiers concernés), pas
+   une fonctionnalité permanente de l'application.
 4. Les **cumuls annuels** du bulletin sont *estimés* (rémunération du mois × mois écoulés),
    faute d'un historique mensuel complet. Le bulletin l'indique.
 5. Les écrans **« Estimation du salaire »** et **« Estimation en lot »** restent des
    simulateurs : ils n'écrivent rien dans l'historique. C'est voulu.
 6. Le **numéro d'employeur CNSS** du dossier doit être renseigné, sans quoi la Caisse
    rejette le bordereau. L'écran le signale.
-7. Les lignes de remboursement de prêt ne portent **aucun compte général**. CPT-01 devra
+7. ~~Les lignes de remboursement de prêt ne portent **aucun compte général**. CPT-01 devra
    leur en attribuer un — la contrepartie SYSCOHADA d'une avance au personnel — et ce
-   choix doit être arrêté avec le comptable, pas deviné ici.
+   choix doit être arrêté avec le comptable, pas deviné ici.~~
+   **Résolu le 15 septembre 2026, en deux temps.** D'abord vérifié : « Acompte », « Prêt »,
+   « Opposition » et « Cotisation syndicale » avaient chacune, depuis la migration 11, un
+   `CompteContrepartie` différent (4271/4272/4273/4274) — mais `EcriturePaieService`
+   (l'écriture CPT-01) ne lisait jamais ce champ pour les retenues, seulement
+   `CompteComptable`, identique (4221) pour les quatre : dans l'écriture réellement générée,
+   toutes les retenues d'un mois se fondaient sur UNE SEULE ligne de crédit 4221, sous le
+   libellé de la première rencontrée. Corrigé : `EcriturePaieService` crédite désormais
+   `CompteContrepartie` pour une ligne de retenue (repli sur `CompteComptable` puis sur
+   422100 si absent), tandis qu'un gain continue de débiter `CompteComptable` comme avant
+   (son crédit se règle globalement, en une seule ligne « Personnel, rémunérations dues »,
+   422000). Ensuite complété : le type « Avance sur salaire » de PAI-05 (distinct de
+   l'acompte, code retenue `AVANCE`) n'avait aucune rubrique correspondante dans le plan de
+   paie et tombait donc dans le compte générique 422100 — ajout d'une rubrique `AVANCE`
+   (4221/4270, ce dernier une proposition modifiable depuis l'écran « Plan de paie ») dans
+   `RubriqueService.RubriquesDeSaisie()` pour les nouveaux dossiers, et migration 27
+   (`INSERT OR IGNORE`, schéma porté à 27) pour rattraper les dossiers déjà en service.
 8. ~~La **quotité cessible et saisissable** du salaire n'est pas contrôlée~~
    **Résolu le 14 septembre 2026 par PAI-06** : calcul rigoureux par tranches progressives de la quotité
    saisissable et cessible sur le salaire net de référence ($R_{net} = \text{Brut} - \text{CNSS 5,5\%} - \text{IUTS}$),
    sanctuaire vital du SMIG (45 000 FCFA), super-privilège alimentaire et répartition au marc le franc.
-9. Les dossiers qui géraient leurs remboursements par une **retenue saisie à la main** dans
+9. ~~Les dossiers qui géraient leurs remboursements par une **retenue saisie à la main** dans
    les variables du mois doivent la supprimer en basculant sur ce module, sinon la retenue
-   sera opérée deux fois. Rien ne le détecte automatiquement.
-10. Une ligne de profil dont la rubrique est en mode **« base × taux »** n'est pas
+   sera opérée deux fois. Rien ne le détecte automatiquement.~~
+   **Résolu (détection heuristique) le 15 septembre 2026.** `ApportVariables.AvecPrets`
+   compare désormais chaque retenue déjà saisie dans les variables du mois à des mots-clés
+   (« PRET », « PRÊT », « AVANCE », « ACOMPTE », « REMB », dans le code ou le libellé) et
+   consigne un avertissement dans une nouvelle liste `Avertissements` quand un doublon
+   possible se dessine. Comme les remboursements automatiques de PAI-05 portent des codes
+   fixes (`PRET`/`AVANCE`/`ACOMPTE`) non passés par le plan de paie, il n'existe pas de
+   collision de code exacte à détecter (contrairement au cas PRIMEANC) — d'où l'heuristique.
+   Non bloquant, sur les quatre écrans : message ajouté au bulletin (Bulletin, Calcul
+   d'IUTS), compteur et journal détaillé (Bulletins en masse, Calcul en lot).
+10. ~~Une ligne de profil dont la rubrique est en mode **« base × taux »** n'est pas
     valorisée : résoudre une base qui est elle-même une autre rubrique relève du moteur.
-    Ces lignes sont signalées comme « non valorisées » sur l'écran des profils.
+    Ces lignes sont signalées comme « non valorisées » sur l'écran des profils.~~
+    **Résolu le 15 septembre 2026.** `ProfilPaieService.Valoriser` résout désormais la base
+    par trois voies, dans cet ordre : une rubrique SYSTÈME (salaire de base, une des quatre
+    indemnités) lue directement sur la fiche ; une autre ligne du MÊME profil, à condition
+    qu'elle ait déjà été valorisée plus haut dans l'ordre d'affichage (`ApportsAsync`
+    accumule les montants résolus au fil de sa boucle) ; à défaut de code, le salaire brut
+    de la fiche (base + quatre indemnités — l'équivalent de l'ancien calcul, qui n'inclut PAS
+    les apports du mois saisis à part, faute de pouvoir les connaître sans boucler sur le
+    moteur lui-même : portée volontairement limitée, pas un moteur de formules général). Une
+    base introuvable (code inconnu, ou pas encore rencontrée dans ce profil) vaut toujours 0,
+    comme avant. `Anomalies()` ne signale plus ces lignes comme « non valorisées » quand elles
+    ont un taux renseigné, au même titre que le mode « pourcentage du salaire de base ».
 11. Le **rattachement à un profil se fait depuis l'écran « Profils de paie »**, pas depuis
     la fiche du salarié. L'écran « Employés » n'affiche donc pas encore le profil porté —
     à reprendre quand SAL-03 (carrière et historique) ouvrira ce volet de la fiche.
@@ -540,20 +729,439 @@ saute toute la chaîne : il naît avec toutes les tables nécessaires (`Absences
     forme que les cases IUTS et CNSS déjà existantes. Aucun changement côté modèle ou service :
     `Rubrique.SoumisTPA` et sa persistance (`RubriqueService`) existaient déjà depuis DEC-02,
     seule l'IHM manquait.
-14. **Aucun verrou n'empêche de générer et d'enregistrer un bulletin sur une période qui
+14. ~~**Aucun verrou n'empêche de générer et d'enregistrer un bulletin sur une période qui
     n'a jamais été ouverte.** `PeriodePaieService.EstClotureeAsync` ne teste que la
     clôture (`Statut = 1`) ; un mois sans aucune ligne dans `PeriodesPaie` compte comme
     « non clôturé », donc traité comme ouvert par défaut. Les quatre écrans qui produisent
     une paie (Bulletin, Bulletins en masse, Calcul d'IUTS, Calcul en lot) n'appellent
     `PeriodePaieService` à aucun moment — seules la saisie des variables du mois et celle
     des absences vérifient la clôture, jamais l'ouverture. Signalé par le client le
-    13 septembre 2026. C'est un contrôle de sécurité à ajouter plutôt qu'un module en soi ;
-    à rattacher à **PAI-01** (périodes de paie et clôture) pour exiger une ligne `Ouverte`
-    avant tout calcul ou toute saisie.
+    13 septembre 2026.~~
+    **Résolu (avertissement, sans blocage) le 15 septembre 2026.** Choix du client :
+    « avertir sans bloquer », plutôt qu'un verrou dur — `PeriodePaieService` a été conçu dès
+    l'origine pour que rien ne soit verrouillé tant qu'une période n'a pas été ouverte
+    explicitement, et l'exiger aurait bloqué tout calcul dans un dossier n'ayant jamais ouvert
+    de période. Les quatre écrans qui produisent une paie appellent désormais
+    `PeriodePaieService.LirePeriodeAsync` et ajoutent une mention au message final si la
+    période n'a jamais été ouverte, sans empêcher le calcul ni l'enregistrement.
 15. ~~**Aucune gestion de sortie d'un employé (fin de contrat, démission).**~~
     **Pris en charge et résolu dans SAL-05 (Solde de tout compte)** : ajout des champs
     `DateSortie`, `MotifDepart`, `StatutSalarie` (Actif / Sorti) dans `Employees` et l'IHM,
     avec calcul des indemnités de rupture et édition des documents légaux.
+16. ~~**« Calcul d'IUTS » (`CalculationViewModel`) et « Calcul en lot »
+    (`BatchSalaryCalculationViewModel`) ne sont câblés que sur absences, prêts et profil.**~~
+    **Résolu le 15 septembre 2026.** Les deux écrans reçoivent maintenant les quatre mêmes
+    modules que Bulletin et Bulletins en masse : heures supplémentaires (PAI-03), convention
+    collective (SOC-05), rappels et régularisations (PAI-07) et avantages en nature (PAI-08).
+    `CalculationViewModel` les ajoute à sa chaîne d'apport mono-salarié
+    (`ChargerApportDuMoisAsync`) ; `BatchSalaryCalculationViewModel` les précharge pour tout
+    l'effectif (mêmes couples `ChargerXxxAsync`/`XxxDe` que `BulletinBatchViewModel`) avant
+    de les appliquer par salarié. Dans `MainViewModel.cs`, la construction de
+    `_calculationViewModel` et `_batchSalaryCalculationViewModel` a dû être déplacée après
+    celle des services PAI-03/SOC-05/PAI-07/PAI-08 (ils n'existaient pas encore à leur ancien
+    point de construction). Les quatre écrans qui produisent la paie (§6) sont maintenant
+    alignés sur les mêmes modules.
+
+**Détour clos le 15 septembre 2026.** Sur demande explicite du client, tous les points de
+cette section ont été traités un par un (14 → 9 → 2 → 10 → 7 → 3 → 1), par dérogation
+assumée à la règle habituelle de l'ordre strict de la feuille de route. Seule la dette n°3
+reste concrètement ouverte : le script est écrit, son exécution attend un feu vert séparé.
+Les points 6 et 11 n'appelaient aucune action (choix du client). Retour à l'ordre strict de
+la feuille de route à partir d'ici — après avoir confirmé le prochain module (§2).
+
+17. ~~**`ConventionId`/`Echelon` (SOC-05) et `DateSortie`/`MotifDepart`/`StatutSalarie`
+    (SAL-05) ne survivaient à aucun enregistrement d'employé.**~~
+    **Résolu le 16 septembre 2026**, trouvé en préparant le modèle d'import CSV
+    (ci-dessous). Même famille de bug que celui déjà réglé pour l'indemnité de sujétion /
+    fonction / date d'entrée / situation matrimoniale (voir le commentaire historique sur
+    `DataService.ColonnesEmploye`) : SOC-05 et SAL-05 avaient bien ajouté leurs colonnes au
+    schéma et leurs champs à `Employee`, et SAL-05 les avait même câblés sur la fiche
+    (`ConventionsDisponibles`, `EchelonsDisponibles`, `StatutsSalarieDisponibles` dans
+    `EmployeeManagementViewModel`, liés en XAML) — mais `DataService.ColonnesEmploye`,
+    `LireEmploye` et `AddEmployeeAsync` (le seul chemin de lecture/écriture réel de la
+    table `Employees`) n'avaient jamais été mis à jour : assigner une convention/échelon ou
+    enregistrer une sortie ne survivait à aucune fermeture de l'application, en silence.
+    Corrigé en ajoutant les cinq colonnes aux trois endroits. `DbValue` gagne au passage
+    `IntNullableFromDb`, par symétrie avec les autres lecteurs `...FromDb`.
+
+    **Import CSV des employés (même jour, à la demande du client).** L'écran « Gestion des
+    employés » avait déjà un bouton « Importer des employés » et une méthode
+    `DataService.ImportEmployeesFromFileAsync`, mais celle-ci ne lisait que du JSON (le code
+    portait littéralement le commentaire « adaptez pour CSV si besoin ») et remplaçait
+    TOUTE la liste des employés (`DELETE FROM Employees` puis réinsertion) — un comportement
+    pensé pour restaurer une sauvegarde complète, dangereux pour un CSV de quelques nouvelles
+    recrues. Ajout de `Services/EmployeeCsvService.cs` : lecture d'un CSV (séparateur `;`,
+    UTF-8 avec repli Windows-1252, colonnes identifiées par nom d'en-tête plutôt que par
+    position) vers des `Employee`, avec erreurs bloquantes (Nom/Prénom manquants, montant
+    illisible) et avertissements non bloquants (date illisible, convention introuvable,
+    colonne inconnue) reportés ligne par ligne. `ImportEmployeesFromFileAsync` distingue
+    maintenant `.csv` (ajout / mise à jour PAR MATRICULE, sans jamais supprimer un employé
+    absent du fichier — comportement demandé par le client) et `.json` (comportement
+    historique inchangé, remplacement complet). `EmployeeManagementViewModel.ImportEmployeesAsync`
+    accepte les deux extensions et affiche le bilan (ajoutés/mis à jour/lignes ignorées),
+    avec le détail complet dans une boîte de dialogue dès qu'une erreur ou un avertissement
+    existe. Modèle livré au client : `Claude outputs/Modele_Import_Employes.csv` (en-têtes +
+    deux lignes d'exemple) et `Modele_Import_Employes_Notes.md` (légende des colonnes).
+
+18. **Signalé le 16 septembre 2026 : « la modification d'une fiche employé (catégorie,
+    via réimport CSV) ne persiste pas — c'est toujours l'ancien état qui revient. »**
+    Investigation en cours. Écarté : build obsolète (le client a recompilé/relancé sans
+    erreur avant de tester) ; `Services/DataService.LoadEmployeesAsync` et
+    `BatchSalaryCalculationViewModel.LoadEmployeesAsync` (bouton « Charger les employés »)
+    relisent bien la base à chaque clic, sans mise en cache visible. Une première
+    hypothèse — un réimport du même fichier sans Matricule créant un DOUBLON à chaque
+    fois plutôt que de mettre à jour la fiche existante, celle-ci restant alors invisible
+    dans une liste non triée (`BatchSalaryCalculationView` n'a aucun tri par défaut) —
+    a été écartée par le client (« une seule ligne, mais avec l'ancienne valeur »). Corrigé
+    quand même, par robustesse (le client l'a demandé) : `EmployeeCsvService.Lire` reconnaît
+    désormais un employé existant par Nom + Prénom quand le Matricule est vide (nouveau
+    paramètre `employesExistants` remplaçant `matriculesExistants` ; en cas d'homonymes,
+    la ligne crée un nouvel employé plutôt que de deviner, avec avertissement). En parallèle,
+    repéré (non lié au signalement, à vérifier séparément) : le bouton **« Charger un
+    employé »** de l'écran « Calcul d'IUTS » (`CalculationViewModel.ExecuteLoadEmployeeAsync`)
+    ~~est resté un bouchon de démonstration — il charge toujours `employees[0]`, le premier
+    de la liste SANS TRI, jamais un employé choisi ; son propre commentaire l'admet
+    (« on simule l'opération »).~~
+    **Résolu le 17 septembre 2026, dans le cadre de l'apurement de la dette technique
+    avant de reprendre la feuille de route.** Un vrai sélecteur a été ajouté : recherche
+    rapide (`FiltreSalarie`) + liste déroulante (`SalariesFiltres`/`SalarieASelectionner`),
+    même schéma que sur les écrans Absences/Prêts/Profils, rechargé à chaque activation de
+    l'écran (`RefreshSettingsAsync`, déjà appelée par `OnIsActiveChanged`) pour ne jamais
+    proposer une fiche périmée — même principe que l'item 21. Le bouton charge désormais le
+    salarié réellement choisi, relu fraîchement en base (`GetEmployeeByIdAsync`) plutôt que
+    la copie affichée dans le sélecteur, par le même principe anti-péremption que l'item 19.
+    ~~Reste à faire : obtenir du client le fichier CSV exact et le message d'import exact
+    (bilan + détail des erreurs/avertissements le cas échéant) pour trouver la cause réelle
+    de CE signalement, qui n'est toujours pas confirmée.~~
+    **Clos le 17 septembre 2026 :** le client confirme que le problème ne se reproduit plus.
+    Cause exacte non isolée séparément (le signalement n'avait jamais été confirmé) ;
+    persiste éventuellement grâce au correctif de robustesse Nom+Prénom déjà en place
+    plus haut dans cet item.
+
+19. **Signalé le 16 septembre 2026 (sans lien avec le CSV cette fois) : « je corrige la
+    date d'entrée dans la fiche employé, je relance le calcul du bulletin, l'ancienne date
+    s'affiche toujours ; et la correction faite dans la fiche est ensuite automatiquement
+    remplacée par l'ancienne date. »** Cause RÉELLE identifiée et corrigée — probablement
+    le même mécanisme que l'item 18 (non confirmé pour celui-ci faute du fichier CSV
+    demandé). Deux ingrédients :
+    (a) `BulletinViewModel` et `BatchSalaryCalculationViewModel` chargent leur propre copie
+    de la liste des employés en mémoire — la première une seule fois à l'ouverture de
+    l'écran (aucun bouton d'actualisation), la seconde au clic sur « Charger les employés »
+    — et ne la relisent jamais automatiquement ensuite : une correction faite entre-temps
+    dans la fiche (écran Gestion des employés) ou par import CSV n'apparaît donc pas tant
+    qu'on n'a pas rouvert le dossier (Bulletin) ou recliqué sur Charger (Calcul en lot) ;
+    (b) `DataService.AddCalculationToHistoryAsync` — déclenché par tout enregistrement de
+    bulletin/calcul — réécrit la fiche employé ENTIÈRE (`INSERT OR REPLACE`) avec l'objet
+    `Employee` attaché au calcul enregistré. Combinés : générer/enregistrer un bulletin avec
+    une copie d'employé périmée ne se contente pas d'afficher l'ancienne valeur, il la
+    **réécrit en base par-dessus la correction**, silencieusement — exactement le
+    comportement décrit. Corrigé en supprimant la staleness à la source plutôt qu'en
+    touchant à `AddCalculationToHistoryAsync` (dont le comportement reste utile pour créer
+    la fiche d'un « calcul libre » sur un employé encore jamais enregistré) : `BulletinViewModel.
+    GenererBulletinAsync` relit désormais la fiche de l'employé sélectionné directement en
+    base (`GetEmployeeByIdAsync`) juste avant de calculer, et `BatchSalaryCalculationViewModel.
+    CalculateAllAsync` relit désormais `LoadEmployeesAsync()` au lieu de réutiliser la liste
+    `Employees` telle qu'affichée. Ni l'un ni l'autre écran ne permet d'éditer les champs de
+    la fiche employé directement à l'écran (pas de binding TwoWay vers l'employé sélectionné
+    dans leurs XAML respectifs) : cette relecture ne peut donc écraser aucune saisie en
+    cours.
+    **Complété le 16 septembre 2026 (suite, sur demande du client « corrige toutes les
+    anomalies de ce genre ») — les trois angles morts restants du même item 19 :**
+    (c) `BulletinBatchViewModel` (écran « Bulletins en masse ») avait exactement le même
+    défaut que `BulletinViewModel` : sa liste `Employees` se charge une seule fois à
+    l'ouverture de l'écran, sans aucun bouton d'actualisation, et `GenererEtExporterAsync`
+    (génération + enregistrement en masse) comme `ExporterRegistreAsync` (registre de paie)
+    calculaient à partir de cette liste figée. Corrigé de la même façon : les deux méthodes
+    ne gardent de `Employees` que la SÉLECTION (quels employés sont cochés), et relisent les
+    fiches elles-mêmes fraîchement en base (`LoadEmployeesAsync`) juste avant de calculer.
+    (d) Filet de sécurité général, au niveau des données plutôt que par écran, pour couvrir
+    tout chemin de sauvegarde non encore identifié : `DataService.AddCalculationToHistoryAsync`
+    ne réécrit plus la fiche employé à l'aveugle. Si l'employé n'existe pas encore en base
+    (calcul libre sur un employé tout juste créé dans un écran de calcul), la fiche est créée
+    comme avant. S'il existe déjà, seuls les champs qu'un écran de calcul a effectivement
+    vocation à modifier (identité, catégorie, éléments de paie — Prénom, Nom, Catégorie,
+    IsHigherCategory, Salaire de base, indemnités, charges familiales, conjoint travaille,
+    cotisation retraite) sont recopiés sur la fiche ACTUELLE relue en base ; tout le reste
+    (état civil, coordonnées, convention, date de sortie...) vient toujours de cette fiche
+    actuelle, jamais d'une copie en mémoire potentiellement périmée. Ce filet rend inoffensif
+    tout oubli similaire dans un écran non encore audité.
+    (e) `CalculationViewModel.LoadExistingCalculation`/`LoadFromHistory` (recharger un calcul
+    depuis l'historique) réutilisait l'instantané `Employee` figé au moment de ce calcul
+    passé — si l'utilisateur cliquait ensuite « Enregistrer » sans rien recalculer, ce même
+    mécanisme réécrivait la fiche actuelle avec cet instantané historique. Converties en
+    `LoadExistingCalculationAsync`/`LoadFromHistoryAsync` (async, seul appelant externe mis à
+    jour : `MainViewModel.cs`, l'abonnement à `_historyViewModel.CalculationSelected`) : la
+    fiche actuelle est désormais relue en base (`GetEmployeeByIdAsync`) au moment du
+    chargement, avec repli sur l'instantané historique seulement si l'employé n'existe plus.
+    L'écran « Calcul d'IUTS » reste volontairement un éditeur de fiche (Catégorie, Salaire de
+    base, indemnités... restent modifiables directement dans son formulaire, à la différence
+    du Bulletin) : cette décision n'a pas été changée, mais elle est maintenant sans risque
+    pour les autres champs de la fiche grâce au filet de sécurité (d) ci-dessus.
+
+20. **Signalé le 16 septembre 2026 : « le calcul en lot d'IUTS prend en compte aussi les
+    employés sortis, il ne doit tenir compte que des employés actifs. »** Confirmé : ni
+    `BatchSalaryCalculationViewModel` (« Calcul en lot ») ni `BulletinBatchViewModel`
+    (« Bulletins en masse ») ne filtraient par statut — les deux chargeaient tous les
+    employés de `DataService.LoadEmployeesAsync`, sorti ou suspendu compris. Le solde de
+    tout compte d'un salarié qui part se traite par l'écran dédié (`SoldeToutCompteViewModel`),
+    jamais par un bulletin mensuel ordinaire : un employé « Sorti » ou « Suspendu » n'a donc
+    rien à faire dans une paie de masse. Corrigé en utilisant `Employee.EstActif` (propriété
+    déjà présente sur le modèle — `StatutSalarie == 0` ET pas encore atteint sa `DateSortie` —
+    mais jamais câblée jusqu'ici) comme filtre systématique : `BatchSalaryCalculationViewModel.
+    LoadEmployeesAsync` (liste affichée) et `CalculateAllAsync` (liste réellement calculée,
+    relue fraîchement depuis l'item 19) ; `BulletinBatchViewModel.LoadEmployeesAsync` (liste
+    à cocher) et `GenererEtExporterAsync`/`ExporterRegistreAsync` (liste réellement traitée,
+    filtrée une seconde fois au moment du calcul par sécurité, au cas où un statut aurait
+    changé entre l'affichage et le lancement). Périmètre volontairement limité aux deux écrans
+    de LOT : les sélecteurs d'un seul employé (« Bulletin de paie », « Calcul d'IUTS ») restent
+    inchangés, un besoin ponctuel de rappeler/consulter la fiche d'un employé sorti (bulletin
+    déjà archivé, régularisation) restant légitime là.
+
+21. **Signalé le 16 septembre 2026 : « quand je modifie une fiche employée ou toute autre
+    information, je dois fermer le dossier et le rouvrir pour que ce soit pris en compte. »**
+    Confirmé, ce n'est pas normal — c'est la forme générale des items 18-20. Cause : à
+    l'exception de « Gestion des employés » (reconstruit à neuf à chaque navigation, donc
+    toujours à jour), presque tous les écrans sont des instances UNIQUES créées une seule
+    fois par `MainViewModel` à l'ouverture du dossier (voir son constructeur) — leur liste
+    d'employés (ou toute autre donnée) n'est chargée qu'à cet instant précis et ne se
+    recharge jamais toute seule ensuite. Fermer et rouvrir le dossier reconstruit tout depuis
+    zéro, ce qui explique pourquoi ça « corrige » le problème en apparence. Corrigé pour les
+    écrans qui chargent la liste des employés (`DataService.LoadEmployeesAsync`), en
+    utilisant `BaseViewModel.OnIsActiveChanged` — un point d'extension déjà présent et déjà
+    utilisé une fois par `CalculationViewModel` pour ses réglages, mais jamais étendu
+    ailleurs : ce hook s'exécute automatiquement à chaque fois qu'un écran redevient actif
+    (donc à chaque navigation vers lui, sans action de l'utilisateur). Écrans corrigés,
+    chacun rechargeant sa liste d'employés (et, pour Prêts/Profils/Absences, l'ensemble de
+    leurs données) au retour sur l'écran : `BulletinViewModel`, `BatchSalaryCalculationViewModel`,
+    `BulletinBatchViewModel`, `PretViewModel`, `ProfilPaieViewModel`, `AbsenceViewModel`. Pour
+    Bulletin et Bulletins en masse, la sélection de l'utilisateur (employé choisi, cases
+    cochées) est explicitement conservée par matricule à travers le rechargement, pour ne
+    pas la réinitialiser à chaque retour sur l'écran. `AvantageNatureViewModel` n'a pas eu
+    besoin de ce correctif : `MainViewModel` rechargeait déjà ses données à chaque clic sur
+    son propre lien de navigation (`NavigateToAvantagesNatureCommand`), tout comme
+    `RappelPaieViewModel` et `SaisieOppositionViewModel` pour les leurs — un second mécanisme
+    de rafraîchissement déjà présent dans le code, coexistant avec celui-ci. **Volontairement
+    non corrigé : `VariablePaieViewModel`** (écran « Variables du mois »). Contrairement aux
+    autres, une ligne ajoutée via « Ajouter » n'est PAS enregistrée tout de suite : elle
+    reste seulement dans la liste affichée jusqu'au clic sur « Enregistrer ». Recharger
+    automatiquement à chaque retour sur l'écran effacerait silencieusement ces lignes non
+    encore enregistrées — un risque de perte de saisie pire que le bug signalé. Cet écran
+    garde donc son bouton « Charger » manuel uniquement ; à reprendre plus tard si le besoin
+    se confirme, avec un vrai suivi des lignes non enregistrées avant d'activer un
+    rechargement automatique. Peut rester un point de vigilance sur d'autres écrans non
+    encore audités pour cette classe de problème (rubriques, conventions collectives,
+    barèmes...) si le client rapporte un cas similaire ailleurs.
+
+22. **Signalé le 16 septembre 2026 : « apparemment, il y a beaucoup de bugs dans le
+    logiciel, découvre-les et corrige-les une bonne fois pour toutes. »** Demande volontairement
+    large plutôt qu'un symptôme précis : traitée comme un audit complet plutôt qu'une
+    correction ponctuelle. Méthode : l'intégralité du code (ViewModels, Services, Models,
+    Helpers, Converters — les XAML volontairement exclus, hors périmètre d'un audit de
+    logique métier/intégrité des données) relue par cinq analyses indépendantes ciblées
+    (couche ViewModels ; Services — session/données ; Services — moteur IUTS ; Services —
+    cycle de vie employé ; Services — prêts/registres/exports), chacune avec consigne
+    explicite de ne pas re-signaler les items 1-21 déjà connus. Deux pistes remontées ont été
+    creusées puis écartées à dessein (voir ci-dessous) ; les anomalies restantes ont été
+    corrigées.
+
+    **Corrigé — couche ViewModels (régression et lacunes issues de l'item 21) :**
+    (a) `PretViewModel`, `ProfilPaieViewModel` : le rechargement automatique ajouté par
+    l'item 21 reclonait `PretEnCours`/`ProfilEnCours` à chaque retour sur l'écran, effaçant
+    une modification en cours de saisie non encore enregistrée. Corrigé par un garde-fou
+    « même fiche » (comparaison d'`Id`) : le clone n'est refait que si la sélection a
+    réellement changé. (b) `SaisieOppositionViewModel` : même défaut sur les champs du
+    formulaire (`OnSelectedSaisieChanged`), corrigé en n'appliquant la resynchronisation que
+    hors mode édition (`IsEditing`). (c) `MainViewModel.NavigateToEmployeeManagement` ne
+    désactivait jamais l'écran quitté (`IsActive = false` manquant, contrairement à
+    `NavigateTo`), ce qui empêchait cet écran de se rafraîchir à la prochaine visite —
+    corrigé. (d) `AuditViewModel` : le rechargement automatique ne jouait qu'à la toute
+    première visite (garde `Entrees.Count == 0` supprimée). (e) `PeriodePaieViewModel`,
+    `BaremeViewModel`, `RubriqueViewModel` : ces trois écrans n'avaient jamais reçu le
+    rafraîchissement automatique de l'item 21, oubli corrigé (avec le même garde-fou
+    « même fiche » que (a) pour éviter toute perte de saisie en cours). (f) `HistoryViewModel` :
+    le rafraîchissement (retour sur l'écran, bouton Actualiser, bouton Réinitialiser les
+    filtres) bloquait le thread d'interface via un `.Wait()` synchrone sur une méthode async —
+    corrigé en appelant directement la version asynchrone.
+
+    **Corrigé — Services et Models :**
+    (g) `ConventionCollectiveService.CalculerAnciennete` : seuil de 2 ans codé en dur en plus
+    du barème d'ancienneté de la convention, empêchant toute prime pour une convention dont
+    la première tranche démarre avant 2 ans — supprimé, le barème se suffit à lui-même.
+    (h) `HeureSupplementaireService.ChargerSaisieMoisAsync` : la requête listait TOUS les
+    employés sans filtre de statut malgré son commentaire annonçant « les employés actifs » —
+    un salarié sorti pouvait recevoir des heures supplémentaires saisies. Filtre ajouté.
+    (i) `AvantageNatureService.MapperAvantage` : les dates étaient relues avec la culture du
+    poste de travail alors qu'elles sont écrites en culture invariante — un salarié utilisant
+    une machine en anglais ou toute culture à format de date différent pouvait faire échouer
+    silencieusement la lecture des dates d'avantages en nature. Corrigé en alignant lecture et
+    écriture sur `CultureInfo.InvariantCulture`. (j) `SaisieOpposition.EstActive` ignorait
+    totalement `DateFin` : une saisie-arrêt à durée déterminée continuait d'être prélevée
+    après son terme légal — corrigé. (k) `DataService.SaveCalculationsHistoryAsync` (restauration
+    de sauvegarde JSON) appelait à tort le même chemin qu'un enregistrement normal
+    (`AddCalculationToHistoryAsync`), qui (i) réécrivait la fiche employé actuelle avec
+    d'anciens instantanés historiques arbitraires et (ii) bloquait toute la restauration
+    (transaction annulée en entier) dès le premier bulletin d'un mois déjà clôturé —
+    c'est-à-dire systématiquement, pour tout dossier ayant un historique réel. Corrigé par un
+    chemin d'insertion dédié (`InsererLigneCalculAsync`) qui ne touche ni la fiche employé, ni
+    la clôture de période — une restauration de sauvegarde doit reconstituer l'historique tel
+    qu'il était, pas le revalider comme une saisie du jour. (l) `DataService.
+    DeleteCalculationFromHistoryAsync` n'avait, seule parmi les écritures sur l'historique,
+    aucun contrôle de période clôturée : un bulletin déjà déclaré pouvait être supprimé
+    silencieusement — corrigé, même verrou que les autres écritures.
+
+    **Corrigé — Services (suite, module par module) :**
+    (m) `SaisieOppositionService.AppliquerEtEnregistrerRetenuesMoisAsync` : en cas de
+    recalcul d'un mois déjà traité, les saisies-arrêts actives étaient relues AVANT que la
+    retenue déjà enregistrée pour ce même mois soit réintégrée à leur solde restant dû — le
+    recalcul partait donc d'un solde compris comme s'il avait déjà été prélevé deux fois.
+    Corrigé en réordonnant la méthode : réintégration puis nettoyage des lignes du mois
+    d'abord, relecture des saisies actives ensuite. (n) `SoldeToutCompteService` : deux
+    anomalies liées au solde de tout compte d'un salarié qui part — la dette de prêts en
+    cours excluait les prêts « Suspendu » du calcul (corrigé, les deux statuts comptent
+    désormais), et surtout, le prêt du salarié n'était jamais effectivement soldé/annulé une
+    fois le solde de tout compte enregistré : il restait « En cours » indéfiniment, échéances
+    futures comprises, alors que la dette avait déjà été déduite du solde versé. Corrigé en
+    appelant `PretService.AnnulerAsync` sur chaque prêt du salarié après l'enregistrement du
+    solde (hors transaction, `PretService` ouvrant la sienne propre) ; un échec de ce solde
+    automatique ne fait plus échouer le solde de tout compte déjà enregistré, il est
+    seulement journalisé pour clôture manuelle depuis l'écran « Prêts et avances ».
+    (o) `AbsenceService` : aucun contrôle n'empêchait d'enregistrer, pour un même salarié,
+    deux absences dont les dates se chevauchent — un même jour pouvait ainsi être compté deux
+    fois dans le compteur de congés et/ou donner lieu à une double retenue sur le brut.
+    Corrigé pour la saisie unitaire (`EnregistrerAsync`) et pour l'import/attribution en masse
+    (`EnregistrerEnMasseAsync`, chevauchement à la fois entre absences du même lot et avec
+    celles déjà en base).
+
+    **Investigué et écarté (pas des bugs) :**
+    (p) Un doublon possible de lignes `TaxCalculations` par salarié/période, redouté pour son
+    impact sur les écritures de paie/ordres de virement/rappels, a été vérifié dans
+    `DataService.EnregistrerBulletinDuMoisAsync` : cette méthode supprime systématiquement
+    toute ligne existante pour le même salarié/période avant d'insérer la nouvelle — l'unicité
+    est garantie par construction, aucune correction nécessaire.
+    (q) Le référentiel daté `BaremeLegal.Tranches`/`ChargesFamille` (barème IUTS et charges de
+    famille) n'est toujours pas branché sur `TaxCalculatorService`, qui continue de lire ces
+    valeurs depuis les fichiers JSON (`TaxDataService`) ; de même, `RetenueSpeciale` reste à
+    1 % en dur. **Ce n'est pas un oubli** : `BaremeLegal.cs` porte une note d'architecture
+    explicite indiquant que ce branchement est une étape volontairement séparée, pour ne pas
+    modifier le moteur IUTS audité en même temps que le stockage de ses paramètres (seuls
+    CNSS/TPA/abattement/plafond, via `ParametresSociaux.DepuisBareme`, ont déjà été branchés
+    lors d'un item antérieur). Point non corrigé ici à dessein — un branchement du barème et
+    de la retenue spéciale reste à faire, mais comme étape dédiée et testée séparément, pas
+    en marge d'un audit général de bugs.
+
+    **Délibérément non traité, priorité plus faible :** absence de contrôle de tri/continuité
+    des tranches d'IUTS dans les fichiers JSON de `TaxBrackets` (ces fichiers ne sont pas
+    modifiables depuis une saisie utilisateur, risque faible) ; absence de contrôle de
+    chevauchement des périodes de rappel de salaire dans `RappelPaieService` (simple
+    observation, pas une anomalie confirmée en usage réel). À reprendre si le client rapporte
+    un cas concret.
+
+23. **Demandé le 16 septembre 2026 : « branche barème IUTS sur le référentiel daté »** —
+    l'étape que l'item 22(q) avait délibérément laissée de côté. `ParametresSociaux` porte
+    désormais deux champs de plus, sur le même principe déjà utilisé pour les taux CNSS/TPA
+    et les plafonds de l'Art.106 (dette n°2) : `Tranches` (`List<TaxBracket>`) et
+    `ChargesFamille` (`Dictionary<int, decimal>`). `Historiques()` leur donne les valeurs
+    exactement telles qu'elles étaient codées en dur dans
+    `TaxDataService.InitializeDefaultData` (mêmes bornes contiguës 30000/50000/80000/...,
+    mêmes taux 12,10 %/13,90 %/.../25 %, mêmes réductions 8 à 20 % pour 1 à 7 charges).
+    `DepuisBareme(bareme)` résout les tranches en tout ou rien — contrairement à un taux
+    scalaire, une table de tranches ne se complète pas champ par champ : si
+    `bareme.Tranches` forme une table valide (au moins une tranche, la première à 0, bornes
+    contiguës, la dernière ouverte, taux entre 0 et 100 %, mêmes contrôles que
+    `BaremeLegal.Anomalies()` mais limités aux tranches), elle est prise telle quelle ;
+    sinon repli sur la table historique. Les charges de famille, elles, se complètent charge
+    par charge comme les autres champs de `DepuisBareme` (une charge non renseignée par le
+    barème retombe sur la valeur historique). `TaxCalculatorService.CalculateGrossTax` lit
+    maintenant `ParametresAppliques.Tranches` au lieu de `_taxDataService.TaxBrackets`, et
+    les deux calculs de réduction pour charges de famille (`CalculateMonthlyTax`,
+    `CalculateAnnualRegularization`) lisent `ParametresAppliques.ChargesFamille` au lieu de
+    `_taxDataService.FamilyChargeRates`. `DiffereDesHistoriques`/`Ecarts()` (affichés sur
+    l'écran « Contrôle d'équivalence ») comparent désormais aussi les tranches et les
+    charges de famille. **Équivalence vérifiée** : le barème système livré avec chaque
+    dossier (`BaremeService`, barème « en vigueur ») porte déjà exactement ces mêmes
+    tranches et réductions depuis SOC-02 — un dossier qui n'a jamais dupliqué/modifié ce
+    barème obtient donc un IUTS rigoureusement identique à avant ce branchement ; le contrôle
+    d'équivalence (DEC-01), qui réinitialise `ParametresAppliques` à `Historiques()` avant de
+    comparer, reste lui aussi inchangé. `RetenueSpeciale` (1 % en dur) reste volontairement
+    non branchée : `BaremeLegal` n'a pas de champ pour ce taux, ajouter en brancher un est un
+    changement de modèle distinct, non demandé ici.
+    **Découvert au passage, non corrigé, à trancher séparément** : l'écran « Paramètres »
+    (`SettingsViewModel`, menu Configuration) possède son propre éditeur de tranches d'IUTS
+    et de taux pour charges de famille, enregistré dans `AppSettings` (table à part,
+    `DataService.SaveSettingsAsync`) — mais rien dans le moteur de calcul ne lit jamais
+    `AppSettings.TaxBrackets`/`FamilyCharges` : cet éditeur existait déjà avant ce
+    branchement et reste, comme avant, sans aucun effet sur les bulletins. Un utilisateur
+    qui modifierait le barème depuis cet écran croirait à tort avoir changé l'IUTS calculé.
+    Deux devenirs possibles, à trancher avec le client : retirer cet écran (le barème daté,
+    module SOC-02, est désormais le seul point d'entrée qui compte), ou le reconstruire pour
+    qu'il édite le même barème daté plutôt qu'un réglage parallèle mort. Non traité ici pour
+    ne pas mélanger une décision produit avec un branchement technique.
+
+24. **Demandé le 16 septembre 2026 : « le reconstruire l'écran 'Paramètres' pour qu'il
+    édite le même barème »** — suite du point 23 : le client a choisi de reconstruire plutôt
+    que retirer l'écran « Paramètres ». `SettingsViewModel` n'édite plus `AppSettings.
+    TaxBrackets`/`FamilyCharges` (retirés, ainsi que leurs valeurs par défaut câblées en dur
+    et fausses depuis longtemps — code mort, jamais lu par le moteur de calcul, donc sans
+    impact sur les bulletins déjà émis) : il édite désormais le barème daté « en vigueur »
+    (`BaremeService.BaremeApplicableAsync(DateTime.Today)`), exactement le même objet que
+    l'écran « Barèmes légaux ». Une fiche `FicheBareme` clonée (même garde « même barème »
+    par Id qu'ailleurs, pour ne pas écraser une saisie en cours lors d'un rechargement en
+    arrière-plan) porte les grilles Tranches/Charges familiales, avec un texte d'avertissement
+    visible sur les deux onglets : modifier ici change rétroactivement le barème de TOUS les
+    bulletins déjà calculés avec ce barème (contrairement à « Dupliquer » sur l'écran
+    « Barèmes légaux », qui crée une nouvelle version datée sans toucher aux bulletins déjà
+    émis). Les boutons Ajouter/Supprimer tranche et la renumérotation automatique des bornes
+    ont été extraits de `BaremeViewModel` vers un nouvel utilitaire partagé
+    `Helpers/EditionTranches.cs` (`Ajouter`, `Supprimer`, `Renumeroter`), repris tel quel par
+    les deux écrans — pas de changement de comportement, juste la fin d'une duplication.
+    L'enregistrement (bouton « Enregistrer ») valide d'abord la fiche barème
+    (`BaremeLegal.Anomalies()`, mêmes règles que sur « Barèmes légaux »), refuse si une autre
+    version du barème a déjà la même date d'effet, puis persiste via `BaremeService.
+    EnregistrerAsync`. Le bouton « Réinitialiser » recharge les tranches/charges du barème
+    légal initial (`BaremeService.BaremesInitiaux()`) dans la fiche de travail, sans
+    enregistrer automatiquement — au clic sur « Réinitialiser » l'ancien code sauvegardait
+    aussitôt ; c'est désormais à l'utilisateur de confirmer avec « Enregistrer ».
+    **Corrigé au passage, bogue préexistant sans lien avec le barème** : `SaveSettingsAsync`
+    construisait un `AppSettings` tout neuf avant de l'enregistrer, ce qui réinitialisait
+    silencieusement à chaque clic sur « Enregistrer » les champs non touchés par cet écran
+    (`JoursCongesParMois`, `BaseRetenueAbsence`, et surtout `AfficherDeviseSurBulletin`, un
+    réglage utilisé par les écrans Bulletin/Bulletin en lot) à leurs valeurs par défaut C# —
+    corrigé en relisant d'abord les réglages actuels (`DataService.LoadSettingsAsync`) avant
+    de les modifier et de les réenregistrer, comme le fait déjà `UpdateSettingAsync` ailleurs
+    dans le code.
+
+25. **Erreur de build signalée le 16 septembre 2026 (capture d'écran, CS1729)** :
+    `MainViewModel.cs` appelait `new AbsenceViewModel(absenceService, dataService, new
+    AbsenceExcelService())` à 3 arguments, mais `AbsenceViewModel` n'avait qu'un constructeur
+    à 2. En creusant, l'écart dépassait largement ce seul constructeur : `AbsenceView.xaml`
+    (et les modèles `Absence`/`Employee`) étaient déjà prêts pour une recherche/filtres sur la
+    liste des absences et pour une « attribution groupée » de congés (tout l'effectif ou par
+    catégorie), mais rien côté `AbsenceViewModel` ne les servait — build cassé par un montage
+    resté à mi-chemin. Sur confirmation du client (« tout construire »), complété en une seule
+    fois :
+    — *Import/export Excel* (`AbsenceExcelService`, déjà écrit, jamais branché) :
+    `ExporterModeleCommand` génère un classeur pré-rempli avec l'effectif et son solde de
+    congés (bouton « Modèle Excel ») ; `ImporterExcelCommand` (bouton « Importer Excel »)
+    relit un fichier complété et enregistre en masse via `AbsenceService.
+    EnregistrerEnMasseAsync` — qui valide tout le lot avant d'écrire quoi que ce soit, donc un
+    salarié en anomalie (chevauchement, période close...) annule l'import entier plutôt que
+    d'en enregistrer une partie ; le détail des lignes ignorées s'affiche dans une boîte de
+    dialogue.
+    — *Recherche et filtres* sur la liste des absences : `SearchText` (nom, type, motif,
+    matricule), `SelectedTypeFilter` et `SelectedRemunereeFilter`, exposés via une
+    `ICollectionView` (`AbsencesView`), même schéma que les filtres déjà en place sur
+    « Gestion des employés » (`EmployeeManagementViewModel`). Une recherche similaire
+    (`FiltreSalarie`) filtre aussi le sélecteur de salarié du formulaire d'édition.
+    — *Attribution groupée de congés* (panneau rétractable, `ToggleAttributionGroupeeCommand`) :
+    choix d'une catégorie ou de tout l'effectif (`CategoriesFiltre`/`CategorieFiltreSelectionnee`),
+    dates et jours ouvrables calculés (`CalculerJoursGroupeeCommand`, même règle que le calcul
+    unitaire), appliqués en un seul lot via `AppliquerAttributionGroupeeCommand` →
+    `AbsenceService.EnregistrerEnMasseAsync`. Seuls les salariés actifs (`Employee.EstActif`)
+    sont ciblés, comme pour les écrans de lot existants (dette n°20) — un salarié sorti ou
+    suspendu ne reçoit pas de congé collectif. Là aussi, tout le lot est refusé si un seul
+    salarié pose problème.
+    Aucun changement dans `AbsenceView.xaml`, déjà correcte : uniquement `AbsenceViewModel.cs`
+    complété pour la servir.
 
 ---
 

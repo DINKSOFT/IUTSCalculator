@@ -393,6 +393,39 @@ namespace IUTSCalculator.Services
             return liste.Where(s => s.EstActive).ToList();
         }
 
+        /// <summary>
+        /// Variante de <see cref="ChargerActivesParEmployeAsync(string)"/> qui lit DANS la
+        /// transaction en cours plutôt que sur une connexion séparée — nécessaire pour voir
+        /// un TotalAmorti déjà corrigé par cette même transaction avant qu'elle ne soit
+        /// validée (voir <see cref="AppliquerEtEnregistrerRetenuesMoisAsync"/>).
+        /// </summary>
+        private static async Task<List<SaisieOpposition>> ChargerActivesParEmployeAsync(
+            string employeeId, SQLiteConnection conn, SQLiteTransaction trans)
+        {
+            var liste = new List<SaisieOpposition>();
+            if (string.IsNullOrWhiteSpace(employeeId)) return liste;
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = trans;
+                cmd.CommandText =
+                    "SELECT " + ColonnesSaisie + ", e.FirstName, e.LastName " +
+                    "FROM SaisiesOppositions s " +
+                    "LEFT JOIN Employees e ON e.EmployeeId = s.EmployeeId " +
+                    "WHERE s.EmployeeId = @emp " +
+                    "ORDER BY s.Statut ASC, s.DateDebut DESC, s.Id DESC";
+                cmd.Parameters.AddWithValue("@emp", employeeId);
+
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                        liste.Add(LireSaisie(reader));
+                }
+            }
+
+            return liste.Where(s => s.EstActive).ToList();
+        }
+
         public async Task<SaisieOpposition> ChargerParIdAsync(int id)
         {
             using (var conn = _sqliteService.CreateConnection())
@@ -552,8 +585,7 @@ namespace IUTSCalculator.Services
             decimal salaireNetReference,
             DateTime datePrelevement)
         {
-            var saisies = await ChargerActivesParEmployeAsync(employeeId);
-            var repartition = RepartirSaisies(salaireNetReference, saisies);
+            ResultatCalculQuotite repartition;
 
             using (var conn = _sqliteService.CreateConnection())
             using (var trans = conn.BeginTransaction())
@@ -561,7 +593,17 @@ namespace IUTSCalculator.Services
                 try
                 {
                     // 1. Annuler les anciennes retenues enregistrées pour cette même période et ce salarié
-                    // et réajuster les amortissements en conséquence
+                    // et réajuster les amortissements en conséquence.
+                    //
+                    // Ce nettoyage doit se faire AVANT de répartir la nouvelle retenue, pas
+                    // après : un second calcul du même mois (bulletin recalculé après une
+                    // correction, par exemple) lisait sinon un TotalAmorti qui incluait
+                    // encore la retenue déjà enregistrée POUR CE MOIS, sous-évaluant le
+                    // solde restant dû et donc la nouvelle retenue calculée — la créance
+                    // finissait réglée plus vite qu'elle n'aurait dû, ou faussement déclarée
+                    // soldée — signalé le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item
+                    // 22). RepartirSaisies() est maintenant appelé plus bas, une fois ce
+                    // nettoyage fait et les saisies rechargées avec un TotalAmorti à jour.
                     using (var cmdAncien = conn.CreateCommand())
                     {
                         cmdAncien.CommandText = @"
@@ -611,7 +653,14 @@ namespace IUTSCalculator.Services
                         await cmdDel.ExecuteNonQueryAsync();
                     }
 
-                    // 2. Insérer les nouvelles retenues
+                    // 2. Répartir la retenue du mois — maintenant que TotalAmorti a été
+                    // remis à l'état d'avant ce mois (étape 1 ci-dessus), le solde restant
+                    // dû que RepartirSaisies() calcule est le bon, que ce soit le premier
+                    // passage du mois ou une correction.
+                    var saisies = await ChargerActivesParEmployeAsync(employeeId, conn, trans);
+                    repartition = RepartirSaisies(salaireNetReference, saisies);
+
+                    // 3. Insérer les nouvelles retenues
                     foreach (var ligne in repartition.Repartitions)
                     {
                         if (ligne.MontantRetenu <= 0m) continue;

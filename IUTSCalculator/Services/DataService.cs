@@ -53,7 +53,7 @@ namespace IUTSCalculator.Services
         private const string ColonnesEmploye =
             "EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, " +
             "FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, " +
-            "Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, " +
+            "Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, " +
             "DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie";
 
         /// <summary>
@@ -79,6 +79,7 @@ namespace IUTSCalculator.Services
                 // Category doit être affectée en dernier parmi les champs dont elle dépend :
                 // son affectation recalcule IsHigherCategory, qui n'a pas d'accesseur public.
                 Category = DbValue.TextFromDb(reader["Category"]),
+                Service = DbValue.TextFromDb(reader["Service"]),
                 Fonction = DbValue.TextFromDb(reader["Fonction"]),
                 DateEntree = DbValue.DateFromDb(reader["DateEntree"], default(DateTime)),
                 SituationMatrimoniale = DbValue.TextFromDb(reader["SituationMatrimoniale"]),
@@ -121,19 +122,83 @@ namespace IUTSCalculator.Services
             return employees;
         }
 
-        public async Task ImportEmployeesFromFileAsync(string filePath)
+        /// <summary>
+        /// Importe des employés depuis un fichier .csv ou .json.
+        ///
+        /// Les deux formats n'ont PAS le même comportement, et c'est volontaire :
+        ///   • .json — remplacement complet de la liste des employés (DELETE puis
+        ///     réinsertion), pensé pour restaurer une sauvegarde entière.
+        ///   • .csv — ajout / mise à jour PAR MATRICULE, sans jamais supprimer un
+        ///     employé absent du fichier. Une ligne dont le Matricule correspond à un
+        ///     employé déjà présent remplace intégralement sa fiche (comme le ferait
+        ///     l'écran salarié) ; une ligne sans Matricule (ou à un Matricule inconnu)
+        ///     crée un nouvel employé. C'est le format attendu pour ajouter un lot de
+        ///     nouvelles recrues à un dossier déjà en service.
+        ///
+        /// <paramref name="conventionsDisponibles"/> permet de résoudre la colonne CSV
+        /// « ConventionCollective » (saisie par code ou libellé) vers son Id ; à défaut
+        /// (null ou vide), la convention n'est pas affectée et un avertissement est
+        /// ajouté au rapport.
+        /// </summary>
+        public async Task<RapportImportEmployes> ImportEmployeesFromFileAsync(
+            string filePath, IEnumerable<ConventionCollective> conventionsDisponibles = null)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
                 throw new FileNotFoundException("Fichier d'import introuvable.");
 
-            // Exemple pour un fichier JSON (adaptez pour CSV si besoin)
-            var json = await Task.Run(() => File.ReadAllText(filePath));
-            var employees = JsonSerializer.Deserialize<List<Employee>>(json);
+            var rapport = new RapportImportEmployes();
+            string extension = Path.GetExtension(filePath);
 
-            if (employees == null)
-                throw new InvalidOperationException("Aucun employé trouvé dans le fichier.");
+            if (string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                var existants = await LoadEmployeesAsync();
 
-            await SaveEmployeesAsync(employees);
+                var lecture = EmployeeCsvService.Lire(filePath, existants, conventionsDisponibles);
+                rapport.Erreurs.AddRange(lecture.ErreursGlobales);
+                rapport.Avertissements.AddRange(lecture.AvertissementsGlobaux);
+
+                var lignesValides = lecture.Lignes.Where(l => l.EstValide).ToList();
+                foreach (var l in lecture.Lignes.Where(l => !l.EstValide))
+                {
+                    rapport.LignesIgnorees++;
+                    foreach (var e in l.Erreurs)
+                        rapport.Erreurs.Add($"Ligne {l.NumeroLigne} : {e}");
+                }
+                foreach (var l in lecture.Lignes)
+                    foreach (var a in l.Avertissements)
+                        rapport.Avertissements.Add($"Ligne {l.NumeroLigne} : {a}");
+
+                if (lignesValides.Count > 0)
+                {
+                    using (var conn = _sqliteService.CreateConnection())
+                    using (var tx = conn.BeginTransaction())
+                    {
+                        foreach (var l in lignesValides)
+                        {
+                            await AddEmployeeAsync(l.Employe, conn, tx);
+                            if (l.EstMiseAJour) rapport.MisAJour++; else rapport.Ajoutes++;
+                        }
+                        tx.Commit();
+                    }
+                }
+            }
+            else
+            {
+                // .json (ou toute autre extension) : comportement historique, remplacement complet —
+                // conservé pour la restauration d'une sauvegarde JSON existante.
+                var json = await Task.Run(() => File.ReadAllText(filePath));
+                var employees = JsonSerializer.Deserialize<List<Employee>>(json);
+
+                if (employees == null)
+                    throw new InvalidOperationException("Aucun employé trouvé dans le fichier.");
+
+                await SaveEmployeesAsync(employees);
+                rapport.Ajoutes = employees.Count;
+                rapport.Avertissements.Add(
+                    "Import JSON : la liste complète des employés a été remplacée par le contenu du fichier.");
+            }
+
+            return rapport;
         }
 
         public async Task SaveEmployeesAsync(List<Employee> employees)
@@ -178,9 +243,9 @@ namespace IUTSCalculator.Services
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
                     INSERT OR REPLACE INTO Employees
-                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie)
+                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie)
                     VALUES
-                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie);";
+                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @Service, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie);";
 
                 cmd.Parameters.AddWithValue("@EmployeeId", employee.EmployeeId);
                 cmd.Parameters.AddWithValue("@FirstName", employee.FirstName ?? "");
@@ -194,6 +259,7 @@ namespace IUTSCalculator.Services
                 cmd.Parameters.AddWithValue("@IsSpouseWorking", employee.IsSpouseWorking ? 1 : 0);
                 cmd.Parameters.AddWithValue("@PensionContribution", DbValue.MoneyToDb(employee.PensionContribution));
                 cmd.Parameters.AddWithValue("@Category", employee.Category ?? "");
+                cmd.Parameters.AddWithValue("@Service", employee.Service ?? "");
                 cmd.Parameters.AddWithValue("@IsHigherCategory", employee.IsHigherCategory ? 1 : 0);
                 cmd.Parameters.AddWithValue("@Fonction", employee.Fonction ?? "");
                 cmd.Parameters.AddWithValue("@DateEntree",
@@ -316,6 +382,32 @@ namespace IUTSCalculator.Services
             return calculations;
         }
 
+        /// <summary>
+        /// Restaure en masse l'historique des calculs — utilisé par la restauration d'une
+        /// sauvegarde JSON complète (voir <see cref="ImportAllDataAsync"/>) et par le
+        /// « Enregistrer toutes les données » de l'écran principal, qui relit puis
+        /// réenregistre tel quel l'historique courant.
+        ///
+        /// N'insère QUE la ligne TaxCalculations elle-même, SANS passer par
+        /// <see cref="AddCalculationToHistoryAsync(TaxCalculation, SQLiteConnection, SQLiteTransaction)"/> :
+        /// deux effets de bord de cette dernière n'ont pas de sens ici, et corrompaient ou
+        /// bloquaient la restauration — signalé le 16 septembre 2026 (voir
+        /// ETAT-DEVELOPPEMENT.md item 22).
+        ///
+        ///   • Fusion sur la fiche employé : chaque TaxCalculation d'une sauvegarde JSON
+        ///     porte un instantané HISTORIQUE de l'employé (son état CE mois-là), pas son
+        ///     état actuel. Les fusionner un par un, dans l'ordre où la sauvegarde les
+        ///     liste (non garanti chronologique), écrasait la fiche employé actuelle —
+        ///     déjà restaurée séparément par <see cref="SaveEmployeesAsync"/> — par la
+        ///     valeur d'un ancien bulletin pris arbitrairement.
+        ///   • Verrou de clôture : une sauvegarde reflète des bulletins déjà émis, y
+        ///     compris dans des mois clôturés depuis ; le verrou existe pour empêcher une
+        ///     NOUVELLE saisie sur un mois clos, pas pour interdire de restaurer ce qui a
+        ///     déjà été déclaré. Avec le verrou, la restauration échouait entièrement (la
+        ///     transaction entière annulée) dès que la sauvegarde contenait ne serait-ce
+        ///     qu'un bulletin d'un mois clôturé depuis — le cas normal dès que le dossier a
+        ///     un peu vécu.
+        /// </summary>
         public async Task SaveCalculationsHistoryAsync(List<TaxCalculation> calculations)
         {
             using (var conn = _sqliteService.CreateConnection())
@@ -329,7 +421,14 @@ namespace IUTSCalculator.Services
                 }
                 foreach (var c in calculations)
                 {
-                    await AddCalculationToHistoryAsync(c, conn, tx);
+                    if (c == null) continue;
+
+                    if (string.IsNullOrEmpty(c.Id))
+                        c.Id = Guid.NewGuid().ToString();
+                    if (c.CalculationDate == default)
+                        c.CalculationDate = DateTime.Now;
+
+                    await InsererLigneCalculAsync(c, conn, tx);
                 }
                 tx.Commit();
             }
@@ -530,7 +629,7 @@ namespace IUTSCalculator.Services
         /// période jamais ouverte n'est pas close.
         /// </summary>
         private static async Task VerifierPeriodeOuverteAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, TaxCalculation calculation)
+            SQLiteConnection conn, SQLiteTransaction tx, TaxCalculation calculation, string action = "enregistré")
         {
             if (calculation == null) return;
 
@@ -538,10 +637,31 @@ namespace IUTSCalculator.Services
             {
                 throw new InvalidOperationException(string.Format(
                     "La période de {0:MM/yyyy} est clôturée : ce bulletin ne peut plus être " +
-                    "enregistré. Rouvrez la période depuis l'écran « Périodes de paie » si la " +
+                    "{1}. Rouvrez la période depuis l'écran « Périodes de paie » si la " +
                     "correction est justifiée.",
-                    calculation.CalculationDate));
+                    calculation.CalculationDate, action));
             }
+        }
+
+        /// <summary>
+        /// Relit une fiche employé par matricule DANS la transaction en cours (contrairement
+        /// à <see cref="GetEmployeeByIdAsync"/>, qui ouvre sa propre connexion). Utilisé pour
+        /// fusionner en toute sécurité, voir <see cref="AddCalculationToHistoryAsync(TaxCalculation, SQLiteConnection, SQLiteTransaction)"/>.
+        /// </summary>
+        private async Task<Employee> LireEmployeParIdAsync(string employeeId, SQLiteConnection conn, SQLiteTransaction tx)
+        {
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "SELECT " + ColonnesEmploye + " FROM Employees WHERE EmployeeId = @EmployeeId";
+                cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                        return LireEmploye(reader);
+                }
+            }
+            return null;
         }
 
         private async Task AddCalculationToHistoryAsync(TaxCalculation calculation, SQLiteConnection conn, SQLiteTransaction tx)
@@ -560,9 +680,65 @@ namespace IUTSCalculator.Services
 
             // L'employé peut être absent (calcul libre, sans fiche associée) : la colonne
             // EmployeeId accepte alors une chaîne vide, comme plus bas.
-            if (calculation.Employee != null)
-                await AddEmployeeAsync(calculation.Employee, conn, tx);
+            //
+            // Filet de sécurité contre la fiche périmée (signalé les 16 septembre 2026, voir
+            // ETAT-DEVELOPPEMENT.md items 18 et 19) : l'objet Employee attaché à un calcul
+            // peut avoir été chargé en mémoire depuis un moment (écran resté ouvert, calcul
+            // rechargé depuis l'historique...) et ne plus refléter une modification faite
+            // depuis via la fiche salarié ou un import CSV. Enregistrer un calcul ne doit
+            // jamais réécrire une fiche existante avec une copie potentiellement périmée :
+            //   - l'employé n'existe pas encore en base → calcul libre sur un employé tout
+            //     juste créé dans un écran de calcul, on l'insère tel quel ;
+            //   - l'employé existe déjà → seuls les champs qu'un écran de calcul a
+            //     effectivement vocation à modifier (identité et éléments de paie) sont
+            //     recopiés sur la fiche ACTUELLE en base ; tout le reste (état civil,
+            //     coordonnées, convention, date de sortie...) vient de cette fiche actuelle,
+            //     jamais de la copie en mémoire du calcul.
+            if (calculation.Employee != null && !string.IsNullOrWhiteSpace(calculation.Employee.EmployeeId))
+            {
+                var employeActuel = await LireEmployeParIdAsync(calculation.Employee.EmployeeId, conn, tx);
+                if (employeActuel == null)
+                {
+                    await AddEmployeeAsync(calculation.Employee, conn, tx);
+                }
+                else
+                {
+                    employeActuel.FirstName = calculation.Employee.FirstName;
+                    employeActuel.LastName = calculation.Employee.LastName;
+                    // IsHigherCategory n'est pas recopiée : son accesseur set est privé, et
+                    // elle se recalcule automatiquement dès l'affectation de Category
+                    // ci-dessous (voir Employee.Category et Employee.DetermineIfHigherCategory).
+                    employeActuel.Category = calculation.Employee.Category;
+                    employeActuel.BaseSalary = calculation.Employee.BaseSalary;
+                    employeActuel.HousingAllowance = calculation.Employee.HousingAllowance;
+                    employeActuel.TransportAllowance = calculation.Employee.TransportAllowance;
+                    employeActuel.FunctionAllowance = calculation.Employee.FunctionAllowance;
+                    employeActuel.SujetionAllowance = calculation.Employee.SujetionAllowance;
+                    employeActuel.FamilyCharges = calculation.Employee.FamilyCharges;
+                    employeActuel.IsSpouseWorking = calculation.Employee.IsSpouseWorking;
+                    employeActuel.PensionContribution = calculation.Employee.PensionContribution;
 
+                    await AddEmployeeAsync(employeActuel, conn, tx);
+
+                    // Le calcul enregistré référence désormais la fiche à jour, pas la copie
+                    // périmée : la colonne EmployeeId ci-dessous et tout appelant qui relit
+                    // calculation.Employee après cet appel voient l'état réel.
+                    calculation.Employee = employeActuel;
+                }
+            }
+
+            await InsererLigneCalculAsync(calculation, conn, tx);
+        }
+
+        /// <summary>
+        /// Insère (ou remplace) la seule ligne TaxCalculations, sans verrou de clôture ni
+        /// fusion sur la fiche employé — ces deux contrôles sont la responsabilité de
+        /// l'appelant. Utilisée par <see cref="AddCalculationToHistoryAsync(TaxCalculation, SQLiteConnection, SQLiteTransaction)"/>
+        /// (qui les fait avant d'appeler ceci) et directement par
+        /// <see cref="SaveCalculationsHistoryAsync"/> (qui ne doit faire ni l'un ni l'autre).
+        /// </summary>
+        private static async Task InsererLigneCalculAsync(TaxCalculation calculation, SQLiteConnection conn, SQLiteTransaction tx)
+        {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = tx;
@@ -619,14 +795,65 @@ namespace IUTSCalculator.Services
             }
         }
 
+        /// <summary>
+        /// Supprime un bulletin de l'historique.
+        ///
+        /// Contrairement à tous les autres chemins d'écriture sur TaxCalculations, cette
+        /// méthode ne passait par AUCUN verrou de clôture : un bulletin d'un mois déjà
+        /// clôturé (et donc, normalement, déjà déclaré à la CNSS/DGI) pouvait être
+        /// silencieusement supprimé, ce qui est pire qu'une simple réécriture puisque la
+        /// clôture est censée garantir que le bulletin reste consultable tel qu'il a été
+        /// déclaré — signalé le 16 septembre 2026 (voir ETAT-DEVELOPPEMENT.md item 22).
+        /// </summary>
         public async Task DeleteCalculationFromHistoryAsync(string calculationId)
         {
             using (var conn = _sqliteService.CreateConnection())
-            using (var cmd = conn.CreateCommand())
+            using (var tx = conn.BeginTransaction())
             {
-                cmd.CommandText = "DELETE FROM TaxCalculations WHERE Id = @Id";
-                cmd.Parameters.AddWithValue("@Id", calculationId);
-                await cmd.ExecuteNonQueryAsync();
+                try
+                {
+                    DateTime dateCalcul = DateTime.MinValue;
+                    bool trouve = false;
+
+                    using (var cmdLecture = conn.CreateCommand())
+                    {
+                        cmdLecture.Transaction = tx;
+                        cmdLecture.CommandText = "SELECT CalculationDate FROM TaxCalculations WHERE Id = @Id";
+                        cmdLecture.Parameters.AddWithValue("@Id", calculationId);
+                        using (var reader = (SQLiteDataReader)await cmdLecture.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                dateCalcul = DbValue.DateFromDb(reader["CalculationDate"], DateTime.Now);
+                                trouve = true;
+                            }
+                        }
+                    }
+
+                    // Introuvable : rien à supprimer, et donc rien à protéger — pas d'erreur,
+                    // pour que rappeler cette méthode sur un Id déjà supprimé reste sans effet.
+                    if (trouve)
+                    {
+                        await VerifierPeriodeOuverteAsync(
+                            conn, tx, new TaxCalculation { CalculationDate = dateCalcul }, "supprimé");
+                    }
+
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.CommandText = "DELETE FROM TaxCalculations WHERE Id = @Id";
+                        cmd.Parameters.AddWithValue("@Id", calculationId);
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    tx.Commit();
+                }
+                catch
+                {
+                    try { tx.Rollback(); }
+                    catch { /* connexion perdue */ }
+                    throw;
+                }
             }
         }
 

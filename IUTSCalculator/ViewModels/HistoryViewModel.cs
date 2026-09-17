@@ -488,17 +488,24 @@ namespace IUTSCalculator.ViewModels
         }
 
         /// <summary>
-        /// Exécute l'action de rafraîchissement de l'historique
+        /// Exécute l'action de rafraîchissement de l'historique.
+        ///
+        /// Appelle directement la version asynchrone plutôt que le wrapper synchrone
+        /// LoadCalculationHistory() : celui-ci bloque le thread appelant — ici le thread
+        /// d'interface — via Task.Run(...).Wait() jusqu'à la fin du chargement, ce qui
+        /// gelait toute la fenêtre (y compris le rail de navigation) le temps du chargement,
+        /// sans le moindre indicateur visuel malgré IsBusy — signalé le 16 septembre 2026
+        /// (voir ETAT-DEVELOPPEMENT.md item 22).
         /// </summary>
-        private void ExecuteRefreshHistory()
+        private async void ExecuteRefreshHistory()
         {
-            LoadCalculationHistory();
+            await LoadCalculationHistoryAsync();
         }
 
         /// <summary>
         /// Exécute l'action de réinitialisation des filtres
         /// </summary>
-        private void ExecuteClearFilters()
+        private async void ExecuteClearFilters()
         {
             SearchText = string.Empty;
             StartDate = null;
@@ -507,8 +514,9 @@ namespace IUTSCalculator.ViewModels
             ShowAnnualOnly = false;
             ShowMonthlyOnly = false;
 
-            // Recharger tous les calculs
-            LoadCalculationHistory();
+            // Recharger tous les calculs (voir ExecuteRefreshHistory pour le choix de la
+            // version asynchrone).
+            await LoadCalculationHistoryAsync();
         }
 
         /// <summary>
@@ -526,8 +534,9 @@ namespace IUTSCalculator.ViewModels
         {
             if (IsActive)
             {
-                // Recharger l'historique quand le ViewModel devient actif
-                LoadCalculationHistory();
+                // Recharger l'historique quand le ViewModel devient actif (voir
+                // ExecuteRefreshHistory pour le choix de la version asynchrone).
+                _ = LoadCalculationHistoryAsync();
             }
         }
     }
