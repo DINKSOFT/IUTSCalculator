@@ -564,8 +564,8 @@ namespace IUTSCalculator.ViewModels
                 {
                     // Calcul annuel ou régularisation : ce n'est pas la paie d'un mois,
                     // les variables et absences mensuelles n'y ont pas leur place.
-                    result = _taxCalculatorService.CalculateTax(
-                        CurrentEmployee, IsAnnual, IsRegularization, PreviousTaxPaid);
+                    result = await Task.Run(() => _taxCalculatorService.CalculateTax(
+                        CurrentEmployee, IsAnnual, IsRegularization, PreviousTaxPaid));
                 }
                 else
                 {
@@ -573,7 +573,7 @@ namespace IUTSCalculator.ViewModels
                     // absences de la période. Sans cet apport, cet écran et le bulletin
                     // donnaient deux résultats différents pour le même salarié.
                     var apport = await ChargerApportDuMoisAsync(CurrentEmployee);
-                    result = _taxCalculatorService.CalculateMonthlyTax(CurrentEmployee, apport);
+                    result = await Task.Run(() => _taxCalculatorService.CalculateMonthlyTax(CurrentEmployee, apport));
 
                     if (!apport.EstVide)
                     {
