@@ -212,7 +212,6 @@ namespace IUTSCalculator.ViewModels
 
         public EmployeeSelectionViewModel EmployeeSelection { get; }
 
-        private string _filtreSalarie;
         public string FiltreSalarie
         {
             get => EmployeeSelection?.FiltreSalarie;
@@ -223,7 +222,6 @@ namespace IUTSCalculator.ViewModels
 
         public IList<Employee> SalariesFiltres => EmployeeSelection?.SalariesFiltres;
 
-        private Employee _salarieASelectionner;
         public Employee SalarieASelectionner
         {
             get => EmployeeSelection?.SalarieASelectionner;
