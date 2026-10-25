@@ -31,9 +31,18 @@ namespace IUTSCalculator.Services
         {
             if (File.Exists(_usersFilePath))
             {
-                // Lire le fichier de façon synchrone dans un thread de fond pour ne pas bloquer l'UI
-                string json = await Task.Run(() => File.ReadAllText(_usersFilePath)).ConfigureAwait(false);
-                _cachedUsers = JsonSerializer.Deserialize<List<UserAccount>>(json, _jsonOptions) ?? new List<UserAccount>();
+                try
+                {
+                    byte[] encryptedData = await Task.Run(() => File.ReadAllBytes(_usersFilePath)).ConfigureAwait(false);
+                    byte[] decryptedData = ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser);
+                    string json = Encoding.UTF8.GetString(decryptedData);
+                    _cachedUsers = JsonSerializer.Deserialize<List<UserAccount>>(json, _jsonOptions) ?? new List<UserAccount>();
+                }
+                catch (Exception)
+                {
+                    // Si le déchiffrement échoue (ex: fichier non chiffré ou profil utilisateur différent), on repart de zéro
+                    _cachedUsers = new List<UserAccount>();
+                }
             }
             return _cachedUsers;
         }
@@ -42,11 +51,14 @@ namespace IUTSCalculator.Services
         {
             _cachedUsers = users ?? new List<UserAccount>();
             string json = JsonSerializer.Serialize(_cachedUsers, _jsonOptions);
+            byte[] plainData = Encoding.UTF8.GetBytes(json);
+            byte[] encryptedData = ProtectedData.Protect(plainData, null, DataProtectionScope.CurrentUser);
+
             // Créer le dossier de données s'il n'existe pas encore (premier démarrage).
             string dossier = Path.GetDirectoryName(_usersFilePath);
             if (!string.IsNullOrEmpty(dossier))
                 Directory.CreateDirectory(dossier);
-            await Task.Run(() => File.WriteAllText(_usersFilePath, json));
+            await Task.Run(() => File.WriteAllBytes(_usersFilePath, encryptedData));
         }
 
         public async Task<UserAccount> AuthenticateAsync(string username, string password)
