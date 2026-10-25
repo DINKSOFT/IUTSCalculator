@@ -28,6 +28,7 @@ namespace IUTSCalculator.ViewModels
         /// <summary>Apport du dernier calcul mensuel, réutilisé à l'enregistrement.</summary>
         private ApportVariables _dernierApport;
         public ObservableCollection<string> EmployeeCategories => _dataService.EmployeeCategories;
+        private readonly NotificationService _notificationService = NotificationService.Instance;
         private readonly DataService _dataService;
 
         // Variables du mois (PAI-02), absences (PAI-04) et prêts (PAI-05). Facultatifs :
@@ -573,6 +574,7 @@ namespace IUTSCalculator.ViewModels
                 CurrentCalculation = result;
 
                 ResultMessage = $"Impôt calculé pour {PeriodeLibelle} : {result.IUTSNet:N0} FCFA{mentionApport}";
+                _notificationService.Success($"Impôt calculé avec succès pour {CurrentEmployee.FirstName} {CurrentEmployee.LastName}.");
 
                 // Déclencher l'événement de calcul terminé
                 CalculationCompleted?.Invoke(this, EventArgs.Empty);
@@ -583,6 +585,7 @@ namespace IUTSCalculator.ViewModels
             catch (Exception ex)
             {
                 ResultMessage = $"Erreur lors du calcul: {ex.Message}";
+                _notificationService.Error($"Erreur critique lors du calcul : {ex.Message}");
             }
             finally
             {

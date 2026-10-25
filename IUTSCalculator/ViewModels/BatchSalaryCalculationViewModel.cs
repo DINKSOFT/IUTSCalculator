@@ -54,6 +54,13 @@ namespace IUTSCalculator.ViewModels
             set => SetProperty(ref _statusMessage, value);
         }
 
+        private double _progressPercentage;
+        public double ProgressPercentage
+        {
+            get => _progressPercentage;
+            set => SetProperty(ref _progressPercentage, value);
+        }
+
         private bool _isBusy;
         public new bool IsBusy
         {
@@ -260,6 +267,10 @@ namespace IUTSCalculator.ViewModels
 
                 foreach (var emp in salaries)
                 {
+                    int currentCount = Calculations.Count + 1;
+                    ProgressPercentage = (double)currentCount / salaries.Count * 100;
+                    StatusMessage = $"Traitement de l'employé {currentCount} sur {salaries.Count} : {emp.FirstName} {emp.LastName}...";
+
                     try
                     {
                         var apport = await _chaine.ChargerApportAsync(emp, periode, m => erreurs.Add(emp.EmployeeId + " : " + m), avecBareme: false);
