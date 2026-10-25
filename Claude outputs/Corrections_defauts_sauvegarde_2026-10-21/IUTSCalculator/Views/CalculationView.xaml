@@ -1,0 +1,406 @@
+<UserControl x:Class="IUTSCalculator.Views.CalculationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:IUTSCalculator.Views"
+             xmlns:vm="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:converters="clr-namespace:IUTSCalculator.Converters"
+             d:DataContext="{d:DesignInstance Type=vm:CalculationViewModel}"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="1000">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="Label" BasedOn="{StaticResource FormLabelStyle}">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Padding" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="FieldBox" TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="MoneyBox" TargetType="TextBox" BasedOn="{StaticResource FormTextBoxStyle}">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <Style x:Key="ReadMoneyBox" TargetType="TextBox" BasedOn="{StaticResource MoneyBox}">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}"/>
+        </Style>
+        <Style x:Key="Unit" TargetType="Label" BasedOn="{StaticResource FormLabelStyle}">
+            <Setter Property="Margin" Value="8,0,0,8"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête d'écran ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Calcul d'IUTS" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock Text="Impôt unique sur les traitements et salaires — barème du CGI en vigueur"
+                           FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
+            </StackPanel>
+
+            <!-- Période traitée : un calcul de paie appartient à un mois. C'est de lui que
+                 dépendent les variables et absences prises en compte, et sous lui que le
+                 calcul est enregistré — donc déclaré. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                <TextBlock Text="Période" VerticalAlignment="Center" Margin="0,0,10,0"
+                           Style="{StaticResource FormTextBlockLabelStyle}"/>
+                <ComboBox Width="140" Height="34" Margin="0,0,8,0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding MoisDisponibles}"
+                          DisplayMemberPath="Nom"
+                          SelectedItem="{Binding MoisSelectionne}"/>
+                <ComboBox Width="92" Height="34" Margin="0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding AnneesDisponibles}"
+                          SelectedItem="{Binding Annee}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <!-- Sélecteur du salarié à charger (recherche rapide + liste), au lieu de
+                     charger systématiquement le premier de la liste (ETAT-DEVELOPPEMENT.md
+                     item 18/20). -->
+                <Grid Width="140" Margin="0,0,6,0">
+                    <TextBox Text="{Binding FiltreSalarie, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource FormTextBoxStyle}"
+                             Height="34" Padding="22,2,20,2" Margin="0"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Filtrer par nom, prénom, matricule ou emploi..."/>
+                    <TextBlock Text="{StaticResource IconSearch}"
+                               FontFamily="Segoe MDL2 Assets" FontSize="11"
+                               Foreground="{StaticResource InkSubtleBrush}"
+                               HorizontalAlignment="Left" VerticalAlignment="Center"
+                               Margin="6,0,0,0" IsHitTestVisible="False"/>
+                    <Button Command="{Binding ClearFiltreSalarieCommand}"
+                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Margin="0,0,4,0" Width="16" Height="16"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            ToolTip="Effacer la recherche"
+                            Visibility="{Binding HasFiltreSalarie, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                   Foreground="{StaticResource InkSubtleBrush}"/>
+                    </Button>
+                </Grid>
+                <ComboBox Width="170" Height="34" Margin="0,0,8,0"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding SalariesFiltres}"
+                          SelectedItem="{Binding SalarieASelectionner, Mode=TwoWay}"
+                          ToolTip="Salarié à charger">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock TextTrimming="CharacterEllipsis">
+                                <Run Text="{Binding LastName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                <Run Text="{Binding FirstName, Mode=OneWay}"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Content="Nouveau" Tag="{StaticResource IconNew}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding CreateNewEmployeeCommand}"/>
+                <Button Content="Charger un employé" Tag="{StaticResource IconEmploye}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        ToolTip="Charge la fiche du salarié sélectionné ci-contre."
+                        Command="{Binding LoadEmployeeCommand}"/>
+                <Button Content="Effacer" Tag="{StaticResource IconEffaceFormulaire}" Margin="0"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ClearFormCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Saisie | Résultat ═══════════
+             Le ScrollViewer est nécessaire : le code-behind le recherche dans
+             l'arborescence pour faire défiler jusqu'aux résultats après un calcul. -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- ───── Colonne de saisie ───── -->
+                <StackPanel Grid.Column="0">
+
+                    <!-- Type de calcul -->
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="TYPE DE CALCUL" Style="{StaticResource SectionLabelStyle}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="Mensuel" VerticalAlignment="Center" Margin="0,0,20,0"
+                                             IsChecked="{Binding IsAnnual, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}"/>
+                                <RadioButton Content="Annuel" VerticalAlignment="Center" Margin="0,0,26,0"
+                                             IsChecked="{Binding IsAnnual}"/>
+                                <CheckBox Content="Régularisation" VerticalAlignment="Center"
+                                          Style="{StaticResource FormCheckBoxStyle}" Margin="0"
+                                          IsChecked="{Binding IsRegularization}"/>
+                            </StackPanel>
+
+                            <Grid Margin="0,12,0,0"
+                                  Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Label Grid.Column="0" Content="Impôt déjà payé" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Column="1" Margin="0" TextAlignment="Right"
+                                         Style="{StaticResource FormTextBoxStyle}"
+                                         Text="{Binding PreviousTaxPaid, StringFormat=N0}"/>
+                                <Label Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}" Margin="8,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Employé -->
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="EMPLOYÉ" Style="{StaticResource SectionLabelStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Label   Grid.Row="0" Grid.Column="0" Content="Nom" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource FieldBox}"
+                                         Text="{Binding CurrentEmployee.LastName}"/>
+
+                                <Label   Grid.Row="1" Grid.Column="0" Content="Prénom" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource FieldBox}"
+                                         Text="{Binding CurrentEmployee.FirstName}"/>
+
+                                <Label    Grid.Row="2" Grid.Column="0" Content="Catégorie" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+                                          Style="{StaticResource FormComboBoxStyle}"
+                                          ItemsSource="{Binding EmployeeCategories}"
+                                          SelectedItem="{Binding CurrentEmployee.Category}"/>
+
+                                <Label   Grid.Row="3" Grid.Column="0" Content="Charges familiales" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource MoneyBox}"
+                                         HorizontalAlignment="Left" Width="72"
+                                         Text="{Binding CurrentEmployee.FamilyCharges}"/>
+
+                                <CheckBox Grid.Row="4" Grid.Column="1" Content="Conjoint(e) salarié(e)"
+                                          Margin="0,2,0,0"
+                                          Style="{StaticResource FormCheckBoxStyle}"
+                                          IsChecked="{Binding CurrentEmployee.IsSpouseWorking}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Rémunération -->
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="RÉMUNÉRATION" Style="{StaticResource SectionLabelStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Label   Grid.Row="0" Grid.Column="0" Content="Salaire de base" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource MoneyBox}"
+                                         Text="{Binding CurrentEmployee.BaseSalary, StringFormat=N0}"/>
+                                <Label   Grid.Row="0" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="1" Grid.Column="0" Content="Ind. de logement" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource MoneyBox}"
+                                         Text="{Binding CurrentEmployee.HousingAllowance, StringFormat=N0}"/>
+                                <Label   Grid.Row="1" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="2" Grid.Column="0" Content="Ind. de transport" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource MoneyBox}"
+                                         Text="{Binding CurrentEmployee.TransportAllowance, StringFormat=N0}"/>
+                                <Label   Grid.Row="2" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="3" Grid.Column="0" Content="Ind. de fonction" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource MoneyBox}"
+                                         Text="{Binding CurrentEmployee.FunctionAllowance, StringFormat=N0}"/>
+                                <Label   Grid.Row="3" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="4" Grid.Column="0" Content="Cotisation retraite" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Style="{StaticResource MoneyBox}"
+                                         Text="{Binding CurrentEmployee.PensionContribution, StringFormat=N0}"/>
+                                <Label   Grid.Row="4" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Actions : une seule action principale, les autres en retrait -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Calculer l'impôt" Tag="{StaticResource IconCalculator}"
+                                Style="{StaticResource MenuButtonStyle}"
+                                Command="{Binding CalculateTaxCommand}"/>
+                        <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding SaveCalculationCommand}"
+                                Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}"/>
+                        <Button Content="Export Excel" Tag="{StaticResource IconExcel}" Margin="0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ExportExcelCommand}"
+                                Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- ───── Colonne des résultats ───── -->
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="0"
+                        VerticalAlignment="Top">
+                    <StackPanel>
+
+                        <Border BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1" Padding="16,12">
+                            <TextBlock Text="RÉSULTAT DU CALCUL" Style="{StaticResource SectionLabelStyle}" Margin="0"/>
+                        </Border>
+
+                        <!-- État vide -->
+                        <StackPanel Margin="16,40" HorizontalAlignment="Center"
+                                    Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=invert}">
+                            <TextBlock Text="&#xE8CD;" FontFamily="Segoe MDL2 Assets" FontSize="32"
+                                       Foreground="{StaticResource RuleStrongBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Aucun calcul effectué" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkMutedBrush}"
+                                       HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                            <TextBlock Text="Renseignez la rémunération, puis cliquez sur « Calculer l'impôt »."
+                                       FontSize="12" Foreground="{StaticResource InkSubtleBrush}"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0"
+                                       TextWrapping="Wrap" MaxWidth="260" TextAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="16,14"
+                                    Visibility="{Binding HasCalculation, Converter={StaticResource BoolToTypeConverter}}">
+
+                            <TextBlock Text="{Binding ResultMessage}" TextWrapping="Wrap"
+                                       FontSize="13" Foreground="{StaticResource InkMutedBrush}"
+                                       Margin="0,0,0,14"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Label   Grid.Row="0" Grid.Column="0" Content="Salaire brut" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource ReadMoneyBox}"
+                                         Text="{Binding CurrentCalculation.SalaireBrut, StringFormat=N0}"/>
+                                <Label   Grid.Row="0" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="1" Grid.Column="0" Content="Montant exonéré" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource ReadMoneyBox}"
+                                         Text="{Binding CurrentCalculation.ExemptAmount, StringFormat=N0}"/>
+                                <Label   Grid.Row="1" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="2" Grid.Column="0" Content="Revenu imposable" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ReadMoneyBox}"
+                                         Text="{Binding CurrentCalculation.BaseIUTSHorsDeduction, StringFormat=N0}"/>
+                                <Label   Grid.Row="2" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="3" Grid.Column="0" Content="Réduction familiale" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource ReadMoneyBox}"
+                                         Text="{Binding CurrentCalculation.FamilyChargeReduction, StringFormat=N0}"/>
+                                <Label   Grid.Row="3" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="4" Grid.Column="0" Content="Taux moyen" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Style="{StaticResource ReadMoneyBox}"
+                                         Text="{Binding CurrentCalculation.TaxRate, StringFormat=N2}"/>
+                                <Label   Grid.Row="4" Grid.Column="2" Content="%" Style="{StaticResource Unit}"/>
+
+                                <Label   Grid.Row="5" Grid.Column="0" Content="Différence à régler" Style="{StaticResource FieldLabel}"
+                                         Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}"/>
+                                <TextBox Grid.Row="5" Grid.Column="1" Style="{StaticResource ReadMoneyBox}"
+                                         Text="{Binding CurrentCalculation.TaxDifference, StringFormat=N0}"
+                                         Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}"/>
+                                <Label   Grid.Row="5" Grid.Column="2" Content="FCFA" Style="{StaticResource Unit}"
+                                         Visibility="{Binding IsRegularization, Converter={StaticResource BoolToTypeConverter}}"/>
+                            </Grid>
+
+                            <!-- Le montant de l'impôt est le chiffre de l'écran : il se lit
+                                 sans le chercher. -->
+                            <Border Background="{StaticResource AccentTintBrush}"
+                                    BorderBrush="{StaticResource AccentTintRuleBrush}" BorderThickness="1"
+                                    Padding="16,12" Margin="0,6,0,0">
+                                <Grid>
+                                    <TextBlock Text="MONTANT DE L'IUTS" VerticalAlignment="Center"
+                                               HorizontalAlignment="Left"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource AccentDarkBrush}"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding CurrentCalculation.IUTSNet, StringFormat=N0}"
+                                                   FontSize="24" FontWeight="SemiBold"
+                                                   Typography.NumeralAlignment="Tabular"
+                                                   Foreground="{StaticResource InkBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="FCFA" FontSize="12" Margin="7,0,0,3"
+                                                   Foreground="{StaticResource InkSubtleBrush}"
+                                                   VerticalAlignment="Bottom"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <TextBlock Text="DÉTAIL DU CALCUL" Style="{StaticResource SectionLabelStyle}" Margin="0,18,0,8"/>
+                            <TextBox Text="{Binding CurrentCalculation.CalculationDetails}"
+                                     IsReadOnly="True" TextWrapping="Wrap"
+                                     MinHeight="120" MaxHeight="260"
+                                     VerticalScrollBarVisibility="Auto"
+                                     VerticalContentAlignment="Top"
+                                     FontFamily="Consolas" FontSize="12"
+                                     Background="{StaticResource SurfaceAltBrush}"
+                                     BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                     Padding="10" Margin="0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- ═══════════ Pied ═══════════ -->
+        <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{StaticResource RuleBrush}"
+                Margin="0,14,0,0" Padding="0,10,0,0">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontSize="11" VerticalAlignment="Center"
+                           Foreground="{StaticResource InkSubtleBrush}"
+                           Text="{Binding IsBusy, Converter={StaticResource BoolToTypeConverter}, ConverterParameter=text:En cours de traitement...;Prêt}"/>
+                <ProgressBar Width="110" Height="4" Margin="12,0,0,0"
+                             IsIndeterminate="{Binding IsBusy}"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToTypeConverter}}"
+                             VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

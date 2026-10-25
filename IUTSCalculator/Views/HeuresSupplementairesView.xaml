@@ -44,8 +44,10 @@
         <Grid Grid.Row="0" Margin="0,0,0,14">
             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
                 <TextBlock Text="Heures supplémentaires &amp; majorations" Style="{StaticResource ScreenTitleStyle}"/>
-                <TextBlock Text="Décompte mensuel et valorisation légale des heures sup (115%, 130%, 150%, 200%)"
+                <TextBlock Text="Décompte mensuel et valorisation des heures sup selon le barème daté du mois"
                            FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
+                <TextBlock Text="{Binding TauxApplicables, Mode=OneWay}" Margin="0,2,0,0"
+                           FontSize="11" Foreground="{StaticResource AccentBrush2}" TextWrapping="Wrap"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
@@ -207,29 +209,36 @@
                                         HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"
                                         ElementStyle="{StaticResource RightTextStyle}"/>
 
-                    <!-- Heures 15% -->
-                    <DataGridTextColumn Header="HS 15% (115%)"
+                    <!-- Tranche 1 : 41e à 48e heure -->
+                    <DataGridTextColumn Header="HS 41e-48e h"
                                         Binding="{Binding Heures15, StringFormat={}{0:0.##}, UpdateSourceTrigger=PropertyChanged}"
                                         Width="105"
                                         HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"
                                         ElementStyle="{StaticResource RightTextStyle}"/>
 
-                    <!-- Heures 30% -->
-                    <DataGridTextColumn Header="HS 30% (130%)"
+                    <!-- Tranche 2 : au-delà de la 48e heure -->
+                    <DataGridTextColumn Header="HS au-delà 48e h"
                                         Binding="{Binding Heures30, StringFormat={}{0:0.##}, UpdateSourceTrigger=PropertyChanged}"
                                         Width="105"
                                         HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"
                                         ElementStyle="{StaticResource RightTextStyle}"/>
 
-                    <!-- Heures 50% -->
-                    <DataGridTextColumn Header="HS 50% (150%)"
+                    <!-- Nuit d'un jour ouvrable -->
+                    <DataGridTextColumn Header="HS nuit"
                                         Binding="{Binding Heures50, StringFormat={}{0:0.##}, UpdateSourceTrigger=PropertyChanged}"
                                         Width="105"
                                         HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"
                                         ElementStyle="{StaticResource RightTextStyle}"/>
 
-                    <!-- Heures 100% -->
-                    <DataGridTextColumn Header="HS 100% (200%)"
+                    <!-- Dimanche / jour férié, de jour (tranche ajoutée par RH-08) -->
+                    <DataGridTextColumn Header="HS dim./férié jour"
+                                        Binding="{Binding Heures60, StringFormat={}{0:0.##}, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="105"
+                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"
+                                        ElementStyle="{StaticResource RightTextStyle}"/>
+
+                    <!-- Dimanche / jour férié, de nuit -->
+                    <DataGridTextColumn Header="HS dim./férié nuit"
                                         Binding="{Binding Heures100, StringFormat={}{0:0.##}, UpdateSourceTrigger=PropertyChanged}"
                                         Width="105"
                                         HeaderStyle="{StaticResource GridColumnHeaderRightStyle}"

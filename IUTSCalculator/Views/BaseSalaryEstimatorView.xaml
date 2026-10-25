@@ -84,8 +84,9 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Catégorie" Style="{StaticResource FieldLabel}"/>
                         <ComboBox  Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,10"
                                    Style="{StaticResource FormComboBoxStyle}"
+                                   IsEditable="True"
                                    ItemsSource="{Binding EmployeeCategories}"
-                                   SelectedItem="{Binding Category, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                                   Text="{Binding Category, UpdateSourceTrigger=LostFocus, Mode=TwoWay}"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Charges familiales" Style="{StaticResource FieldLabel}"/>
                         <TextBox   Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left" Width="72"

@@ -1,0 +1,109 @@
+<Window x:Class="IUTSCalculator.Views.UserManagementWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Gestion des utilisateurs"
+        Height="620" Width="900"
+        MinHeight="540" MinWidth="820"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="SingleBorderWindow"
+        Background="{StaticResource GrayLightBrush}"
+        FontFamily="Segoe UI">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="2,0,0,14">
+            <TextBlock Text="Gestion des utilisateurs" FontSize="20" FontWeight="Bold"
+                       Foreground="{StaticResource PrimaryBlueDarkerBrush}"/>
+            <TextBlock Text="Sélectionnez un compte dans la liste pour le modifier, ou cliquez sur « Nouvel utilisateur » pour en créer un. Rôles : Lecture seule (consultation), Éditeur (saisie et calculs), Administrateur (tout + gestion des utilisateurs)."
+                       FontSize="12" Foreground="{StaticResource GrayDarkBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.4*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Liste des utilisateurs -->
+            <Border Grid.Column="0" Background="White" CornerRadius="8"
+                    BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1" Padding="10">
+                <DataGrid x:Name="GrilleUtilisateurs" AutoGenerateColumns="False" IsReadOnly="True"
+                          SelectionMode="Single" SelectionUnit="FullRow" HeadersVisibility="Column" RowHeaderWidth="0"
+                          GridLinesVisibility="Horizontal" SelectionChanged="Grille_SelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Nom affiché" Binding="{Binding Nom}" Width="2*"/>
+                        <DataGridTextColumn Header="Identifiant" Binding="{Binding Identifiant}" Width="1.4*"/>
+                        <DataGridTextColumn Header="Rôle" Binding="{Binding RoleLibelle}" Width="1.2*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- Fiche utilisateur : création ou modification du compte sélectionné.
+                 Elle défile si la fenêtre est petite : le panneau du compte sélectionné
+                 n'est plus coupé en bas de la fenêtre. -->
+            <Border Grid.Column="2" Background="White" CornerRadius="8"
+                    BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="14">
+                        <TextBlock x:Name="TitreFiche" Text="Nouvel utilisateur" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{StaticResource InkBrush}" Margin="0,0,0,4"/>
+                        <TextBlock x:Name="AideFiche"
+                                   Text="Remplissez la fiche, puis cliquez sur « Ajouter l'utilisateur »."
+                                   FontSize="11" Foreground="{StaticResource GrayDarkBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Nom affiché" FontSize="11" Margin="0,0,0,2"/>
+                        <TextBox x:Name="FicheNom" Height="28" Margin="0,0,0,8" VerticalContentAlignment="Center"
+                                 BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1"/>
+
+                        <TextBlock Text="Identifiant (pour se connecter)" FontSize="11" Margin="0,0,0,2"/>
+                        <TextBox x:Name="FicheIdentifiant" Height="28" Margin="0,0,0,8" VerticalContentAlignment="Center"
+                                 BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1"/>
+
+                        <TextBlock Text="Rôle" FontSize="11" Margin="0,0,0,2"/>
+                        <ComboBox x:Name="FicheRole" Height="28" Margin="0,0,0,8" SelectedIndex="1">
+                            <ComboBoxItem Content="Lecture seule"/>
+                            <ComboBoxItem Content="Éditeur"/>
+                            <ComboBoxItem Content="Administrateur"/>
+                        </ComboBox>
+
+                        <TextBlock x:Name="LibelleMdp" Text="Mot de passe (6 caractères min.)" FontSize="11"
+                                   TextWrapping="Wrap" Margin="0,0,0,2"/>
+                        <PasswordBox x:Name="FicheMdp" Height="28" Margin="0,0,0,8" VerticalContentAlignment="Center"
+                                     BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1"/>
+
+                        <TextBlock Text="Confirmation du mot de passe" FontSize="11" Margin="0,0,0,2"/>
+                        <PasswordBox x:Name="FicheMdpConfirmation" Height="28" Margin="0,0,0,12" VerticalContentAlignment="Center"
+                                     BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1"/>
+
+                        <Button x:Name="BoutonEnregistrer" Content="Ajouter l'utilisateur"
+                                Style="{StaticResource MenuButtonStyle}"
+                                Height="32" Margin="0,0,0,8" Click="Enregistrer_Click"/>
+                        <Button x:Name="BoutonNouveau" Content="Nouvel utilisateur"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Height="30" Margin="0,0,0,8" Click="Nouveau_Click"
+                                ToolTip="Vide la fiche pour créer un nouveau compte."/>
+                        <Button x:Name="BoutonSupprimer" Content="Supprimer cet utilisateur"
+                                Style="{StaticResource DangerButtonStyle}"
+                                Height="30" Click="Supprimer_Click" Visibility="Collapsed"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <DockPanel Grid.Row="2" Margin="0,14,0,0" LastChildFill="False">
+            <Button Content="Fermer" DockPanel.Dock="Right" Style="{StaticResource SecondaryButtonStyle}"
+                    MinWidth="110" Height="34" Click="Fermer_Click"/>
+            <TextBlock x:Name="MessageEtat" DockPanel.Dock="Left" VerticalAlignment="Center"
+                       FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,12,0"/>
+        </DockPanel>
+    </Grid>
+</Window>

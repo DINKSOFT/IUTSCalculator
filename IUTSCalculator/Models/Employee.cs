@@ -47,6 +47,8 @@ namespace IUTSCalculator.Models
         private int _statutSalarie;
         private int? _posteId;
         private string _managerMatricule;
+        private decimal _soldeCongesReprise;
+        private DateTime? _dateRepriseConges;
         private string _posteLibelle;
         private string _managerNom;
 
@@ -683,9 +685,50 @@ namespace IUTSCalculator.Models
         /// </summary>
         private void DetermineIfHigherCategory()
         {
-            // Les catégories supérieures sont P, A, B et les classes 6, 1 et 2 du secteur public
-            string[] higherCategories = { "Cadre Supérieur" }; //{ "P", "A", "B", "6", "1", "2" }
-            IsHigherCategory = Array.Exists(higherCategories, c => c.Equals(Category, StringComparison.OrdinalIgnoreCase));
+            IsHigherCategory = EstCategorieCadreSuperieur(Category);
+        }
+
+        /// <summary>
+        /// Vrai pour une catégorie de cadre supérieur, qui ouvre droit à l'abattement
+        /// forfaitaire réduit (20 % au lieu de 25 %).
+        ///
+        /// Deux vocabulaires coexistent dans un dossier : la liste historique de la fiche
+        /// (« Cadre Supérieur ») et les libellés des grilles conventionnelles (« Cadres
+        /// Supérieurs »). Seul le premier était reconnu, si bien qu'un salarié classé avec
+        /// le libellé de la grille — ce qu'exigent la prime d'ancienneté et le contrôle du
+        /// minimum — perdait l'abattement de 20 %. La comparaison ignore désormais la
+        /// casse, les accents, les espaces et le pluriel.
+        /// </summary>
+        public static bool EstCategorieCadreSuperieur(string categorie)
+        {
+            string c = NormaliserCategorie(categorie);
+            return c == "cadre superieur" || c == "cadres superieurs" || c == "cadre superieure" || c == "cadres superieures";
+        }
+
+        /// <summary>
+        /// Forme de comparaison d'un libellé de catégorie : minuscules, sans accents,
+        /// espaces multiples réduits.
+        /// </summary>
+        public static string NormaliserCategorie(string categorie)
+        {
+            if (string.IsNullOrWhiteSpace(categorie)) return "";
+            string d = categorie.Trim().Normalize(System.Text.NormalizationForm.FormD);
+            var sb = new System.Text.StringBuilder(d.Length);
+            bool espace = false;
+            foreach (char ch in d)
+            {
+                if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.NonSpacingMark)
+                    continue;
+                if (char.IsWhiteSpace(ch))
+                {
+                    if (!espace) sb.Append(' ');
+                    espace = true;
+                    continue;
+                }
+                espace = false;
+                sb.Append(char.ToLowerInvariant(ch));
+            }
+            return sb.ToString();
         }
 
         /// <summary>
@@ -742,6 +785,9 @@ namespace IUTSCalculator.Models
                 StatutSalarie = StatutSalarie,
                 PosteId = PosteId,
                 ManagerMatricule = ManagerMatricule,
+                SoldeCongesReprise = SoldeCongesReprise,
+                DateRepriseConges = DateRepriseConges,
+                TypeContrat = TypeContrat,
                 PosteLibelle = PosteLibelle,
                 ManagerNom = ManagerNom
             };
@@ -763,6 +809,39 @@ namespace IUTSCalculator.Models
         {
             get => _managerMatricule;
             set { if (_managerMatricule != value) { _managerMatricule = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// Solde de congés repris à l'ouverture du dossier (jours restant dus à la date de
+        /// reprise), pour un salarié déjà en poste avant l'utilisation du logiciel.
+        ///
+        /// Sans reprise, le compteur recomptait 2,5 jours par mois depuis la date d'entrée
+        /// et ignorait tous les congés pris avant le logiciel : un salarié de vingt ans
+        /// d'ancienneté affichait 600 jours dus (défaut n° 7 du guide de formation).
+        /// </summary>
+        public decimal SoldeCongesReprise
+        {
+            get => _soldeCongesReprise;
+            set { if (_soldeCongesReprise != value) { _soldeCongesReprise = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// Date d'arrêté du solde repris. Renseignée : le compteur = solde repris + droits
+        /// acquis depuis cette date − congés pris depuis cette date. Vide : compteur depuis
+        /// la date d'entrée, comme avant.
+        /// </summary>
+        public DateTime? DateRepriseConges
+        {
+            get => _dateRepriseConges;
+            set { if (_dateRepriseConges != value) { _dateRepriseConges = value; OnPropertyChanged(); } }
+        }
+
+        private string _typeContrat;
+        /// <summary>Type de contrat de travail (CDI, CDD, Stage...), repris de l'embauche RH-05.</summary>
+        public string TypeContrat
+        {
+            get => _typeContrat;
+            set { if (_typeContrat != value) { _typeContrat = value; OnPropertyChanged(); } }
         }
 
         /// <summary>

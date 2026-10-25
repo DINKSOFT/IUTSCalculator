@@ -65,7 +65,9 @@ namespace IUTSCalculator.ViewModels
         public string StatusMessage
         {
             get => _statusMessage;
-            set => SetProperty(ref _statusMessage, value);
+            // Une écriture refusée au profil « Lecture seule » remonte de SQLite sous la forme
+            // « not authorized » : on affiche une phrase compréhensible à la place.
+            set => SetProperty(ref _statusMessage, Services.GardeLectureSeule.Traduire(value));
         }
 
         /// <summary>

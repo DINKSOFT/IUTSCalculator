@@ -23,6 +23,34 @@ namespace IUTSCalculator.Models
         public string Details { get; set; }
         public string AdresseMachine { get; set; }
 
+        // ── Scellement (chaînage d'intégrité SHA-256, migration 38) ──────────
+
+        /// <summary>
+        /// Empreinte SHA-256 du contenu de l'entrée et de l'empreinte de l'entrée
+        /// précédente. Vide pour les entrées antérieures au scellement du journal.
+        /// </summary>
+        public string Empreinte { get; set; }
+
+        /// <summary>Empreinte de l'entrée précédente au moment de l'enregistrement.</summary>
+        public string EmpreintePrecedente { get; set; }
+
+        /// <summary>Marquée par « Vérifier l'intégrité » : contenu ou chaînage non conforme.</summary>
+        public bool EstAlteree { get; set; }
+
+        public bool EstScellee
+        {
+            get { return !string.IsNullOrEmpty(Empreinte); }
+        }
+
+        public string StatutScellement
+        {
+            get
+            {
+                if (EstAlteree) return "Altérée";
+                return EstScellee ? "Scellée" : "Non scellée";
+            }
+        }
+
         // ── Propriétés calculées pour l'affichage WPF et les rapports ─────────
 
         public string DateActionFormattee
@@ -116,7 +144,38 @@ namespace IUTSCalculator.Models
         public string Entite { get; set; }
         public string Action { get; set; }
         public string RechercheTexte { get; set; }
+
+        /// <summary>
+        /// Nombre maximal d'entrées renvoyées (taille d'une page à l'écran). 0 ou moins :
+        /// aucune limite — c'est ce que demandent les exports, qui sortent tout le filtre.
+        /// </summary>
         public int Limite { get; set; } = 500;
+
+        /// <summary>Nombre d'entrées à sauter (pagination) : (page - 1) × Limite.</summary>
+        public int Decalage { get; set; }
+
+        /// <summary>
+        /// N° de la dernière entrée prise en compte (figé quand on applique le filtre) : les
+        /// entrées enregistrées ensuite ne décalent pas les pages déjà comptées. Vide : aucune borne.
+        /// </summary>
+        public long? IdMax { get; set; }
+
+        /// <summary>Copie du filtre, pour paginer ou exporter sans toucher au filtre appliqué.</summary>
+        public FiltreAudit Copier()
+        {
+            return new FiltreAudit
+            {
+                DateDebut = DateDebut,
+                DateFin = DateFin,
+                Utilisateur = Utilisateur,
+                Entite = Entite,
+                Action = Action,
+                RechercheTexte = RechercheTexte,
+                Limite = Limite,
+                Decalage = Decalage,
+                IdMax = IdMax
+            };
+        }
 
         public bool EstActif
         {
@@ -128,6 +187,77 @@ namespace IUTSCalculator.Models
                        (!string.IsNullOrWhiteSpace(Entite) && Entite != "Toutes les entités") ||
                        (!string.IsNullOrWhiteSpace(Action) && Action != "Toutes les actions") ||
                        !string.IsNullOrWhiteSpace(RechercheTexte);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Compteurs d'un filtre du journal d'audit, calculés sur TOUTES les entrées qui y
+    /// répondent — et non sur la seule page affichée.
+    /// </summary>
+    public class StatistiquesAudit
+    {
+        public int Total { get; set; }
+        public int ModificationsFinancieres { get; set; }
+        public int ActionsSensibles { get; set; }
+        public DateTime? DerniereActivite { get; set; }
+    }
+
+    /// <summary>
+    /// Résultat de « Vérifier l'intégrité » : la chaîne des empreintes est recalculée
+    /// depuis la première entrée scellée ; la première entrée non conforme est signalée.
+    /// </summary>
+    public class ResultatIntegriteAudit
+    {
+        public DateTime DateVerification { get; set; } = DateTime.Now;
+
+        /// <summary>Faux si la base n'a pas encore les colonnes de scellement (migration 38).</summary>
+        public bool ScellementActif { get; set; }
+
+        public int EntreesControlees { get; set; }
+        public int EntreesScellees { get; set; }
+        public int EntreesNonScellees { get; set; }
+
+        /// <summary>N° (Id) de la première entrée altérée, ou de l'entrée qui suit une rupture.</summary>
+        public long? PremiereEntreeAlteree { get; set; }
+        public DateTime? DatePremiereEntreeAlteree { get; set; }
+
+        /// <summary>Description de la première anomalie ; null si la chaîne est intègre.</summary>
+        public string Anomalie { get; set; }
+
+        /// <summary>Empreinte de la dernière entrée conforme (« empreinte de tête »).</summary>
+        public string EmpreinteDeTete { get; set; }
+
+        public bool EstIntegre
+        {
+            get { return ScellementActif && Anomalie == null; }
+        }
+
+        public string Message
+        {
+            get
+            {
+                if (!ScellementActif)
+                {
+                    return "Journal non scellé : la base du dossier n'a pas encore reçu la mise à niveau " +
+                           "qui ajoute les empreintes (schéma v38). Aucune vérification n'est possible.";
+                }
+
+                string avant = EntreesNonScellees > 0
+                    ? string.Format(" {0} entrée(s) antérieure(s) au scellement sont marquées « non scellées » : elles ne peuvent pas être contrôlées.", EntreesNonScellees)
+                    : "";
+
+                if (Anomalie == null)
+                {
+                    return string.Format(
+                        "✓ Intégrité vérifiée le {0:dd/MM/yyyy à HH:mm} : {1} entrée(s) scellée(s), toutes conformes.{2}{3}",
+                        DateVerification, EntreesScellees, avant,
+                        string.IsNullOrEmpty(EmpreinteDeTete) ? "" : " Empreinte de tête : " + EmpreinteDeTete + ".");
+                }
+
+                return string.Format(
+                    "⚠ Journal altéré — {0} Les {1} entrée(s) scellée(s) qui précèdent sont conformes.{2}",
+                    Anomalie, EntreesScellees, avant);
             }
         }
     }

@@ -88,7 +88,8 @@
                     <ComboBox  Grid.Row="1" Grid.Column="6" Width="170" Margin="0"
                                Style="{StaticResource FormComboBoxStyle}"
                                ItemsSource="{Binding ModesReglement}"
-                               SelectedItem="{Binding ModeReglement, Mode=TwoWay}"/>
+                               SelectedItem="{Binding ModeReglement, Mode=TwoWay}"
+                               ToolTip="« Mode de la fiche » : chaque salarié garde le mode de règlement de sa fiche. Un autre choix s'applique à tous les salariés du lot."/>
 
                     <TextBlock Grid.Row="0" Grid.Column="8" Text="Modèle de bulletin" Style="{StaticResource FieldLabel}"/>
                     <ComboBox  Grid.Row="1" Grid.Column="8" Width="200" Margin="0"

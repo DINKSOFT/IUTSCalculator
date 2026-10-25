@@ -129,12 +129,26 @@ namespace IUTSCalculator.Services
             if (rappel == null) throw new ArgumentNullException(nameof(rappel));
             if (string.IsNullOrWhiteSpace(rappel.EmployeeId)) throw new ArgumentException("L'employé est obligatoire.");
             if (string.IsNullOrWhiteSpace(rappel.Libelle)) throw new ArgumentException("Le libellé est obligatoire.");
+            if (rappel.MoisImputation < 1 || rappel.MoisImputation > 12 || rappel.AnneeImputation < 2000)
+                throw new ArgumentException("Le mois et l'année d'imputation sont obligatoires (mois de 1 à 12).");
 
             return await Task.Run(async () =>
             {
                 int id = rappel.Id;
                 using (var connection = _sqliteService.CreateConnection())
                 {
+                    // Défaut n° 9 du guide : un rappel en attente pouvait viser un mois déjà
+                    // clôturé — il n'y était jamais imputé (aucun bulletin ne s'y recalcule)
+                    // et restait en attente sans que rien ne le signale. Le principe annoncé
+                    // (imputer sur le mois ouvert) est désormais contrôlé.
+                    if (rappel.Statut == StatutRappelPaie.EnAttente &&
+                        await PeriodePaieService.EstClotureeAsync(connection, new DateTime(rappel.AnneeImputation, rappel.MoisImputation, 1)))
+                    {
+                        throw new InvalidOperationException(string.Format(
+                            "Le mois d'imputation {0:00}/{1} est clôturé : un rappel s'impute sur la paie d'un mois ouvert. " +
+                            "Choisissez le mois de paie en cours.", rappel.MoisImputation, rappel.AnneeImputation));
+                    }
+
                     using (var cmd = connection.CreateCommand())
                     {
                         if (id == 0)
@@ -371,6 +385,70 @@ namespace IUTSCalculator.Services
         #region Moteur de calcul différentiel rétroactif
 
         /// <summary>
+        /// Mois de paie sur lequel imputer un rappel par défaut : la période ouverte la plus
+        /// récente ; à défaut, le mois qui suit la dernière période clôturée ; à défaut, le
+        /// mois en cours. « Créer le rappel pour le mois courant » prenait le mois de
+        /// l'horloge du poste, qui peut être un mois déjà clôturé ou pas encore ouvert.
+        /// </summary>
+        public async Task<DateTime> MoisImputationParDefautAsync()
+        {
+            var aujourdhui = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            try
+            {
+                using (var connection = _sqliteService.CreateConnection())
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='PeriodesPaie';";
+                        if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 0) return aujourdhui;
+                    }
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT MAX(Annee * 100 + Mois) FROM PeriodesPaie WHERE Statut = 0;";
+                        object o = await cmd.ExecuteScalarAsync();
+                        if (o != null && o != DBNull.Value && Convert.ToInt32(o) > 0)
+                        {
+                            int am = Convert.ToInt32(o);
+                            return new DateTime(am / 100, am % 100, 1);
+                        }
+                    }
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT MAX(Annee * 100 + Mois) FROM PeriodesPaie WHERE Statut = 1;";
+                        object o = await cmd.ExecuteScalarAsync();
+                        if (o != null && o != DBNull.Value && Convert.ToInt32(o) > 0)
+                        {
+                            int am = Convert.ToInt32(o);
+                            return new DateTime(am / 100, am % 100, 1).AddMonths(1);
+                        }
+                    }
+                }
+            }
+            catch (SQLiteException)
+            {
+                // Base illisible : repli sur le mois en cours.
+            }
+            return aujourdhui;
+        }
+
+        /// <summary>
+        /// Écart d'IUTS qu'un gain imposable et cotisable de <paramref name="gain"/> FCFA
+        /// produit sur le bulletin du salarié (même moteur que la paie, barème courant).
+        /// Renvoie 0 si le moteur n'est pas branché.
+        /// </summary>
+        public decimal DeltaIutsPourGain(Employee employee, decimal gain)
+        {
+            if (_taxCalculatorService == null || employee == null || gain == 0m) return 0m;
+
+            var sans = _taxCalculatorService.CalculateMonthlyTax(employee, ApportVariables.Aucun());
+            var rappel = new ApportRappels();
+            rappel.AjouterLigne("RAPPELSAL", "Simulation de rappel", gain > 0m ? SensRubrique.Gain : SensRubrique.Retenue,
+                                Math.Abs(gain), true, true, true);
+            var avec = _taxCalculatorService.CalculateMonthlyTax(employee, ApportVariables.Aucun().AvecRappels(rappel));
+            return Math.Round(avec.IUTSNet - sans.IUTSNet, 0, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>
         /// Calcule le différentiel rétroactif mois par mois sur une plage de mois passés fermés.
         /// Respecte le plafonnement de la CNSS (800 000 FCFA/mois) et les taux légaux.
         /// </summary>
@@ -420,7 +498,11 @@ namespace IUTSCalculator.Services
                 decimal deltaCnssSalarial = Math.Round(deltaAssietteCnss * TauxCnssSalarialDefaut, MidpointRounding.AwayFromZero);
                 decimal deltaCnssPatronal = Math.Round(deltaAssietteCnss * TauxCnssPatronalDefaut, MidpointRounding.AwayFromZero);
                 decimal deltaTpa = Math.Round(deltaBrut * tauxTpa, MidpointRounding.AwayFromZero);
-                decimal deltaNet = deltaBrut - deltaCnssSalarial;
+
+                // Défaut n° 9 : l'écart d'IUTS valait toujours 0. Il est simulé par le
+                // moteur de paie, mois par mois, comme si la hausse avait été payée à temps.
+                decimal deltaIuts = DeltaIutsPourGain(employee, deltaBrut);
+                decimal deltaNet = deltaBrut - deltaCnssSalarial - deltaIuts;
 
                 details.Add(new LigneRappelRetroactifDetail
                 {
@@ -435,7 +517,7 @@ namespace IUTSCalculator.Services
                     DeltaCnssSalarial = deltaCnssSalarial,
                     DeltaCnssPatronal = deltaCnssPatronal,
                     DeltaTpa = deltaTpa,
-                    DeltaIuts = 0m,
+                    DeltaIuts = deltaIuts,
                     DeltaNet = deltaNet,
                     Observation = deltaAssietteCnss < deltaBrut ? "Assiette CNSS plafonnée à 800 000 FCFA" : "Plein différentiel"
                 });
@@ -782,10 +864,26 @@ namespace IUTSCalculator.Services
 
         #region Branchement Bulletin & ApportVariables
 
+        /// <summary>
+        /// Rappels du mois d'imputation d'un salarié : en attente ET déjà imputés à CE mois.
+        ///
+        /// Seuls les rappels « En attente » étaient repris ; or l'enregistrement d'un bulletin
+        /// les marque « Imputé ». Recalculer un mois déjà enregistré (Calcul en lot, Calcul
+        /// d'IUTS, plage de mois, régénération du bulletin, bulletin de sortie) perdait donc
+        /// ses rappels. Un rappel imputé reste attaché à son propre mois d'imputation, et à
+        /// lui seul ; un rappel annulé n'est jamais repris.
+        /// </summary>
         public async Task<ApportRappels> ApportAsync(int annee, int mois, string employeeId)
         {
-            var rappels = await ObtenirRappelsAsync(annee, mois, employeeId, StatutRappelPaie.EnAttente);
+            var rappels = await ObtenirRappelsDuMoisAsync(annee, mois, employeeId);
             return ApportDe(rappels, employeeId);
+        }
+
+        /// <summary>Rappels imputables au mois (en attente ou imputés à ce mois), hors annulés.</summary>
+        public async Task<List<RappelPaie>> ObtenirRappelsDuMoisAsync(int annee, int mois, string employeeId = null)
+        {
+            var rappels = await ObtenirRappelsAsync(annee, mois, employeeId, null);
+            return rappels.Where(r => r.Statut != StatutRappelPaie.Annule).ToList();
         }
 
         public static ApportRappels ApportDe(IEnumerable<RappelPaie> tousLesRappels, string employeeId)
@@ -793,9 +891,11 @@ namespace IUTSCalculator.Services
             var apport = new ApportRappels();
             if (tousLesRappels == null) return apport;
 
+            // En attente ou déjà imputé : la liste fournie est celle du mois calculé
+            // (ObtenirRappelsDuMoisAsync) ; un rappel annulé n'est jamais repris.
             var pourEmploye = tousLesRappels.Where(r =>
                 string.Equals(r.EmployeeId, employeeId, StringComparison.OrdinalIgnoreCase) &&
-                r.Statut == StatutRappelPaie.EnAttente);
+                r.Statut != StatutRappelPaie.Annule);
 
             foreach (var r in pourEmploye)
             {

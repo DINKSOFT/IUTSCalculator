@@ -4,13 +4,19 @@ Ce fichier sert à **reprendre le travail dans une nouvelle conversation** sans 
 zéro. Il dit où en est le projet, quelles décisions ont été prises et pourquoi, et ce qui
 reste en dette. Il se met à jour à chaque module livré.
 
-Dernière mise à jour : 17 septembre 2026 — après **RH-01** (« Organigramme d'entreprise » :
-directions, services, postes et rattachements hiérarchiques N+1, visualisation arborescente dynamique WPF,
-affectation rapide des salariés, exports ClosedXML 3 feuilles et PDF officiel). Ce module a exigé l'ajout de
-deux tables (`UnitesOrganisationnelles` et `Postes`) ainsi que de colonnes de rattachement hiérarchique
-(`PosteId`, `ManagerMatricule`) sur la table `Employees`, d'où une migration de schéma (`SchemaCible` passe à **29**).
-Le module s'intègre sous une nouvelle section de menu « RESSOURCES HUMAINES » dans la barre de navigation.
-La Phase 4 (« Pilotage, automatisation et conventionnel » / Volet Ressources humaines) progresse à plein régime.
+Dernière mise à jour : 19 octobre 2026 — livraison du module **RH-07** (« Santé & sécurité au travail »), qui **achève la
+Phase 4**. Trois registres : visites médicales (embauche, périodiques, reprise, à la demande) et leurs échéances, avec une
+périodicité de 12 mois ajustable par poste (RH-02) ; équipements de protection individuelle remis à chaque salarié (catalogue
+avec durée de vie, renouvellements, fiche de dotation à signer) ; accidents du travail, de trajet et maladies
+professionnelles (délai de déclaration de **48 heures ouvrables** à la CNSS et à l'inspection du travail, fiche PDF préparant
+l'imprimé de la CNSS, arrêt reporté dans les absences, **indemnités journalières des 2/3 à réclamer à la CNSS** — choix du
+client : salaire maintenu en entier). Échéancier, registre Excel 5 feuilles. `SchemaCible = 37`.
+Plus tôt le même jour : RH-08 (par anticipation), RH-06 « Discipline & procédures » (`SchemaCible = 35`), correction de la
+dette signalée (`SchemaCible = 36`), équivalence **8 heures = 1 jour** pour les absences, barre de défilement du planning RH-08.
+**Les Phases 1 à 4 sont livrées** ; suite proposée au client (§2, « Prochain »).
+En fin de journée, **protection des données lors des mises à jour** (version **1.4.37.1**) : mise à niveau des bases tout ou
+rien (copie de travail contrôlée puis substituée), refus d'une base plus récente que le programme, numéro de version
+affiché, sauvegarde / restauration de toutes les données du poste (§3, §4, §7 et « Mettre à jour un client » au §8).
 
 ---
 
@@ -28,7 +34,7 @@ chaque phase ouvre les suivantes.
 
 ## 2. Où en est le développement
 
-### Livré (Phases 1, 2 et 3 intégralement achevées, Phase 4 en cours)
+### Livré (Phases 1, 2, 3 et 4 intégralement achevées)
 
 | Module | Objet |
 |---|---|
@@ -48,7 +54,7 @@ chaque phase ouvre les suivantes.
 | CPT-01 | Écritures de paie SYSCOHADA (pièce d'OD mensuelle équilibrée, exports Excel et texte) |
 | CPT-02 | Ordres de virement bancaire et récapitulatif des règlements (filtrage banque/mode, détection anomalies RIB, exports Excel et CSV) |
 | ADM-02 | Journal d'audit et traçabilité des opérations (suivi fin des salaires et primes, traçabilité des actions sensibles, exports ClosedXML et CSV) |
-| PAI-03 | Heures supplémentaires et majorations légales (saisie mensuelle tranches 115%, 130%, 150%, 200%, valorisation automatique, intégration bulletin/masse, export Excel) |
+| PAI-03 | Heures supplémentaires et majorations légales (saisie mensuelle, valorisation automatique, intégration bulletin/masse, export Excel) — cinq tranches sur barème daté depuis RH-08 (15/35/50/60/120 dès octobre 2026, 15/30/50/100 avant) |
 | SOC-05 | Grilles de salaires et conventions collectives (classification catégorielle, salaires minima garantis, prime d'ancienneté légale CCI-BF, alertes conformité, intégration bulletin) |
 | SAL-05 | Solde de tout compte et gestion des départs (décompte de rupture légal burkinabè, indemnités préavis et licenciement, apurement prêts, reçus PDF/Excel, certificat Art. 67, attestation de service) |
 | PAI-06 | Saisies-arrêts, cessions et oppositions (calcul par tranches de la quotité saisissable, super-privilège alimentaire, répartition au marc le franc, arrêt auto, exports Excel) |
@@ -57,19 +63,39 @@ chaque phase ouvre les suivantes.
 | DEC-05 | État annuel des salaires — DADS (cumuls annuels par salarié et par rubrique : brut, base imposable, IUTS retenu, cotisations CNSS/TPA, alimentés par les mois clôturés) |
 | PIL-01 | Tableau de bord masse salariale (évolution mensuelle du brut, du net et du coût employeur ; ventilation par catégorie et par service ; alimenté par les mois clôturés ; export Excel 3 feuilles) |
 | RH-01 | Organigramme d'entreprise (directions, services, postes et rattachements hiérarchiques N+1, détection de cycles, visualisation arborescente WPF, affectations, double export Excel 3 feuilles et PDF officiel) |
+| RH-02 | Postes & fiches de poste (missions, activités, profil, compétences 1-4, classification conventionnelle, effectif budgété vs pourvu, 4 statuts GPEC, exports ClosedXML 3 feuilles et fiche PDF officielle A4) |
+| RH-03 | Entretiens & évaluations (campagnes annuelles, grilles d'évaluation multicritères, objectifs N-1/N+1, notation pondérée sur 5, verrouillage d'immutabilité dès validation, recensement besoins de formation RH-04, double export PDF tripartite et Excel 4 feuilles) |
+| RH-04 | Formation (plans annuels de formation, catalogue avec compétences RH-02, organismes agréés/internes, sessions, inscriptions, pointage présence, attestations officielles A4, verrou probatoire, passerelle RH-03, tableau de bord TPA, exports Excel 4 feuilles) |
+| RH-08 | Gestion des temps & rotations (équipes et cycles, planning jour par jour, jours fériés, arrêté de période, import pointages/grille Excel, décompte hebdomadaire en 5 tranches, transferts HS/absences/paniers vers la paie, barème HS daté, export Excel planning + récapitulatif) — **livré avant RH-06/RH-07 à la demande du client** |
+| RH-05 | Recrutement & candidatures (expression de besoin avec motifs et quota, vivier de candidats, candidatures multi-étapes, entretiens et notations, intégration directe et atomique en fiche salarié SAL-01 avec affectation de poste RH-01, garde-fou anti-sur-recrutement, verrou probatoire inviolable, lettre d'embauche officielle A4 conforme Loi n°028-2008/AN, bilan consolidé ClosedXML 4 feuilles) |
+| RH-06 | Discipline & procédures (procédure de la constatation à la notification, contrôles de procédure en direct, catalogue des sanctions et délais paramétrables, salarié protégé / inspection du travail, 5 lettres PDF, pièces, échéancier, registre des sanctions Excel, mise à pied → absence PAI-04, licenciement → SAL-05) |
+| RH-07 | Santé & sécurité au travail (visites médicales et échéances, périodicité par poste, situation médicale par salarié ; EPI : catalogue, remises, renouvellements, fiche de dotation PDF ; accidents du travail : déclaration CNSS + inspection en 48 h ouvrables, fiche PDF pour l'imprimé CNSS, arrêt → absence PAI-04, indemnités journalières 2/3 ; échéancier ; registre Excel 5 feuilles) |
 
 ### Prochain
 
-**Phase 4 — Pilotage, automatisation et conventionnel.**
-Ordre strict de la feuille de route (« Feuille de route Sigma Paie & RH.pdf », 53 modules) : SAL-05, PAI-03,
-PAI-08, DEC-05, PIL-01 et RH-01 sont désormais tous livrés. Le prochain module est **RH-02** (« Postes & fiches de poste : missions, compétences requises, classification conventionnelle, effectif budgété vs pourvu »).
+**Phase 4 — Pilotage, automatisation et conventionnel : achevée** avec RH-07 (19 octobre 2026).
+Ordre de la feuille de route (« Feuille de route Sigma Paie & RH.pdf », 53 modules) : SAL-05, PAI-03, PAI-08, DEC-05,
+PIL-01, RH-01 à RH-08 sont tous livrés. Restent les modules hors phase (21). Ordre proposé au client le 19 octobre 2026 :
+**PAI-10 avant la paie de décembre**, puis SOC-04, DEC-07, SAL-02 / SAL-03 / SAL-04, les états (ETA), le pilotage (PIL) et
+l'administration (ADM) — à confirmer avec lui avant d'attaquer.
 
 ---
 
 ## 3. Schéma de base
 
-`SQLiteService.SchemaCible` vaut **29**. Chaque montée de version fait une sauvegarde
-`.avant-vN.bak` à côté du fichier avant de migrer.
+`SQLiteService.SchemaCible` vaut **38** (constante publique, lue aussi par `VersionApplication`). Chaque montée de
+version fait une sauvegarde `.avant-vN.bak` à côté du fichier avant de migrer.
+
+**Mise à niveau tout ou rien (depuis le 19 octobre 2026).** `EnsureSchema` ne migre plus le fichier du dossier
+lui-même : il copie la base (`<base>.migration.tmp`), applique la chaîne `AppliquerMigrations` sur la copie, contrôle
+le résultat (`PRAGMA quick_check` — seulement si la base était saine avant —, niveau atteint, table `Employees`), puis
+substitue la copie à l'original par `File.Replace` (réessais si un antivirus ou une connexion retient le fichier). En
+cas d'erreur, de coupure ou d'arrêt brutal, le fichier du dossier est intact et la copie est jetée (un reste est nettoyé
+à l'ouverture suivante). Une seule transaction englobante était impossible : certaines migrations posent des `PRAGMA`
+hors transaction et ouvrent leurs propres transactions. Un **dossier neuf** est créé de la même façon. Une base dont
+le niveau dépasse `SchemaCible` lève `BaseTropRecenteException` (fichier non touché) : l'écran de sélection du dossier
+prépare la base AVANT d'ouvrir le dossier et affiche le message (programme trop ancien, ou mise à niveau impossible)
+au lieu de planter. `SQLiteService.LireVersionFichier(chemin)` lit le niveau d'un fichier sans rien modifier.
 
 | N° | Objet |
 |---|---|
@@ -99,11 +125,20 @@ PAI-08, DEC-05, PIL-01 et RH-01 sont désormais tous livrés. Le prochain module
 | 27 | Rubrique « Avance sur salaire » (`AVANCE`, 4221/4270) — dette n°7 : donne enfin à l'avance sur salaire (PAI-05) un compte distinct de la retenue générique 422100 |
 | 28 | Service d'affectation (`Department`) sur la fiche employé et synchronisation du schéma vierge |
 | 29 | Organigramme d'entreprise et postes (`UnitesOrganisationnelles`, `Postes`, colonnes `PosteId`, `ManagerMatricule` dans `Employees`) |
+| 30 | Fiches de poste et compétences (`Competences`, `PosteCompetences`, 12 colonnes étendues sur `Postes`, pré-remplissage de 10 compétences de référence) |
+| 31 | Entretiens & évaluations (`CampagnesEvaluation`, `EntretiensEvaluation`, `EntretienCriteres`, `EntretienObjectifs`, `EntretienBesoinsFormation`, index unique `UX_EntretiensEvaluation_Campagne_Employe`, pas de `CASCADE` sur `EmployeeId`) |
+| 32 | Formation professionnelle et contrepartie TPA (`PlansFormation`, `OrganismesFormation`, `FormationsCatalogue`, `SessionsFormation`, `SessionInscriptions`, index unique `UX_SessionInscriptions_Session_Employe`, colonne `SessionFormationId` sur `EntretienBesoinsFormation`, amorçage 2 organismes et 3 actions catalogue) |
+| 34 | Gestion des temps & rotations, RH-08 (`BaremesHeuresSup` daté + 2 barèmes livrés, `HeuresSupplementaires.Heures60/Montant60`, `Absences.PeriodeImputation`, `EquipesTravail`, `EquipesMembres`, `PlanningJours` unique `(EmployeeId, DateJour)`, `JoursFeries`, `ParametresTemps`, rubrique `PANIER`) |
+| 37 | Santé & sécurité au travail, RH-07 (`ParametresSST` une ligne, `PeriodicitesVisitePoste`, `VisitesMedicales`, `TypesEPI` + 10 EPI courants à 12 mois, `DotationsEPI`, `AccidentsTravail` référence unique `AT-AAAA-NNNN` ; aucune donnée existante transformée) |
+| 36 | Correction de dette : plan de paie initial complet posé (INSERT OR IGNORE) dans tout dossier dont le plan ne contient pas `SALBASE` — signature d'un plan jamais amorcé ; registre `MandatsRepresentatifs` (RH-06) |
+| 35 | Discipline & procédures, RH-06 (`ParametresDiscipline` une ligne, `TypesSanction` + 5 sanctions livrées AVT/BLA/MAP/LIC/LFL, `ProceduresDisciplinaires`, `PiecesDisciplinaires` ; aucune donnée existante transformée) |
+| 33 | Recrutement & gestion des candidatures (`RecrutementBesoins`, `RecrutementCandidats`, `RecrutementCandidatures`, `RecrutementEntretiens`, index unique `UX_RecrutementCandidatures_Besoin_Candidat`, amorçage d'un besoin initial et de deux profils candidats) |
+| 38 | Corrections du guide de formation (21 octobre 2026) : `Migration38_CorrectionsPaie` (REMBFRAIS/FRAISMISS hors TPA si encore au réglage d'origine ; rubriques de sortie `INDCONGES`, `INDDEPART`, `INDDIVERS`, `RETSORTIE` ; `Employees.SoldeCongesReprise`, `DateRepriseConges`), `Migration38_SanteSecurite` (`AccidentsTravail.DateDepotIJ`, `MontantRembourseIJ`, `DateRemboursementIJ`), `Migration38_Entretiens` (`EntretiensEvaluation.ValidePar`), `Migration38_Recrutement` (`Employees.TypeContrat`, `RecrutementCandidatures.TypeContratEmbauche`, `RecrutementBesoins.Indemnite*`), `Migration38_FichesDePostes` (`PosteCompetences.NiveauAVerifier`, lignes existantes marquées « à vérifier », jamais converties), `Migration38_ParametresComptables` (table clé/valeur, valeurs initiales = anciens comptes codés en dur), `Migration38_AuditScelle` (`JournalAudit.Empreinte`/`EmpreintePrecedente`, `JournalAuditScellement`, déclencheurs anti-modification/suppression). Toutes idempotentes, aussi appelées par `CreerSchemaComplet`. |
 
 **Bases vierges.** `CreerSchemaComplet` rejoue désormais les migrations qui CRÉENT quelque
-chose (12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29). Un dossier neuf est enregistré directement au niveau cible et
+chose (12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29, 30, 31, 32, 33, 34, 35, 36, 37 — le plan de paie de la 36 en dernier). Un dossier neuf est enregistré directement au niveau cible et
 saute toute la chaîne : il naît avec toutes les tables nécessaires (`Absences`, `Prets`,
-`ProfilsPaie`, `JournalAudit`, `HeuresSupplementaires`, `ConventionsCollectives`, `SoldesToutCompte`, `SaisiesOppositions`, `UnitesOrganisationnelles`, `Postes`, etc.).
+`ProfilsPaie`, `JournalAudit`, `HeuresSupplementaires`, `ConventionsCollectives`, `SoldesToutCompte`, `SaisiesOppositions`, `UnitesOrganisationnelles`, `Postes`, `Competences`, `PosteCompetences`, `CampagnesEvaluation`, `EntretiensEvaluation`, `EntretienCriteres`, `EntretienObjectifs`, `EntretienBesoinsFormation`, `PlansFormation`, `OrganismesFormation`, `FormationsCatalogue`, `SessionsFormation`, `SessionInscriptions`, `RecrutementBesoins`, `RecrutementCandidats`, `RecrutementCandidatures`, `RecrutementEntretiens`, `TypesSanction`, `ProceduresDisciplinaires`, `PiecesDisciplinaires`, `ParametresDiscipline`, `MandatsRepresentatifs`, `ParametresSST`, `PeriodicitesVisitePoste`, `VisitesMedicales`, `TypesEPI`, `DotationsEPI`, `AccidentsTravail`) et un plan de paie complet.
 La migration 27 n'y figure pas : elle ne fait qu'insérer une rubrique, déjà couverte pour un
 dossier neuf par `RubriqueService.RubriquesDeSaisie()` (même principe que la migration 11).
 
@@ -123,6 +158,10 @@ dossier neuf par `RubriqueService.RubriquesDeSaisie()` (même principe que la mi
 - **Barres d'outils** : jamais une grille toutes colonnes `Auto` — elle ne se comprime pas
   et pousse le dernier groupe hors de l'écran. Une colonne `*` absorbe la largeur restante.
 - Pas d'accent dans les identifiants C#. Pas de propriété portant le nom de son type.
+- **Numéro de version** (`Properties/AssemblyInfo.cs`, seul endroit à changer) : `1.<dernière phase livrée>.<SchemaCible>.<révision>`,
+  et `AssemblyInformationalVersion` = « numéro du JJ/MM/AAAA », libellé affiché (titre de la fenêtre, barre d'état, À propos,
+  écran de sélection du dossier, manifeste des sauvegardes) via `Helpers/VersionApplication`. **À chaque livraison** : nouvelle
+  révision (ou nouveau niveau de schéma) et nouvelle date. 19/10/2026 : `1.4.37.1`.
 
 ## 5. Méthode de travail
 
@@ -131,10 +170,17 @@ dossier neuf par `RubriqueService.RubriquesDeSaisie()` (même principe que la mi
   nouvelles produit un résultat inchangé, au centime. L'écran **« Contrôle du moteur »**
   le vérifie en rejouant chaque bulletin avec l'ancienne formule et la nouvelle, sans
   aucune tolérance d'arrondi. C'est la preuve, pas la promesse.
-- **`device_bash` est inutilisable sur ce poste** (depuis une mise à jour Windows du
-  8 septembre 2026). Le déploiement passe par : édition locale → validation → copie dans
-  `/mnt/user-data/outputs/` → `SendUserFile` → `device_list_dir` pour relever les mtimes →
-  `device_commit_files` avec `expectedMtimeMs`.
+- **`device_bash` fonctionne à nouveau sur ce poste depuis le 6 octobre 2026** (il était
+  inutilisable depuis une mise à jour Windows du 8 septembre). Livraison de RH-08 : une seule
+  archive déposée puis extraite sur place, sommes de contrôle vérifiées fichier par fichier
+  après extraction, originaux sauvegardés dans `Claude outputs\RH-08_sauvegarde_2026-10-19`.
+- **Vérification de compilation dans le cloud (depuis RH-08)** : le compilateur Roslyn du SDK
+  .NET 8 compile TOUT le projet (liste `<Compile>` du vrai `.csproj`) contre les assemblys de
+  référence .NET Framework 4.8 du poste (WPF compris) et les DLL du dossier `packages`, avec
+  des talons générés pour le code XAML (`InitializeComponent`, champs `x:Name`). Zéro erreur
+  avant livraison. Les services sont aussi exécutés sous Mono sur une vraie base SQLite
+  (fournisseur `Mono.Data.Sqlite`), y compris la migration d'un dossier v33 créé par
+  l'ANCIEN code : c'est ce qui prouve l'équivalence au centime des mois antérieurs.
 - **Vérifier que CHAQUE fichier modifié d'un lot a bien été livré, pas seulement les
   derniers touchés.** Avant DEC-02, `ApportVariables.cs` (les méthodes `AvecPrets` et
   `AvecProfil` ajoutées pour PAI-05/SOC-03) et le branchement de `MainViewModel.cs` sur les
@@ -1198,9 +1244,575 @@ la feuille de route à partir d'ici — après avoir confirmé le prochain modul
     latérale de `MainWindow.xaml`, intégration dans le moteur de recherche du menu avec mots-clés RH,
     et respect du cycle de vie `OnIsActiveChanged` pour le rafraîchissement temps réel des effectifs.
 
+27. **Livré le 17 septembre 2026 : RH-02 — Postes & fiches de poste** :
+    Deuxième module du volet Ressources Humaines (Phase 4).
+    — *Modèle relationnel et fiches de poste* (`Models/FichePoste.cs`, `Models/Organigramme.cs`) :
+    extension de `Poste` avec finalité principale, activités clés & tâches régulières, niveau d'étude requis,
+    diplôme exigé, expérience minimale requise, conditions particulières de travail, convention collective de rattachement,
+    catégorie et échelon conventionnels indicatifs, salaire minimum conventionnel issu de la grille SOC-05,
+    fourchette de salaire budgétée (min - max).
+    — *Catalogue des compétences d'entreprise* : `DomaineCompetence` (Technique, Management, Relationnel, Organisationnel, JuridiqueEtReglementaire),
+    `NiveauMaitrise` (Notions 1 ★, Pratique 2 ★★, Confirme 3 ★★★, Expert 4 ★★★★), `Competence` d'entreprise
+    avec description et critères d'évaluation, `PosteCompetence` associant une compétence requise à un poste avec
+    niveau d'exigence et caractère obligatoire. Migration 30 pré-alimente 10 compétences de référence adaptées
+    au tissu économique burkinabè (SYSCOHADA, paie, droit du travail, gestion de projets, management, etc.).
+    — *Cardinalité GPEC et décompte dynamique des effectifs (1 Poste ↔ N Salariés)* :
+    l'effectif pourvu réel est calculé dynamiquement par `COUNT(*) FROM Employees WHERE PosteId = @id AND StatutSalarie = 0` (salariés actifs uniquement).
+    Quatre statuts d'occupation GPEC stricts : `Vacant` (0 pourvu sur N requis), `Partiel` (0 < pourvu < requis),
+    `Pourvu` (pourvu == requis), `Sureffectif` (pourvu > requis). Badges graphiques colorés (rouge, ambre, vert, violet).
+    — *Nouvel écran transverse « Suivi budgétaire des postes »* (`Views/SuiviPostesBudgetView.xaml`, `ViewModels/SuiviPostesBudgetViewModel.cs`) :
+    deux volets : (0) Tableau de bord « Budget vs Pourvu » avec 6 cartes d'indicateurs KPIs (Postes ouverts, Effectif budgété,
+    Effectif pourvu, Postes vacants, Sureffectif, Taux d'occupation global), filtres combinés par statut et direction/service,
+    recherche instantanée, DataGrid détaillé et volet inférieur maître-détail affichant les titulaires réels et les compétences
+    requises du poste sélectionné ; (1) Référentiel des Compétences d'entreprise avec catalogue et formulaire d'édition CRUD.
+    — *Éditeur enrichi dans l'Organigramme* (`Views/OrganigrammeView.xaml`, `ViewModels/OrganigrammeViewModel.cs`) :
+    l'onglet « Postes & Fonctions » intègre la fiche de poste complète découpée en 6 sections professionnelles,
+    avec ajout rapide de compétences depuis le catalogue, affichage des titulaires réels multiples, et bouton d'export direct.
+    — *Double export* (`Services/FichePosteExportService.cs`) :
+    (1) Fiche de poste PDF A4 officielle iTextSharp : cartouche employeur IFU/RCCM, 7 sections structurées
+    (identification, finalité, activités clés, profil requis, classification conventionnelle, compétences requises
+    avec étoiles de niveau, titulaires actuels) et pavé de signatures tripartites (Le Titulaire, Le Supérieur N+1, La Direction RH).
+    (2) Synthèse Excel ClosedXML à 3 feuilles : « Budget vs Pourvu » (tableau GPEC avec alertes d'occupation),
+    « Nomenclature des Postes » (spécifications complètes des fiches de poste) et « Catalogue Compétences » (répertoire société).
+    — *Tests unitaires* (`IUTSCalculator_Tests/FichePosteTests.cs`) : validation complète du décompte GPEC sur les 4 statuts
+    (en ignorant les salariés sortis/inactifs), CRUD catalogue et affectation des compétences, consultation du salaire minimum conventionnel,
+    et génération conforme des fichiers PDF et Excel sur disque.
+    — **Correctifs du 18 septembre 2026, suite à un audit de conformité au plan approuvé** : l'implémentation initiale (livrée
+    en dehors de cette conversation) présentait deux écarts par rapport aux décisions actées avec l'utilisatrice avant le
+    développement. (1) *Bug confirmé* : `Poste.EstPourvu` combinait le nouveau décompte GPEC (`EffectifPourvu > 0`) avec un
+    reliquat de l'ancien champ mono-titulaire (`!string.IsNullOrWhiteSpace(TitulaireMatricule)`), alors que ce champ n'est
+    plus mis à jour lorsqu'un salarié quitte un poste via l'onglet « Affectation rapide » (`AffecterSalarieAsync` ne touche
+    que `Employees.PosteId`, jamais `Postes.TitulaireMatricule`). Conséquence réelle : les cartes KPI « Postes pourvus /
+    vacants » et le filtre du même nom (onglet Organigramme) pouvaient déclarer un poste « pourvu » alors que l'arbre et le
+    badge GPEC le montraient à juste titre « Vacant ». Corrigé en simplifiant `EstPourvu` en pur alias du décompte GPEC
+    (`_effectifPourvu > 0`). (2) *Écart de nommage* : le champ avait été implémenté sous le nom `ConventionNom` alors que le
+    renommage en `ConventionLibelle` (cohérence avec `UniteLibelle` et `ConventionCollective.Libelle`) avait été explicitement
+    validé avant le développement. Renommé dans `Models/Organigramme.cs`, `Services/OrganigrammeService.cs` (alias SQL et
+    lecture), `ViewModels/OrganigrammeViewModel.cs`, `Views/OrganigrammeView.xaml` et `IUTSCalculator_Tests/FichePosteTests.cs`.
+    Le reste de l'implémentation RH-02 (schéma, décompte GPEC, service de fiches de poste, exports PDF/Excel, écran transverse,
+    non-duplication de l'éditeur de poste, non-écrasement des champs `Employee.Category/ConventionId/Echelon`) a été vérifié
+    conforme au plan et à l'architecture GPEC décidée. Point à surveiller, non corrigé (choix d'affichage, pas un bug) : pour
+    un poste GPEC à plusieurs titulaires, l'arbre organisationnel n'affiche que le nom/avatar du dernier titulaire renseigné
+    via l'éditeur de poste (`TitulaireNom`/`TitulaireMatricule`), pas la liste complète — seul le badge d'effectif (ex.
+    « 2/2 ») reflète le nombre réel.
+    — **Correctif de disposition, même date** : signalé par la cliente sur capture d'écran — l'onglet « Tableau de bord Budget
+    vs Pourvu » de `SuiviPostesBudgetView.xaml` répartissait tout son contenu (cartes KPI, filtres, tableau des postes, volet
+    détail Titulaires/Compétences) en lignes de grille figées (`3*`/`2*`, sans `MinHeight`), sans `ScrollViewer` global — contrairement
+    au reste du module RH (`OrganigrammeView.xaml` protège sa zone principale avec `MinHeight="350"` et enveloppe ses formulaires
+    longs dans un `ScrollViewer`). À la hauteur de fenêtre de conception (780px), le tableau des postes n'affichait que 2 lignes
+    avec ascenseur et le volet détail était réduit à ses seuls en-têtes, sans aucune ligne visible. Corrigé en enveloppant tout
+    l'onglet dans un `ScrollViewer` vertical et en donnant un plancher (`MinHeight="200"` / `"220"`) aux deux lignes concernées :
+    la répartition proportionnelle reste inchangée quand la fenêtre est assez haute, et un ascenseur de page apparaît sinon —
+    au lieu d'un volet écrasé à l'invisibilité. Fichier modifié : `Views/SuiviPostesBudgetView.xaml`. À vérifier visuellement
+    dans Visual Studio (changement de mise en page WPF, non testable sans compilateur ni rendu depuis cette conversation).
+
+28. **Livré le 18 septembre 2026 : RH-03 — Entretiens & Évaluations** :
+    Troisième module du volet Ressources Humaines (Phase 4).
+    — *Modèle de données relationnel étendu (migration 31)* (`Models/Evaluation.cs`, `Services/SQLiteService.cs`) :
+    création de 5 tables spécialisées : (1) `CampagnesEvaluation` (Code unique, Titre, AnneeExercice, DateDebut, DateFin,
+    Statut 0-3, Description, DateCreation) ; (2) `EntretiensEvaluation` (CampagneId, EmployeeId, EvaluateurMatricule nullable avec
+    `ON DELETE SET NULL`, DateEntretien, Statut 0-4, NoteGlobale TEXT invariant, PointsForts, AxesProgres, CommentairesSalarie,
+    CommentairesEvaluateur, AvisDirectionRH, SouhaitsEvolution, DateValidation, DateCreation) ; (3) `EntretienCriteres`
+    (EntretienId, CompetenceId nullable vers `Competences(Id) ON DELETE SET NULL`, Categorie, Libelle, Note 1-5, Poids/Coefficient,
+    Commentaire) ; (4) `EntretienObjectifs` (EntretienId, TypeObjectif 0-1 pour Passé N-1 vs Nouveau N+1, Intitule, IndicateurMesure,
+    CibleAttendue, ResultatObtenu, TauxAtteintePct, Appreciation, Echeance, Poids) ; (5) `EntretienBesoinsFormation`
+    (EntretienId, CompetenceId nullable vers `Competences(Id)`, ThemeFormation, Priorite 1-3, Statut 0-3 pour passerelle RH-04).
+    Index unique strict `UX_EntretiensEvaluation_Campagne_Employe` sur `(CampagneId, EmployeeId)`.
+    Conformité d'intégrité : **aucun `ON DELETE CASCADE` sur `EmployeeId`** pour préserver l'historique d'évaluation opposable
+    des collaborateurs en cas de départ.
+    — *Règles d'immutabilité et recalcul dynamique de la notation* :
+    `NoteGlobale` (moyenne pondérée sur 5 des critères) recalculée immédiatement à chaque mise à jour de critère tant que
+    l'entretien est en phase préparatoire ou de conduite (`Statut < Valide`). Dès que l'entretien est visé/signé (`Statut >= Valide`),
+    le document est scellé avec sa date de validation : toute tentative de modifier l'entretien, ses critères, ses objectifs
+    ou ses besoins de formation est rejetée au niveau du service métier (`EvaluationService`) par une exception `InvalidOperationException`
+    (garantie juridique et légale des évaluations signées).
+    — *Initialisation de campagne idempotente et ciblage actif* :
+    ciblage exclusif de l'effectif actif conforme à `Employee.EstActif` (`StatutSalarie == 0` et absence de `DateSortie` dans le passé),
+    éliminant les salariés ayant quitté l'entreprise. Traitement idempotent : vérification d'existence préalable évitant
+    toute violation d'index ou doublon en cas de réouverture de campagne, avec rapport détaillé (salariés actifs, créés, existants).
+    — *Algorithme de résolution d'évaluateur N+1 à 3 étapes* :
+    (1) `Employee.ManagerMatricule` explicite prioritaire ; (2) Dérivation depuis l'organigramme RH-01 via
+    `Employee.PosteId` -> `Poste.SuperieurPosteId` -> titulaires actifs trouvés via `OrganigrammeService.ChargerTitulairesPosteAsync` ;
+    (3) En cas d'ambiguïté (vacance, absence de supérieur, pluralité de titulaires), aucun évaluateur n'est deviné :
+    le champ est laissé vide et le collaborateur remonte dans la liste des « Évaluateurs à assigner manuellement » avec badge ambre.
+    — *Passerelle avec le référentiel de compétences RH-02* :
+    quand un critère est rattaché à une compétence catalographiée, sa `Categorie` hérite automatiquement du domaine de la compétence
+    (`DomaineLibelle` : Technique, Managériale, Comportementale, Réglementaire). Les besoins de formation enregistrent également
+    le `CompetenceId` optionnel pour consolidation ultérieure par le module RH-04.
+    — *Interface utilisateur MVVM complète (3 onglets)* (`Views/EntretiensEvaluationsView.xaml`, `ViewModels/EntretiensEvaluationsViewModel.cs`) :
+    enveloppée dans un `ScrollViewer` global avec `MinHeight` pour proscrire tout écrasement vertical sur petit écran :
+    (0) « Campagnes d'Évaluation » : bandeau KPIs (salariés cibles, planifiés, en cours, validés, non assignés, note moyenne de campagne),
+    tableau de bord des campagnes, formulaires de création/clôture et initialisation automatique en lot ;
+    (1) « Conduite de l'Entretien » : sélecteur de campagne et de salarié, cartes d'identité collaborateur et évaluateur,
+    panneau de contrôle du statut (Planifié -> En cours -> Réalisé -> Validé & Signé -> Clôturé), volet d'évaluation multicritères
+    avec étoiles et moyenne en temps réel, volet des objectifs N-1 (taux d'atteinte moyen pondéré) et N+1, recueil des besoins
+    de formation, bilans qualitatifs (points forts, axes de progrès, avis RH), et verrouillage automatique des contrôles en lecture seule
+    avec badge cadenas émeraude dès validation ;
+    (2) « Historique Collaborateur » : trajectoire pluriannuelle des évaluations avec courbe de notation, historique des objectifs
+    et mention globale par exercice.
+    — *Double export réglementaire et de pilotage* (`Services/EvaluationExportService.cs`) :
+    (1) Fiche officielle d'évaluation individuelle en PDF A4 (iTextSharp) : cartouche employeur IFU/RCCM, 6 sections structurées
+    (collaborateur & poste, évaluateur, grille des compétences notées, objectifs N-1 & N+1, besoins de formation, synthèse & appréciations)
+    et pavé officiel de triple signature (Le Collaborateur, L'Évaluateur N+1, La Direction RH).
+    (2) Classeur Excel de synthèse de campagne à 4 feuilles (ClosedXML) : « Synthèse Campagne » (baromètre, KPIs, répartition des mentions),
+    « Relevé des Évaluations » (tableau nominatif complet des notes et statuts), « Objectifs Fixés N+1 » (portefeuille d'objectifs consolidé),
+    et « Besoins de Formation » (état consolidé des demandes préparant RH-04).
+    — *Câblage MainWindow et navigation* :
+    DataTemplate dédié, bouton de menu sous `RESSOURCES HUMAINES` avec propriété de visibilité `IsNavEntretiensVisible`,
+    enregistrement dans `_navMenuItems` avec mots-clés RH pour la recherche globale, et liaison MVVM dans `MainViewModel.cs`.
+    — *Validation et tests unitaires* (`IUTSCalculator_Tests/EvaluationTests.cs`) :
+    7 tests unitaires automatisés validant la migration 31, le CRUD de campagne, le filtre `EstActif`, l'idempotence,
+    la hiérarchie d'évaluateur N+1 à 3 étapes, le calcul de la note globale et le verrouillage d'immutabilité, le cycle d'objectifs/formations,
+    et la génération effective des exports PDF et Excel sur disque.
+
+- **18 septembre 2026 — livraison du module RH-04 « Formation » (Plan annuel, catalogue, sessions, inscriptions, pointage présence, attestations officielles A4, verrou probatoire, passerelle RH-03, tableau de bord TPA, exports Excel 4 feuilles).**
+    — *Schéma de données (Migration 32, `SchemaCible = 32`)* :
+    création de 5 tables relationnelles : (1) `PlansFormation` (Id, Code, Titre, AnneeExercice, BudgetPrevisionnel,
+    Statut 0-4 : Élaboration, Soumis, Validé, En cours, Clôturé, DateValidation, DateCreation, ObjectifsStrategiques) ;
+    (2) `OrganismesFormation` (Id, RaisonSociale, ContactNom, Telephone, Email, Adresse, NumeroAgrement [ex: FAFPA], Specialites, Actif) ;
+    (3) `FormationsCatalogue` (Id, Code, Intitule, Domaine, CompetenceViseeId nullable vers `Competences(Id)`, TypeFormation 0-2 : Interne, Externe, En ligne,
+    DureeHeures, CoutEstimeParParticipant, ObjectifsPedagogiques, Prerequis, Actif) ;
+    (4) `SessionsFormation` (Id, PlanFormationId, FormationId, OrganismeId nullable, CodeSession, IntituleSession, FormateurNom,
+    DateDebut, DateFin, Lieu, NombrePlaces, CoutPedagogique, CoutLogistique, CoutAutre, Statut 0-4 : Planifiée, Confirmée, En cours, Réalisée, Annulée,
+    DateCreation, Commentaire) avec `CoutTotalReel` calculé comme la somme des trois composantes de coûts ;
+    (5) `SessionInscriptions` (Id, SessionId, EmployeeId, DateInscription, StatutPresence 0-4 : Inscrit, Présent, Absent justifié, Absent injustifié, Abandon,
+    NoteEvaluation, AttestationObtenue 0/1, FraisImputes, Commentaire).
+    Index unique strict anti-doublon `UX_SessionInscriptions_Session_Employe` sur `(SessionId, EmployeeId)`.
+    Extension de la table RH-03 `EntretienBesoinsFormation` avec la colonne `SessionFormationId INTEGER` indexée pour la passerelle de consolidation.
+    Amorçage de 2 organismes de référence (DRH Interne et IBMI agréé FAFPA) et de 3 actions de formation au catalogue reliées aux compétences.
+    — *Architecture probatoire et cascades de suppression C# explicites en transactions atomiques* :
+    en raison de l'absence de `PRAGMA foreign_keys` actif sous SQLite, les cascades ont été rigoureusement implémentées en C# (`FormationService`) :
+    suppression d'une session -> nettoyage des inscriptions et détachement gracieux (`SessionFormationId = NULL`) des besoins RH-03 liés sans suppression des besoins ;
+    suppression d'un plan -> suppression en cascade de toutes ses sessions et inscriptions.
+    **Verrou probatoire inviolable** : toute tentative de suppression d'une session ou d'un plan rattaché à au moins une inscription dont l'attestation a été délivrée (`AttestationObtenue = 1`)
+    est catégoriquement rejetée par une `InvalidOperationException` afin de garantir l'opposabilité juridique des attestations délivrées face au fisc et aux inspecteurs du travail.
+    — *Passerelle bidirectionnelle avec les entretiens RH-03* :
+    `AssignerBesoinASessionAsync` lie le besoin à la session et fait basculer son statut à `Retenu` (1). `DetacherBesoinSessionAsync` réinitialise la liaison sans altérer l'historique du besoin.
+    — *Tableau de bord TPA (Taxe Patronale et d'Apprentissage)* :
+    arbitrage fiscal calculant la masse salariale soumise TPA cumulée sur les bulletins normaux (en excluant les régularisations `IsRegularization = 1` et récapitulatifs annuels `IsAnnual = 1`),
+    la TPA théorique due au taux légal, le total des dépenses réelles de formation engagées, le taux de couverture TPA (%), et le solde restant dû ou crédit de formation.
+    — *Interface utilisateur MVVM complète (4 onglets)* (`Views/FormationView.xaml`, `ViewModels/FormationViewModel.cs`) :
+    conforme aux conventions d'ergonomie du projet avec `ScrollViewer` global, `MinHeight=750`, pinceaux et icônes vectorielles réelles :
+    (0) « Plans de Formation » : indicateurs clés (budget prévisionnel, coûts réels engagés, écart budgétaire, sessions, stagiaires formés), liste des plans, formulaires et validation ;
+    (1) « Sessions & Inscriptions » : filtrage par plan et statut, gestion complète des sessions, détail financier 3 composantes, liste des participants avec badge de statut, bouton de pointage de présence et délivrance d'attestation ;
+    (2) « Catalogue & Organismes » : double gestionnaire catalogue de formation (avec compétence visée) et organismes agréés FAFPA / internes ;
+    (3) « Arbitrage TPA & Besoins » : tableau de bord de couverture TPA avec jauges et indicateurs financiers, et recueil consolidé des besoins issus des évaluations RH-03 avec assignation directe à une session.
+    — *Double export réglementaire et de pilotage* (`Services/FormationExportService.cs`) :
+    (1) Attestation officielle de formation A4 individuelle (iTextSharp) : cartouche d'entreprise IFU/RCCM, identification complète du bénéficiaire, intitulé de l'action, dates, volume horaire, mention de réussite, et pavé de double visa (L'Organisme / Formateur et La Direction Générale / DRH).
+    (2) Classeur Excel de bilan annuel de formation à 4 feuilles (ClosedXML) : « Synthèse Bilan & TPA » (KPIs, baromètre TPA), « Sessions de Formation » (registre détaillé des sessions et coûts), « Registre des Stagiaires » (tableau nominatif avec présences et attestations), et « Besoins Recueillis » (état consolidé des demandes d'évaluation).
+    — *Câblage MainWindow et navigation* :
+    DataTemplate dédié, bouton de menu sous `RESSOURCES HUMAINES` avec propriété de visibilité `IsNavFormationVisible`,
+    enregistrement dans `_navMenuItems` avec mots-clés RH pour la recherche globale, et liaison MVVM dans `MainViewModel.cs`.
+    — *Validation et tests unitaires* (`IUTSCalculator_Tests/FormationTests.cs`) :
+    10 tests unitaires automatisés validant la migration 32, le CRUD des plans, le catalogue et organismes avec compétence liée, le calcul du coût total réel,
+    l'anti-doublon d'inscription et le pointage de présence, le verrou probatoire strict interdisant la suppression, la cascade C# en transaction atomique,
+    la passerelle RH-03 avec assignation et détachement gracieux, l'arbitrage fiscal TPA avec exclusion des régularisations, et la génération effective de l'attestation PDF sur disque.
+    - **18 septembre 2026 — livraison du module RH-05 « Recrutement & Candidatures » (Expression de besoin, vivier candidats, sélection multi-étapes, entretiens et notation, intégration directe et atomique en fiche salarié SAL-01, affectation de poste RH-01, garde-fou anti-sur-recrutement, verrou probatoire inviolable, lettre d'embauche officielle A4 et bilan ClosedXML 4 feuilles).**
+    — *Schéma de données (Migration 33, `SchemaCible = 33`)* :
+    création de 4 tables relationnelles avec double point d'ancrage (`EnsureSchema` et `CreerSchemaComplet`) :
+    (1) `RecrutementBesoins` (Id, Reference [ex: REC-2026-001], IntitulePoste, Departement, PosteId nullable vers `Postes(Id)`,
+    Motif 0-4 : Creation, Remplacement, SurcroitActivite, StagePreEmbauche, Autre, NombrePostes [>=1], NombreRecrutes [>=0],
+    SalaireProposeMin, SalaireProposeMax, TypeContratPrevu [CDI, CDD, Stage...], ProfilRecherche, DateExpression, DateEcheanceSouhaitee,
+    Statut 0-4 : Brouillon, Ouvert, EnCours, Pourvu, Annule, DateCloture, DateCreation, Commentaire) ;
+    (2) `RecrutementCandidats` (Id, Nom, Prenoms, Email, Telephone, Adresse, Ville, Nationalite, DiplomeLePlusEleve, AnneesExperience,
+    DernierPosteOccupe, CompetencesCles, PretentionSalariale, Disponibilite, CvLien, Actif 0/1 [vivier], DateCreation, NotesInternes) ;
+    (3) `RecrutementCandidatures` (Id, BesoinRecrutementId vers `RecrutementBesoins(Id)`, CandidatId vers `RecrutementCandidats(Id)`,
+    DatePostulation, CanalSource 0-5 : SiteWeb, Cooptation, CabinetRecrutement, ReseauxSociaux, CandidatureSpontanee, Autre,
+    PretentionSalariale, Statut 0-5 : Recue, EnEvaluation, Retenue, Rejetee, Embauchee, Vivier,
+    EtapeActuelle 0-7 : Reception, TriCv, EntretienTelephonique, EntretienRh, TestTechnique, EntretienManager, NegociationSalariale, Finalisee,
+    ScoreGlobal, CommentaireRecruteur, DateEmbauche, SalaireNegocie, SalarieCreeMatricule vers `Employees(EmployeeId)`, DateCloture) ;
+    (4) `RecrutementEntretiens` (Id, CandidatureId vers `RecrutementCandidatures(Id)`, Etape 0-7, DateEntretien, Heure, EvaluateurMatricule,
+    EvaluateurNom, Modalite 0-2 : Presentiel, Visioconference, Telephonique, Lieu, Avis 0-3 : Favorable, Reserve, Defavorable, NonEvalue,
+    NoteSur5 [0.0 - 5.0], PointsForts, AxesAmelioration, Synthese, DateCreation).
+    Index unique strict anti-doublon `UX_RecrutementCandidatures_Besoin_Candidat` sur `(BesoinRecrutementId, CandidatId)` interdisant qu'un candidat postule deux fois au même besoin.
+    Index d'accélération sur `RecrutementBesoins.PosteId`, `RecrutementCandidatures.BesoinRecrutementId`, `RecrutementCandidatures.CandidatId` et `RecrutementEntretiens.CandidatureId`.
+    Amorçage initial d'un besoin de référence (Responsable Paie & Administration) et de deux profils dans le vivier.
+    — *Passerelle directe d'embauche SAL-01 & organigramme RH-01 atomique* :
+    `IntegrerCandidatEnSalarieAsync` réalise au sein d'une **seule transaction SQLite atomique** :
+    (1) Génération du matricule automatique `EMP-XXXX` via `DataService.GenerateNextEmployeeIdAsync` ;
+    (2) Insertion complète dans `Employees` via la surcharge interne `_dataService.AddEmployeeAsync(nouveauSalarie, conn, trans)` (civilité, nom/prénoms, date de naissance déduite ou par défaut, fonction héritée de l'intitulé du besoin, salaire de base négocié, date d'entrée, service/département, type de contrat, statut actif, et affectation optionnelle du `PosteId`) ;
+    (3) Si le besoin était rattaché à un poste (`PosteId`), mise à jour directe dans `Postes` du champ `TitulaireMatricule` (`UPDATE Postes SET TitulaireMatricule = @Matricule WHERE Id = @PosteId`) pour matérialiser instantanément l'affectation dans l'organigramme RH-01 et les effectifs pourvus RH-02 ;
+    (4) Marquage de la candidature en `Statut = Embauchee` (4), `EtapeActuelle = Finalisee` (7), horodatage de la date d'embauche, salaire négocié et liaison matricule `SalarieCreeMatricule` ;
+    (5) Incrémentation de `NombreRecrutes` sur le besoin, et si `NombreRecrutes >= NombrePostes`, basculement automatique du besoin en `Statut = Pourvu` (3) avec horodatage de `DateCloture`.
+    — *Garde-fou anti-sur-recrutement & intégrité probatoire étendue* :
+    (1) Garde-fou strict interdisant l'embauche si le quota de postes à pourvoir est déjà atteint (`nbRecrutes >= nbPostes` ou `Statut == Pourvu`), empêchant toute embauche excédentaire non budgétée sans révision préalable du quota par la direction ;
+    (2) Verrou probatoire étendu : interdiction absolue (`InvalidOperationException`) de supprimer un besoin ayant donné lieu à au moins une embauche (`NombreRecrutes > 0` ou candidatures embauchées liées) ;
+    (3) Interdiction de supprimer un candidat du vivier dont une candidature a abouti à une embauche (garantie de traçabilité légale du dossier d'embauche) ;
+    (4) Interdiction de modifier ou supprimer une candidature déjà validée en statut `Embauchee`.
+    — *Calcul dynamique du score global de candidature* :
+    à chaque création, modification ou suppression d'un entretien dans `RecrutementEntretiens`, la note moyenne pondérée est recalculée et mise à jour automatiquement sur la candidature parente dans `RecrutementCandidatures.ScoreGlobal`.
+    — *Interface utilisateur MVVM complète (4 onglets)* (`Views/RecrutementView.xaml`, `ViewModels/RecrutementViewModel.cs`) :
+    conforme aux standards d'excellence du projet avec `ScrollViewer` global, `MinHeight=750`, palettes contrastées, badges d'état et icônes vectorielles réelles :
+    (0) « Besoins de Recrutement » : bandeau de 5 KPIs dynamiques (Postes ouverts, Postes pourvus, Candidatures totales, Entretiens planifiés, Embauches réalisées), tableau de bord des besoins avec barre de progression des recrutements, formulaires d'expression de besoin avec sélecteur de postes RH-01 et motifs légaux ;
+    (1) « Vivier de Candidats » : gestion complète des profils candidats, filtrage par disponibilité, diplôme et texte libre, fiches de compétences et historique de candidatures ;
+    (2) « Candidatures & Sélections » : suivi du pipeline par besoin et par étape (Réception -> Tri -> Entretien RH -> Test technique -> Négociation -> Finalisée), panneau de conduite d'entretien avec notation sur 5 et avis recruteur, historique des entretiens ;
+    (3) « Embauche & Intégration SAL-01 » : formulaire d'intégration directe pré-rempli (salaire négocié, date de prise de fonction, type de contrat, catégorie, service), bouton d'action directe vers la fiche salarié, et panneau d'édition de la lettre d'embauche officielle.
+    — *Double export réglementaire et de pilotage* (`Services/RecrutementExportService.cs`) :
+    (1) Lettre d'embauche officielle A4 individuelle (iTextSharp) : cartouche d'entreprise complet (Raison sociale, IFU, RCCM, Adresse, Téléphone), référence de recrutement, identification du candidat retenu, rappel formel des conditions d'embauche (fonction, département, salaire mensuel brut en FCFA, date de prise de fonction, type de contrat), mention expresse de la période d'essai et de son renouvellement éventuel conformément aux **articles 38 à 43 de la loi n° 028-2008/AN portant Code du travail du Burkina Faso**, et pavé de double signature officielle (L'Employeur / Directeur Général et Le Salarié avec mention manuscrite « Lu et approuvé ») ;
+    (2) Classeur Excel de synthèse du recrutement à 4 feuilles (ClosedXML) : « Synthèse Recrutement » (baromètre, KPIs, répartition des motifs et des canaux de sourcing), « Registre des Besoins » (tableau détaillé des postes à pourvoir et statuts), « Vivier des Candidats » (profils, diplômes, expériences, compétences clés et prétentions), et « Suivi des Candidatures » (pipeline nominatif complet avec scores, étapes, dates d'embauche et matricules générés).
+    — *Câblage MainWindow et navigation* :
+    DataTemplate dédié, bouton de menu sous `RESSOURCES HUMAINES` avec propriété de visibilité `IsNavRecrutementVisible`,
+    enregistrement dans `_navMenuItems` avec mots-clés RH pour la recherche globale, et liaison MVVM dans `MainViewModel.cs`.
+    — *Validation et tests unitaires* (`IUTSCalculator_Tests/RecrutementTests.cs`) :
+    11 tests unitaires automatisés validant la migration 33, le CRUD et les transitions de statut des besoins, le vivier de candidats avec réactivation, le cycle des candidatures et avancement d'étapes, la notation d'entretiens et recalcul automatique du score global, la passerelle atomique d'embauche SAL-01 avec création salarié et affectation poste, le garde-fou anti-sur-recrutement, le triple verrou probatoire (besoin, candidat, candidature embauchée), et la génération sur disque des exports PDF et Excel.
+    100% des 87 tests de la solution passent avec succès.
+    - **19 octobre 2026 — livraison du module RH-08 « Gestion des temps & rotations », par anticipation sur RH-06/RH-07 (demande expresse du client), et passage de PAI-03 à cinq tranches sur barème daté.**
+    — *Origine* : l'onglet « 01 » de l'état de salaire KS (Koswende Services, site de Youga) — planning de rotation 7 repos /
+    7 jours / 7 nuits en postes de 12 h, décompte hebdomadaire des HS (15 % 41e-48e h, 35 % au-delà, 50 % nuit, 60 % et 120 %
+    dimanche/férié de jour et de nuit), primes de panier. L'analyse du classeur a relevé deux défauts de formules, corrigés dans
+    le moteur : (1) les tranches nuit / férié pouvaient compter deux fois les mêmes heures quand une semaine mêlait nuits et
+    fériés (3 N + 1 FN : 12 h payées pour 8 h réelles) ; (2) le poste férié de JOUR se mesurait sur la durée du poste de nuit.
+    — *Choix du client (questionnaire du 19/10/2026)* : coder RH-08 maintenant ; taux HS sur barème daté, défaut 15/35/50/60/120 ;
+    semaine de décompte paramétrable par équipe (civile ou de rotation) ; période de pointage à jour d'arrêté paramétrable.
+    — *Barème daté des HS* (`Models/BaremeHeuresSup.cs`, `Services/BaremeHeuresSupService.cs`, table `BaremesHeuresSup`) :
+    deux barèmes livrés, `EstSysteme` : « Taux initiaux du module PAI-03 » au 01/01/2000 (15/30/50/**50**/100 — le dimanche de
+    jour était majoré comme la nuit) et « cinq tranches » au **01/10/2026** (15/35/50/60/120). Le barème d'un mois est celui de
+    date d'effet la plus récente ≤ 1er jour du mois ; deux barèmes ne partagent jamais une date. Édition dans l'onglet
+    « Paramètres, fériés & barème HS » de l'écran RH-08 (Nouveau = copie datée du mois affiché). Le nouveau Code du travail
+    (loi n°013-2026/ALP du 6 mai 2026) renvoie les taux aux conventions et textes d'application : d'où un barème modifiable.
+    — *PAI-03* : `HeureSupplementaire` gagne `Heures60/Montant60` (dimanche/férié de jour) et des taux portés par l'objet
+    (`AppliquerBareme`). **Les noms historiques des propriétés et colonnes sont conservés** (Heures30 = tranche 2, majorée à
+    35 % depuis octobre 2026 ; Heures100 = férié de nuit, 120 %) pour ne pas migrer les saisies. Taux par défaut = anciens
+    littéraux. Lignes de bulletin construites par `HeureSupplementaireService.LignesBulletin` : code et libellé portent le taux
+    appliqué (HS35 « Heures supplémentaires 135% ») ; avec le barème historique on retrouve exactement HS15/HS30/HS50/HS100 et
+    leurs libellés. Écran HS : colonne « HS dim./férié jour », en-têtes par nature (41e-48e h, au-delà, nuit…) et rappel des
+    taux du mois ; export Excel à cinq paires de colonnes. **Preuve d'équivalence** : un dossier v33 créé par l'ancien code
+    (HS de septembre et d'octobre 2026, absence manuelle à cheval sur deux mois) puis ouvert par le nouveau : HS de septembre
+    identiques au centime (montants, codes, libellés), absences inchangées, octobre aux nouveaux taux.
+    — *PAI-04, absences imputées* : `Absences.PeriodeImputation` (« yyyy-MM »). Une absence relevée au planning appartient EN
+    ENTIER à son mois de paie (`AbsenceService.JoursPourMoisDePaie`), même si ses dates tombent dans le mois civil précédent
+    (arrêté au 20) — y compris quand ce mois précédent est clôturé. `ChargerPeriodeAsync` la liste sous son mois d'imputation
+    seulement ; le contrôle de clôture porte sur ce mois ; l'UPDATE de l'écran des congés ne touche pas la colonne ; le
+    contrôle « jours > jours ouvrables » ne s'applique pas (un dimanche de rotation est travaillé). Toute absence sans
+    imputation suit exactement l'ancienne règle. `RemplacerAbsencesReleveesAsync` remplace en une transaction les absences
+    marquées `[RH-08]` du mois pour les salariés concernés ; un salarié dont un relevé chevauche une absence saisie à la main
+    est écarté en entier, avec la raison.
+    — *Modèle RH-08* (`Models/GestionTemps.cs`) : codes J, N, R, FJ, FN, AJ, A, CP, M ; `MotifCycle` (« 7J 7N 7R », « 4J 4R »,
+    « J J N N R R », normalisé et répété depuis `DateDebutCycle`, y compris avant) ; `EquipeTravail` (durées des postes,
+    heures normales par poste = 8, semaine civile ou de rotation, dimanche majoré, panier fixe ou fraction du taux horaire) ;
+    `PeriodePointage.Pour(annee, mois, jourArrete)` (0 = mois civil ; 20 = du 21 du mois précédent au 20) ;
+    `RecapTempsSalarie`, `SemaineDecompte`.
+    — *Moteur* (`Services/CalculTemps.cs`, pur, sans base) : J/N un jour férié (ou un dimanche si l'équipe le majore) → FJ/FN ;
+    heures = durée du poste ou heures pointées ; AJ = 0 h, ou 8 h si le dossier le décide ; par semaine : normales =
+    min(40, total), puis nuit (excédent des nuits au-delà de 8 h), tranche 1 (8 h), férié jour, férié nuit, tranche 2 = solde,
+    chacune bornée par ce qui reste. **Une semaine est rattachée à la période qui contient son dernier jour** : décomptée en
+    entier une seule fois (jours de la période précédente compris), les derniers jours d'une période étant reportés avec leur
+    semaine. Paniers = postes travaillés de la période. Les jours « A » consécutifs deviennent une absence non rémunérée.
+    — *Service* (`Services/GestionTempsService.cs`) : équipes, affectations (un salarié = une équipe), jours fériés, paramètres,
+    planning (upsert, code vide = suppression, refus si la paie du jour est clôturée), génération depuis les cycles (jamais
+    sur un jour saisi/importé sauf « Régénérer » ; jours de la 1re semaine hors période complétés seulement s'ils sont vides ;
+    jour de travail couvert par une absence de « Congés et absences » → CP/M/AJ/A), décompte, transferts : HS dans la saisie
+    PAI-03 du mois (salariés concernés seulement, commentaire `[RH-08]`), absences imputées, paniers en variables du mois
+    (rubrique `PANIER`, lignes `[RH-08]` remplacées).
+    — *Import/Export* (`Services/GestionTempsExcelService.cs`) : export du planning en grille colorée (une colonne par jour,
+    liste déroulante des codes) + récapitulatif + légende ; réimport de cette grille corrigée ; import de pointages Excel/CSV
+    (Matricule, Date, Code ou Entrée/Sortie — nuit si entrée ≥ 18:00 ou < 05:00, sortie le lendemain reconnue —, Heures) ;
+    modèle de fichier de pointages.
+    — *Écran* (`Views/GestionTempsView.xaml(.cs)`, `ViewModels/GestionTempsViewModel.cs`) : 4 onglets — Planning (colonnes de
+    jours construites dans le code-behind à chaque changement de période, saisie au clavier « comme dans Excel », couleurs
+    par code, infobulles), Décompte & transfert (KPI, détail par semaine), Équipes & cycles (fiche + affectation par cases à
+    cocher), Paramètres, fériés & barème HS. Rechargement à chaque retour sur l'écran (`OnIsActiveChanged`) ; proposition
+    d'enregistrer avant de changer de période ou de calculer ; commandes d'écriture réservées à `UserSession.CanEdit`.
+    — *Navigation et licence* : bouton « Gestion des temps & rotations » sous RESSOURCES HUMAINES, entrée de recherche
+    `GestionTemps`, DataTemplate ; module de licence **RH08** ajouté à `LicenceModules` (fichier partagé : **recompiler aussi
+    le générateur de licences** avant d'émettre une licence qui l'inclut).
+    — *Tests* (`IUTSCalculator_Tests/GestionTempsTests.cs`, 12 tests) : cas de l'onglet 01, somme des tranches, fériés et
+    dimanche majoré, AJ, arrêté et semaines à cheval sans doublon ni oubli, cycle, regroupement des absences, équivalence
+    PAI-03, barème applicable, absence imputée, dossier neuf, chaîne complète planning → décompte → transferts.
+    — *Dette RH-08* :
+    (1) **Plan de paie jamais amorcé dans un dossier neuf** (antérieur à RH-08, découvert en le testant) : les migrations 25
+    et 26 insèrent leurs rubriques (RAPPEL*, AVNAT_*) même dans un plan vide, et `RubriqueService.ChargerAsync` n'amorce le
+    plan initial que s'il est vide — un dossier créé aujourd'hui n'a donc ni SALBASE ni HSUP/PRIME/AVANCE dans « Plan de
+    paie ». **Corrigé le 19 octobre 2026 (migration 36)**, voir plus bas.
+    (2) **Ordre d'imputation des HS** : celui du classeur KS (nuit, puis 8 h à 15 %, puis fériés, puis 35 %), et non
+    chronologique (les dernières heures de la semaine). Les deux lectures coexistent ; à confirmer avec le conseil du client
+    si un contrôle de l'inspection du travail le demande.
+    (3) Une absence NON imputée posée seule sur un dimanche compte 0 jour dans PAI-04 (`JoursDansPeriode`, dimanches exclus) ;
+    sans effet sur les absences relevées par RH-08, qui sont imputées. **Corrigé le 19 octobre 2026.**
+    (4) Pas de remplissage d'une plage de cases en une fois dans la grille (régénérer depuis le cycle couvre l'essentiel).
+    **Corrigé le 19 octobre 2026.**
+    - **19 octobre 2026 — livraison du module RH-06 « Discipline & procédures ».**
+    — *Cadrage juridique* : le Code du travail (loi n° 013-2026/ALP du 6 mai 2026, comme l'ancien 028-2008/AN) pose la
+    discipline de l'entreprise comme obligation du travailleur, la mise à pied comme cause de suspension du contrat, la
+    rupture sans préavis pour faute lourde sous contrôle du juge, l'absence d'indemnité de licenciement en cas de faute
+    lourde, l'obligation de motiver par écrit la rupture (sinon irrégularité indemnisée), l'autorisation préalable de
+    l'inspecteur du travail pour licencier un délégué, et le règlement intérieur visé par l'inspection. Il **ne fixe ni
+    l'échelle des sanctions, ni la durée maximale de la mise à pied, ni les délais de procédure** : ils relèvent du règlement
+    intérieur et de la convention collective. D'où un module paramétrable dont les valeurs par défaut sont indicatives
+    (réponse 3 jours ouvrables, convocation 5 jours ouvrables pleins, engagement 60 jours, décision 30 jours, mise à pied 8 j
+    au plus). Les lettres ne citent **aucun numéro d'article** (le code vient de changer, la numérotation définitive n'a pas
+    pu être vérifiée) : elles renvoient au Code du travail, au règlement intérieur (référence saisie) et à la convention.
+    Le client n'a pas pu être consulté sur ces choix (reprise de session) : ils sont réversibles par paramétrage.
+    — *Modèle* (`Models/Discipline.cs`) : `ProcedureDisciplinaire` (faits, date de connaissance, qualification légère /
+    sérieuse / lourde, salarié protégé et mandat, demande d'explication et réponse, mise à pied conservatoire, convocation,
+    entretien (heure et lieu, assistant, compte rendu), décision de l'inspecteur, sanction envisagée puis décidée, motifs,
+    dates de mise à pied et jours retenus, date d'effet du licenciement, classement sans suite, notification et mode,
+    accusé de réception, recours, liens vers les absences créées). **L'étape (`Statut`) n'est jamais saisie** : elle se déduit
+    des dates (ouverte → explication demandée → entretien → décision à notifier → notifiée / classée sans suite).
+    `TypeSanction` (code, libellé, nature morale / mise à pied / licenciement / autre, rang, exige explication, exige
+    entretien, durée max, faute lourde, effacement en mois, active, système) ; `ParametresDiscipline` ; `PieceDisciplinaire`.
+    — *Moteur pur* (`Services/ControleDiscipline.cs`) : jours ouvrables du lundi au samedi, fériés RH-08 exclus ; date limite
+    de réponse ; première date d'entretien ; fin d'instruction et date limite de décision ; pièces exigées selon le stade et
+    la sanction ; **bloquants** : dates dans le désordre, décision sans demande d'explication (si exigée) ou avant la fin du
+    délai de réponse, décision sans entretien (si exigé) ou avant lui, mise à pied sans dates / au-delà du maximum / plus de
+    jours que la période / commençant avant la notification, licenciement sans motifs écrits, faute lourde sur une faute non
+    qualifiée de lourde, licenciement d'un salarié protégé sans autorisation accordée (ou décidé avant elle), notification sans
+    décision, classement sans motif ; **à vérifier** : engagement tardif (prescription), convocation trop proche de
+    l'entretien, décision hors délai, décision non notifiée, conservatoire qui s'éternise, pièces manquantes une fois la
+    procédure close, mêmes faits déjà sanctionnés (même date, même nature) ; **info** : étape suivante, antécédents non
+    effacés, effets paie et SAL-05. Échéancier et registre (effacement = notification + N mois du type).
+    — *Service* (`Services/DisciplineService.cs`) : CRUD, référence `DISC-AAAA-NNNN` par année de connaissance des faits,
+    refus de tout enregistrement portant une alerte bloquante, salarié non modifiable une fois la procédure créée, suppression
+    refusée une fois la sanction notifiée (registre), pièces copiées sous `Pieces\<base>\Discipline\<référence>` à côté de
+    la base (retrait refusé après notification), journal d'audit (entité `Discipline`). **Passerelle PAI-04, dans la même
+    transaction** : mise à pied notifiée → absence `MiseAPied` (non rémunérée) marquée `[RH-06]`, mise à jour ou retirée si la
+    décision change ; mise à pied conservatoire → absence seulement si la décision finale est un licenciement pour **faute
+    lourde** (jusqu'à la veille de l'effet), sinon les jours restent payés ; contrôle de clôture des mois touchés et de
+    chevauchement avec les autres absences ; une absence inchangée n'est pas réécrite (un recours se saisit après clôture).
+    En cas d'échec, rien n'est écrit et l'objet édité retrouve son identifiant, sa référence et ses liens d'origine.
+    **Passerelle SAL-05** : `DernierLicenciementNotifieAsync` ; l'écran Solde de tout compte propose le motif
+    (`LicenciementFauteLourde` ou `LicenciementPersonnel`) et la date d'effet comme date de sortie, avec un rappel visible.
+    — *Lettres et export* (`Services/DisciplineExportService.cs`) : demande d'explication (avec date limite), convocation à
+    entretien préalable (sanction envisagée, heure et lieu, droit à assistance), mise à pied conservatoire, notification de
+    sanction (motifs, dates et reprise pour une mise à pied), lettre de licenciement (motifs, autorisation de l'inspecteur,
+    faute lourde sans préavis ni indemnité ou préavis conventionnel) ; en-tête du dossier, bloc de décharge du salarié et
+    des témoins ; chaque lettre est produite dans le répertoire des pièces et versée au dossier. Registre Excel 3 feuilles
+    (registre des sanctions, procédures, échéancier).
+    — *Écran* (`Views/DisciplineView.xaml`, `ViewModels/DisciplineViewModel.cs`) : KPI, onglets Procédures (liste filtrable +
+    fiche en 11 sections avec contrôles en direct en tête), Échéancier, Registre des sanctions (sanctions effacées
+    masquables), Délais & catalogue des sanctions. Confirmation explicite avant d'enregistrer une notification ;
+    rechargement au retour sur l'écran ; proposition d'enregistrer en quittant une fiche modifiée. Navigation « Discipline &
+    procédures » sous RESSOURCES HUMAINES, recherche `Discipline`, module de licence **RH06** (recompiler le générateur).
+    — *Vérification* : compilation complète (0 erreur) ; 13 tests NUnit (`IUTSCalculator_Tests/DisciplineTests.cs`) ;
+    86 contrôles d'intégration sous Mono sur un dossier **v34 créé par le code RH-08** puis ouvert par le nouveau
+    (migration 35 et sauvegarde, absences existantes identiques au centime, mise à pied → retenue 82 000 × 3/30,
+    clôture : recours accepté et modification refusée avec annulation complète, chevauchement refusé sans rien écrire,
+    salarié protégé, faute lourde et conservatoire (9 jours retenus) puis requalification qui la rend payée, classement
+    sans suite, pièces, catalogue, paramètres, dossier neuf) ; les cinq lettres et le registre générés et relus.
+    — *Dette RH-06* :
+    (1) **Délais et échelle à faire valider** par le client (et son règlement intérieur visé) : valeurs livrées indicatives.
+    (2) ~~Le statut « salarié protégé » se coche sur la procédure : il n'existe pas encore de registre des mandats.~~
+    **Corrigé le 19 octobre 2026** (registre des salariés protégés, voir plus bas).
+    (3) Le licenciement notifié ne sort pas le salarié lui-même : c'est la validation du solde de tout compte (SAL-05) qui le
+    fait, motif et date proposés.
+    (4) Pas de modèle de lettre modifiable par l'utilisateur (textes dans le code) ; pas d'envoi par courriel. Relève
+    d'ETA-06 (« Attestations & courriers types », modèles éditables).
+    - **19 octobre 2026 — correction de la dette signalée (RH-08 n°1, 3 et 4 ; RH-06 n°2).** `SchemaCible = 36`.
+    — *Plan de paie jamais amorcé* (`SQLiteService.Migration36_PlanDePaieComplet`) : `RubriqueService.ChargerAsync`
+    n'amorce le plan que s'il est VIDE, alors que les migrations 11, 25, 26, 27 et 34 y déposent leurs rubriques sans
+    condition. Conséquence réelle : dans tout dossier créé depuis PAI-07 (ou dont le plan n'avait jamais été ouvert avant
+    ces migrations), le plan ne contenait que RAPPEL*, AVNAT_*, PANIER — ni SALBASE, ni les indemnités, ni HSUP/PRIME/
+    AVANCE/PRET… — et une variable du mois saisie sur ces codes était **ignorée par le bulletin** (`ApportVariables.Depuis`
+    écarte une rubrique introuvable). Correction : si `SALBASE` manque (signature sûre : une rubrique système ne se supprime
+    jamais) et que le plan n'est pas vide, le plan initial complet est inséré en `INSERT OR IGNORE` — une rubrique déjà
+    présente, modifiée ou non, est conservée ; un plan sain n'est pas touché (une rubrique supprimée par l'utilisateur ne
+    ressuscite pas). Aussi rejouée EN DERNIER dans `CreerSchemaComplet`. Vérifié sur un dossier v34 réellement touché
+    (11 rubriques, sans SALBASE) : 20 rubriques ajoutées (7 système, 13 de saisie ; PANIER existait déjà), rubrique PANIER modifiée conservée, variable PRIME de
+    nouveau retenue ; dossier sain : 0 ajout ; dossier neuf : plan complet.
+    — *Absence d'un dimanche* (`AbsenceService.JoursDansPeriode`, `Anomalie`) : quand le décompte « dimanches exclus » vaut
+    zéro (absence posée sur un seul dimanche), repli sur les jours calendaires — elle compte pour le nombre saisi, au plus
+    1 ; au-delà, l'enregistrement est refusé. Toutes les autres absences gardent exactement leur décompte (vérifié : absence
+    à cheval sur deux mois toujours 2,4 + 1,6). L'écran des congés propose 1 jour pour un dimanche seul, avec explication.
+    — *Planning RH-08* : « Remplir la sélection » (code choisi + « Appliquer à la sélection ») sur les cases sélectionnées
+    à la souris (cliquer-glisser, Maj/Ctrl), touche Suppr pour vider la sélection ; les cases changent comme une saisie,
+    rien n'est écrit avant « Enregistrer » (`GestionTempsViewModel.AppliquerCode`, code-behind `GestionTempsView`).
+    Défilement (demande du client, même jour) : barre horizontale toujours affichée sous la grille, Maj + molette,
+    boutons « ◀ Début », « Aujourd'hui », « Fin ▶ » (colonnes matricule/salarié/équipe figées). Une grille WPF SANS LIGNE
+    n'a pas d'étendue horizontale (rien à faire défiler, même les en-têtes) : un message sur la grille vide explique
+    d'affecter les salariés à une équipe puis de générer le planning (`PlanningVide`).
+    — *Registre des salariés protégés* (RH-06, table `MandatsRepresentatifs`, onglet « Salariés protégés ») : mandat,
+    début, fin (vide = en cours), protection prolongée éventuelle (le Code n'a pas été vérifié sur ce point : champ
+    laissé au dossier). `ControleDiscipline.MandatApplicable` : un mandat qui protège le salarié entre la date des faits et
+    la décision. Le salarié choisi pour une nouvelle procédure est coché « protégé » automatiquement ; une procédure non
+    cochée malgré un mandat est signalée, et **bloquée** si elle aboutit à un licenciement.
+    — *Vérification* : compilation complète 0 erreur, liaisons XAML contrôlées ; tests NUnit : 14 RH-06 (dont mandats) +
+    3 nouveaux `AbsenceDimancheTests` + 10 RH-08 inchangés ; intégration sous Mono : 61 contrôles des corrections, 86 de
+    RH-06 et ceux de RH-08 rejoués (seuls changent le numéro de version et le nom de la sauvegarde, désormais `avant-v36`).
+    — *Reste ouvert* : RH-08 n°2 (ordre d'imputation des HS — choix du client), RH-06 n°1 (délais à valider avec le
+    règlement intérieur), RH-06 n°3 (voulu) et n°4 (ETA-06).
+    - **19 octobre 2026 — décision du client : 8 heures = 1 jour pour les absences (PAI-04).** Défaut relevé pendant les
+    corrections : une absence saisie en heures seulement comptait UNE JOURNÉE ENTIÈRE par date dans les bases « trentième »
+    et « jours ouvrables » (4 h retenues comme 1 jour) ; au taux horaire, une absence saisie en jours seulement ne donnait
+    lieu à AUCUNE retenue, et les heures d'une absence à cheval sur deux mois étaient comptées en entier dans chacun.
+    `Absence.HeuresParJour = 8` (constante, pas un paramètre du dossier), `Absence.JoursEquivalents` /
+    `HeuresEquivalentes` ; `AbsenceService.JoursDansPeriode` (heures seules → heures ÷ 8), nouveaux `HeuresDansPeriode` /
+    `HeuresPourMoisDePaie` (jours seuls → jours × 8, réparties au même prorata que les jours), `Apport` (heures du mois),
+    `Solde` (congés pris en heures convertis), absence imputée RH-08 en heures seules ; `Anomalie` refuse plus de 24 h par
+    jour calendaire. **Inchangé** : toute absence saisie en jours dans une base en jours, et toute absence en heures d'un
+    seul mois au taux horaire (6 tests `AbsenceHeuresTests` ; intégration : 1,6 j + 4 h = 2,1 j → 8 400 FCFA sur
+    120 000, et 16,8 h au taux horaire). Au taux horaire, 1 jour = 8 h ÷ 173,33 h du salaire, soit davantage qu'un
+    trentième : conséquence voulue de l'équivalence retenue.
+    - **19 octobre 2026 — livraison du module RH-07 « Santé & sécurité au travail » (fin de la Phase 4).** `SchemaCible = 37`.
+    — *Cadrage* : loi n° 004-2021/AN (sécurité sociale) et site de la CNSS : l'accident du travail se déclare **à la CNSS et à
+    l'inspection du travail dans les 48 heures ouvrables**, sur l'imprimé de la CNSS en deux exemplaires ; la victime peut
+    déclarer elle-même pendant deux ans ; le **jour de l'accident est entièrement à la charge de l'employeur** ; à partir du
+    lendemain, **indemnité journalière égale aux 2/3 de la rémunération journalière**, chaque jour d'incapacité, ouvrable ou
+    non ; premiers soins à la charge de l'employeur. Les délais de visites médicales ne sont pas fixés ici par la loi (service
+    de santé au travail, convention) : valeurs indicatives paramétrables. **Choix du client** (19 octobre 2026) :
+    (a) **salaire maintenu en entier** pendant l'arrêt (comme aujourd'hui) — le module calcule les IJ à réclamer à la CNSS,
+    aucun bulletin ne change ; (b) **EPI suivis par dotation individuelle** (catalogue + durée de vie, remises, décharge,
+    alertes de renouvellement ; pas de gestion de stock) ; (c) **visites tous les 12 mois, ajustables par poste**, visites
+    d'embauche et de reprise suivies.
+    — *Modèle* (`Models/SanteSecurite.cs`) : `VisiteMedicale` (type, date de convocation, date de visite, médecin, avis
+    d'aptitude, réserves, prochaine visite fixée par le médecin, accident lié), `TypeEPI` (durée de vie en mois, 0 = sans
+    échéance, norme, actif), `DotationEPI` (quantité, taille, renouvellement, état en service / rendu / perdu-usé, retour),
+    `AccidentTravail` (nature travail / trajet / maladie professionnelle, date, heure, lieu, circonstances, siège et nature
+    des lésions, témoins, premiers soins, arrêt et dates, reprise, mortel, déclarations CNSS et inspection, référence CNSS,
+    rémunération journalière, taux d'IPP, lien vers l'absence), `ParametresSST`, `PeriodicitePoste`, `EcheanceSST`,
+    `SituationMedicale`, `LigneIndemniteJournaliere`, `AlerteSST`.
+    — *Moteur pur* (`Services/ControleSanteSecurite.cs`) : rémunération journalière proposée (base + 4 indemnités ÷ 30) ;
+    jours indemnisés (du lendemain de l'accident à la fin d'arrêt, sinon veille de la reprise, sinon aujourd'hui ; 0 sans
+    arrêt ou accident mortel) ; montant CNSS arrondi et part employeur (le tiers) ; état mensuel des IJ ; date limite de
+    déclaration (2 jours ouvrables, lundi-samedi, fériés RH-08 exclus) ; périodicité applicable (poste, sinon dossier) ;
+    prochaine visite (sans visite : embauche due à l'entrée ; sinon date fixée par le médecin, sinon dernière + périodicité) ;
+    visites de reprise attendues (arrêt AT ou maladie de plus de 21 jours sans visite depuis) ; **échéancier** (visites dues ou
+    programmées jusqu'à l'horizon d'alerte, reprises des arrêts terminés depuis moins de 90 jours, EPI à renouveler,
+    accidents à déclarer, reprises à saisir) ; situation médicale par salarié actif ; contrôles de saisie. **Bloquants** :
+    victime absente, accident dans le futur, arrêt sans premier jour, dates d'arrêt dans le désordre, déclaration avant
+    l'accident, IPP hors 0-100 %. **À vérifier** : déclaration tardive ou en retard (CNSS et inspection séparément), fin
+    d'arrêt manquante, rémunération journalière manquante, visite de reprise non enregistrée. **Info** : date limite, jour de
+    l'accident à l'employeur, IJ estimées, accident mortel.
+    — *Service* (`Services/SanteSecuriteService.cs`) : CRUD des trois registres, paramètres et périodicités par poste,
+    référence `AT-AAAA-NNNN` par année de l'accident, refus de toute saisie bloquante. **Passerelle PAI-04, dans la même
+    transaction** (via `DisciplineService.AppliquerAbsenceAsync`, désormais `internal static` et partagé) : arrêt aux dates
+    connues → absence `AccidentTravail` (rémunérée par nature) marquée `[RH-07]`, jours ouvrables (dimanches exclus), mise à
+    jour à la prolongation, retirée si l'arrêt l'est ; contrôle de clôture et de chevauchement ; en cas d'échec rien n'est
+    écrit et l'accident retrouve identifiant, référence et lien. Un accident **déclaré à la CNSS ne se supprime plus**
+    (registre). Journal d'audit (entité `Santé & sécurité`) **sans les réserves médicales**.
+    — *Documents* (`Services/SanteSecuriteExportService.cs`) : **fiche de déclaration** A4 d'une page (employeur et n° CNSS,
+    victime et n° d'immatriculation, accident, conséquences et IJ estimées, déclarations, date limite en rouge si dépassée,
+    rappels CNSS, signature) — préparatoire : la déclaration officielle reste l'imprimé de la CNSS ; **fiche de dotation en
+    EPI** (tous les EPI en service du salarié, émargement, engagement, signatures) ; **registre Excel 5 feuilles** (accidents,
+    IJ de l'année avec total, visites, EPI remis, échéancier).
+    — *Écran* (`Views/SanteSecuriteView.xaml`, `ViewModels/SanteSecuriteViewModel.cs`) : 7 indicateurs ; onglets Échéancier
+    (filtres, double-clic : ouvre l'accident ou la remise, ou prépare la convocation pré-remplie), Accidents du travail (liste
+    + fiche en 4 sections, contrôles en direct, boutons « Aujourd'hui » pour les déclarations, « Proposer » la rémunération,
+    « Programmer la visite de reprise »), Visites médicales (situation par salarié / historique + fiche ; rappel : aucun
+    diagnostic), Équipements de protection (remises + fiche, « Renouveler » = rendu aujourd'hui + nouvelle remise), Indemnités
+    journalières (année, mois, totaux), Paramètres & catalogue des EPI. Proposition d'enregistrer un accident modifié en
+    quittant. Navigation « Santé & sécurité au travail » sous RESSOURCES HUMAINES (icône `IconHealth` ajoutée à `App.xaml`),
+    recherche `SanteSecurite`, module de licence **RH07** (recompiler le générateur).
+    — *Vérification* : compilation complète 0 erreur, 173 liaisons XAML contrôlées ; 11 tests NUnit
+    (`IUTSCalculator_Tests/SanteSecuriteTests.cs`) ; 116 contrôles d'intégration sous Mono : dossier v36 créé par le code
+    d'avant RH-07 puis migré (sauvegarde `avant-v37`, absences existantes identiques, pas de doublon à la réouverture), dossier
+    v34 migré d'un coup, paramètres (2/3 exacts relus), périodicité par poste, visites, catalogue et remises d'EPI, accident →
+    absence de 13 jours puis prolongation à 19 jours sur la même absence, salaire maintenu (aucune retenue), chevauchement et
+    période clôturée refusés avec annulation complète, saisie sans effet paie acceptée après clôture, arrêt retiré puis remis,
+    suppression, IJ (16 × 3 000 × 2/3 = 32 000), échéancier, dossier neuf ; fiche de déclaration, fiche de dotation et
+    registre générés et relus. Tests RH-06 et correctifs rejoués (version attendue désormais 37, sauvegarde `avant-v37`).
+    — *Dette RH-07* :
+    (1) Pas de pré-remplissage de l'imprimé officiel de la CNSS (sa mise en page n'est pas disponible) : la fiche en
+    rassemble les éléments à reporter.
+    (2) La rémunération journalière est proposée sur le salaire mensuel ÷ 30 (base + indemnités) ; la CNSS retient la
+    rémunération moyenne de la période de référence : montant modifiable par accident, à vérifier sur la notification CNSS.
+    (3) Les IJ sont un état de suivi : le remboursement reçu de la CNSS n'est ni saisi ni rapproché (relève d'une évolution
+    comptable).
+    (4) Un arrêt sans date de fin n'est pas reporté dans les absences tant que la fin n'est pas saisie (alerte « à
+    vérifier ») ; une rechute se saisit comme une prolongation ou un nouvel accident.
+    (5) Pas de stock d'EPI (choix du client) ; pas de modèle de document modifiable (ETA-06).
+    - **19 octobre 2026 — protection des données lors des mises à jour (version 1.4.37.1).** Demandée par le client après
+    la question « comment déployer chez les clients sans perte de données ». Constat : programme et données étaient déjà
+    séparés et les migrations additives, mais (a) la chaîne de migrations travaillait directement sur le fichier, étape par
+    étape, alors que le message d'échec affirmait « aucune donnée n'a été modifiée » ; (b) un ancien programme ouvrait sans
+    rien dire une base plus récente ; (c) la version restait à 1.0.0.0 ; (d) aucune sauvegarde / restauration dans le
+    programme. — *Corrections* : mise à niveau **tout ou rien** sur copie de travail et refus d'une base plus récente
+    (`Services/SQLiteService.cs`, §3) ; ouverture d'un dossier précédée de la préparation de sa base, avec message clair
+    (`DossierSelectionViewModel`) ; **numéro de version** (`Properties/AssemblyInfo.cs` 1.4.37.1, `Helpers/VersionApplication.cs`,
+    titre, barre d'état, À propos, écran de sélection) ; **sauvegarde / restauration** (`Services/SauvegardeService.cs`,
+    `Helpers/SauvegardeInteractive.cs`) : un zip de tout le dossier de données (bases copiées par `VACUUM INTO`, cohérentes
+    même programme ouvert ; `.bak`, copies de travail et journaux exclus ; manifeste `sauvegarde-sigma.txt` : date, version,
+    poste, bases et niveaux ; base d'un dossier rangée hors du dossier de données signalée), écrit sous un nom provisoire puis
+    relu avant de remplacer un fichier existant. **Restauration** : seulement au démarrage, avant d'ouvrir un dossier (le
+    bouton est désactivé quand un dossier est ouvert) ; refus d'une archive étrangère, d'une base illisible ou d'une
+    sauvegarde faite par une version plus récente ; chemins sortant de l'archive refusés ; **sauvegarde de sécurité
+    automatique de l'état actuel** (Documents\Sigma Paie & RH\Sauvegardes\Avant_restauration_…zip) sans laquelle rien
+    n'est touché ; fichiers remis en place sans supprimer ceux créés depuis ; anciennes copies `.avant-vN.bak` de la base
+    remplacée renommées ; redémarrage du programme (les utilisateurs restaurés s'appliquent). Boutons « Sauvegarder les
+    données… » et « Restaurer… » sur l'écran de sélection du dossier, « Sauvegarder les données… » dans le menu ⋯.
+    — *Vérification* : compilation complète 0 erreur ; 4 tests NUnit (`IUTSCalculator_Tests/ProtectionDonneesTests.cs`, vraies
+    bases dans le dossier temporaire) ; 56 contrôles d'intégration sous Mono (échec de migration : fichier identique à
+    l'octet, message exact, copie jetée, réussite après correction ; reste de copie après coupure ; base v38 refusée et
+    intacte ; aller-retour sauvegarde / restauration avec pièces, CV, utilisateurs, base v36 restaurée puis mise à niveau ;
+    sauvegarde d'une version plus récente, archive étrangère et archive malveillante refusées sans rien modifier) ; suites
+    RH-07 (116), RH-06 (86), correctifs (64) et tests unitaires rejoués avec le nouveau mécanisme de mise à niveau.
+    — *Reste ouvert* : pas d'installateur (copie du dossier `bin\Release`) ; pas de sauvegarde automatique planifiée ; la
+    licence (liée au poste) ne fait pas partie des sauvegardes ; le logo d'un dossier (chemin libre) non plus.
+
+    - **21 octobre 2026 — correction des 25 défauts relevés en préparant le guide de formation (version 1.4.38.0, base v38).**
+    Demandée par le client (« lance les corrections ») après la section 15.5 du guide ; choix du client : tous les défauts,
+    la paie d'abord ; le solde de tout compte produit un **bulletin de sortie** ; ancienneté au **1er du mois de paie**
+    partout ; écritures au **format Sage 100c** avec comptes réglables. — *Paie* : chaîne d'assemblage unique
+    (`Services/ChaineBulletinService.cs`) utilisée par Bulletin, plage de mois, Calcul en lot, Calcul d'IUTS et STC (saisies,
+    rappels, archive ; jamais de remplacement silencieux d'un bulletin archivé ; un bulletin de sortie validé ne peut plus
+    être écrasé par une paie ordinaire) ; date de calcul de l'ancienneté unique (`ConventionCollectiveService.DateCalculAnciennete`) ;
+    « Cadre Supérieur » et « Cadres Supérieurs » ont tous deux l'abattement de 20 % (`Employee.EstCategorieCadreSuperieur`), liste
+    de catégories éditable qui n'écrase plus une valeur enregistrée ; saisies sur salaire : date d'effet respectée, libellé
+    lisible, bordereau du mois choisi, aperçu recalculable ; mode « Mobile money » et « Mode de la fiche » ; rappels refusés
+    sur un mois clôturé, imputés par défaut sur la période ouverte, Δ IUTS estimé, et repris au recalcul d'un mois ;
+    **prorata automatique** des entrées et sorties en cours de mois (base, indemnités, prime d'ancienneté, gains permanents
+    du profil, abattement forfaitaire et plafond retraite sur la base due) ; garde-fou HSUP / module HS, code `HS50J` au barème
+    2000 ; frais de mission et remboursements hors TPA ; reprise du solde de congés (« Congés repris (j) », « Reprise au ») ;
+    préavis 3 mois cadres, agents de maîtrise et techniciens, 1 mois sinon, modifiable (source à confirmer, voir dette) ;
+    départ volontaire à la retraite : indemnité réduite de moitié ; réimport CSV qui conserve poste, manager, reprise de
+    congés et type de contrat, statuts « Sorti… » / « Suspendu… » reconnus. — *Modules RH* : RH-08 absence « A » comptée au
+    poste prévu par le cycle (0 h sur un repos) et pré-chargement des 11 jours chômés de la loi n° 001-2026/ALT (fêtes
+    musulmanes 2026 seulement, sourcées ; lundi de Pâques supprimé par cette loi) ; RH-07 prolongation d'un arrêt touchant un
+    mois clôturé, suivi des remboursements d'IJ par la CNSS ; RH-04 totaux du plan non multipliés par les présents, filtres
+    « Statut » ; RH-03 validation en une seule transition, date et auteur scellés ; RH-05 matricule selon le schéma du
+    dossier, contrat, motif, convention, échelon, catégorie et indemnités repris à l'embauche ; RH-02 niveaux 1 à 4
+    corrects (anciennes lignes « à vérifier »), convention enregistrée, minimum repris de la grille ; RH-01 codes uniques à
+    l'initialisation (transaction unique), filtre des postes ; RH-06 procédure notifiée figée, « Salarié protégé » recalculé ;
+    simulateur des conventions branché. — *Contrôle* : profil « Lecture seule » appliqué par la base elle-même
+    (`Services/GardeLectureSeule.cs`, autorisateur SQLite posé par `SQLiteService.CreateConnection` après la mise à niveau ;
+    seul le journal d'audit reste inscriptible ; bandeau « LECTURE SEULE » ; création, suppression de dossier et restauration
+    interdites) ; « Clôturée par » = utilisateur connecté ; écritures : comptes réglables par dossier, longueur uniforme,
+    export « Import Sage 100c » (JO_Num;EC_Reference;Date;EC_Piece;CG_Num;CT_Num;EC_Intitule;Sens;Montant, Windows-1252,
+    intitulé ≤ 33 car., pièce équilibrée sinon refus), journal par défaut « PAIE » ; journal d'audit paginé sans plafond,
+    barèmes et calculs journalisés, chaînage SHA-256 et « Vérifier l'intégrité ». — *Vérification* : compilation complète
+    0 erreur ; migration v37 → v38 et base neuve testées (idempotence, données conservées) ; tests du client mis à jour et
+    nouveaux tests (`CorrectionsPaieTests`, `EcriturePaieTests`, `AuditIntegriteTests`, compléments RH) passés sous Mono, sauf
+    ceux qui exigent iTextSharp, ClosedXML ou la bibliothèque SQLite native (à rejouer dans Visual Studio) ; année STI rejouée :
+    seuls changent STI028 en septembre (prorata de sortie) et STI035 en novembre (indemnité de retraite réduite de moitié) ;
+    relecture du code par deux agents, 10 défauts trouvés et corrigés. — *Dette* :
+    (1) Préavis : la règle retenue (3 mois cadres, agents de maîtrise et techniciens ; 1 mois sinon) vient d'une source
+    secondaire incohérente — à confirmer sur la convention CCI-BF et le Code du travail ; 8 jours des horaires à saisir à la main.
+    (2) Pour une absence ordinaire (non rémunérée), l'abattement forfaitaire reste calculé sur le salaire de base complet
+    (comportement validé antérieurement) ; seul le prorata d'entrée/sortie le réduit.
+    (3) Supprimer un STC ne supprime pas son bulletin de sortie.
+    (4) Fêtes musulmanes 2027 et suivantes à saisir à la main ; Tabaski 2026 sourcée par la FAIB seulement.
+    (5) La garde « Lecture seule » affiche un message traduit dans la barre d'état ; une boîte de dialogue qui affiche
+    `ex.Message` brut peut encore montrer « not authorized ».
+    (6) Limites Sage supposées (journal 6, pièce 13, référence 17, compte 13) : à confirmer sur le poste du client.
+
+    - **22 octobre 2026 — gestion des utilisateurs : la sélection remplit enfin la fiche (version 1.4.38.1).** Signalé
+    par le client : « quand je clique sur un utilisateur, aucune information n'est saisie dans le formulaire ». Cause : la
+    fenêtre avait deux panneaux empilés, « Nouvel utilisateur » (jamais rempli par la sélection) puis « Utilisateur
+    sélectionné », coupé par le bas de la fenêtre (560 px, sans défilement) ; le nom affiché et l'identifiant ne se
+    modifiaient d'ailleurs nulle part. — *Correction* (`Views/UserManagementWindow.xaml(.cs)`) : une seule fiche, qui
+    défile, pour créer ou modifier ; sélectionner une ligne la remplit (nom affiché, identifiant, rôle) et la passe en
+    « Modifier l'utilisateur » ; « Nouvel utilisateur » la vide ; mot de passe facultatif en modification (vide = conservé)
+    avec confirmation ; « Supprimer cet utilisateur » visible en modification seulement ; la liste resélectionne le compte
+    après chaque enregistrement. Nouveau `UserAccountService.ModifierUtilisateurAsync` (identifiant obligatoire et unique sans
+    tenir compte des majuscules, mot de passe de 6 caractères au moins, toujours un administrateur, rien d'enregistré en
+    cas de refus) ; retirer son propre rôle d'administrateur demande confirmation ; modifier son propre compte met à jour la
+    session et le menu « Connecté : … » (`MainWindow.xaml.cs`). — *Vérification* : compilation complète 0 erreur ; 13
+    contrôles du service sous Mono (modification, doublon, dernier administrateur, mot de passe conservé / changé / trop
+    court, identifiant vide).
+
 ---
 
 ## 8. Pour reprendre dans une nouvelle conversation
+
+### Mettre à jour un client sans perte de données
+
+Le programme (dossier d'installation) et les données (`%APPDATA%\IUTSCalculator` : `dossiers.json`, `users.json`,
+`settings.json`, `Dossiers\*.db`, pièces, CV ; licence à part dans `%PROGRAMDATA%\SigmaPaieRH`) sont séparés.
+1. Chez le client, avant tout : « Sauvegarder les données… » (écran de sélection du dossier ou menu ⋯), copie du zip hors du poste.
+2. Fermer le programme ; remplacer TOUT le contenu du dossier d'installation par `bin\Release` (jamais de `.db`).
+3. Nouveaux modules achetés : nouvelle licence (générateur recompilé), importée par le client.
+4. Relancer, ouvrir chaque dossier (mise à niveau tout ou rien, `.avant-vN.bak` déposé), contrôler quelques chiffres.
+5. En cas de problème : remettre l'ancien programme ET « Restaurer… » la sauvegarde de l'étape 1, au démarrage.
+
 
 Ouvrir la conversation sur le dossier du projet et dire, en substance :
 

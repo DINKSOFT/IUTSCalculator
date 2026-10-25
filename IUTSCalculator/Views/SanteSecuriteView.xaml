@@ -1,0 +1,941 @@
+<UserControl x:Class="IUTSCalculator.Views.SanteSecuriteView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:SanteSecuriteViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style x:Key="Section" TargetType="TextBlock" BasedOn="{StaticResource SectionLabelStyle}">
+            <Setter Property="Margin" Value="0,14,0,6"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush2}"/>
+        </Style>
+        <Style x:Key="Field" TargetType="StackPanel">
+            <Setter Property="Margin" Value="0,0,10,6"/>
+        </Style>
+        <Style x:Key="Saisie" TargetType="TextBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+        </Style>
+        <Style x:Key="SaisieLongue" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="56"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Padding" Value="4,2"/>
+        </Style>
+        <Style x:Key="Date" TargetType="DatePicker" BasedOn="{StaticResource FormDatePickerStyle}">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style x:Key="KpiLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{StaticResource InkMutedBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+        <Style x:Key="KpiValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+        </Style>
+        <Style x:Key="KpiCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+        <Style x:Key="Toolbar" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource GroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="CelluleEcheance" TargetType="DataGridCell" BasedOn="{StaticResource GridCellStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding EstDepassee}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="0,0,0,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="200"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Santé &amp; sécurité au travail" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock Text="Visites médicales et échéances, équipements de protection, registre des accidents du travail et déclaration à la CNSS (RH-07)"
+                           FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Actualiser" Tag="{StaticResource IconRefresh}"
+                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ChargerCommand}"/>
+                <Button Content="Exporter le registre" Tag="{StaticResource IconExcel}"
+                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ExporterRegistreCommand}"/>
+                <Button Content="Déclarer un accident" Tag="{StaticResource IconAdd}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}" Command="{Binding NouvelAccidentCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Indicateurs ═══════════ -->
+        <WrapPanel Grid.Row="1" Margin="0,0,0,8">
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="ÉCHÉANCES EN RETARD" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreEcheancesEnRetard, Mode=OneWay}" Style="{StaticResource KpiValue}" Foreground="{StaticResource DangerBrush}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="VISITES À PASSER" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreVisitesAPasser, Mode=OneWay}" Style="{StaticResource KpiValue}" Foreground="{StaticResource AccentBrush2}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="APTITUDES AVEC RÉSERVES" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreAvecReserves, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="EPI À RENOUVELER" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreEpiARenouveler, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="ACCIDENTS CETTE ANNÉE" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreAccidentsAnnee, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="JOURS D'ARRÊT INDEMNISÉS (ANNÉE)" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding JoursArretAnnee, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="ACCIDENTS NON DÉCLARÉS" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreAccidentsADeclarer, Mode=OneWay}" Style="{StaticResource KpiValue}" Foreground="{StaticResource DangerBrush}"/>
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+
+        <!-- ═══════════ Onglets ═══════════ -->
+        <TabControl Grid.Row="2" SelectedIndex="{Binding OngletActif, Mode=TwoWay}">
+
+            <!-- ───────── 0. Échéancier ───────── -->
+            <TabItem Header="Échéancier">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource Toolbar}">
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox Width="190" Height="28" ItemsSource="{Binding Categories}" SelectedItem="{Binding FiltreCategorie}" Margin="0,0,12,0"/>
+                            <CheckBox Content="En retard seulement" Style="{StaticResource FormCheckBoxStyle}"
+                                      IsChecked="{Binding SeulementEnRetard}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                            <Button Content="Ouvrir / traiter" Tag="{StaticResource IconView}" Margin="0"
+                                    Style="{StaticResource SecondaryButtonStyle}" Command="{Binding TraiterEcheanceCommand}"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Grid.Row="1" Style="{StaticResource Hint}" Margin="2,0,0,8"
+                               Text="Visites médicales dues (embauche, périodiques, reprise), EPI à renouveler, accidents à déclarer ou dont la reprise n'est pas saisie — jusqu'à l'horizon d'alerte fixé dans les paramètres. Double-cliquez une ligne pour la traiter : une visite à passer ouvre une convocation pré-remplie."/>
+                    <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+                        <DataGrid ItemsSource="{Binding VueEcheances}" SelectedItem="{Binding EcheanceSelectionnee}"
+                                  Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                  AutoGenerateColumns="False" BorderThickness="0" CellStyle="{StaticResource CelluleEcheance}">
+                            <DataGrid.InputBindings>
+                                <MouseBinding Gesture="LeftDoubleClick" Command="{Binding TraiterEcheanceCommand}"/>
+                            </DataGrid.InputBindings>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Date" Binding="{Binding DateLibelle, Mode=OneWay}" Width="120"/>
+                                <DataGridTextColumn Header="Délai" Binding="{Binding DelaiLibelle, Mode=OneWay}" Width="125"/>
+                                <DataGridTextColumn Header="Catégorie" Binding="{Binding Categorie, Mode=OneWay}" Width="115"/>
+                                <DataGridTextColumn Header="Échéance" Binding="{Binding Libelle, Mode=OneWay}" Width="*" MinWidth="240"/>
+                                <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}" Width="90"/>
+                                <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="200"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 1. Accidents du travail ───────── -->
+            <TabItem Header="Accidents du travail">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4*" MinWidth="300"/>
+                        <ColumnDefinition Width="6*" MinWidth="460"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Registre -->
+                    <Grid Grid.Column="0" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*" MinHeight="100"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Border Style="{StaticResource Toolbar}">
+                            <TextBox Style="{StaticResource Saisie}" Text="{Binding RechercheAccident, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Filtrer : référence, matricule, nom, lieu, nature"/>
+                        </Border>
+                        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                            <DataGrid ItemsSource="{Binding VueAccidents}" SelectedItem="{Binding AccidentSelectionne}"
+                                      Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                      AutoGenerateColumns="False" BorderThickness="0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Référence" Binding="{Binding Reference, Mode=OneWay}" Width="100"/>
+                                    <DataGridTextColumn Header="Victime" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="120"/>
+                                    <DataGridTextColumn Header="Date" Binding="{Binding DateLibelle, Mode=OneWay}" Width="80"/>
+                                    <DataGridTextColumn Header="Arrêt" Binding="{Binding ArretLibelle, Mode=OneWay}" Width="140"/>
+                                    <DataGridTextColumn Header="Déclaration" Binding="{Binding DeclarationLibelle, Mode=OneWay}" Width="150"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                        <TextBlock Grid.Row="2" Style="{StaticResource Hint}" Margin="2,8,0,0" Text="{Binding RappelLegal, Mode=OneWay}"/>
+                    </Grid>
+
+                    <!-- Fiche -->
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="12,10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*" MinHeight="120"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,6">
+                                <TextBlock Text="{Binding TitreAccident, Mode=OneWay}" FontSize="14" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,420,0"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                            Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerAccidentCommand}"/>
+                                    <Button Content="Annuler" Tag="{StaticResource IconCancel}"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding AnnulerAccidentCommand}"/>
+                                    <Button Content="Fiche de déclaration" Tag="{StaticResource IconPdf}"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding FicheAccidentCommand}"
+                                            ToolTip="Fiche PDF rassemblant les éléments à reporter sur l'imprimé de déclaration de la CNSS."/>
+                                    <Button Content="Supprimer" Tag="{StaticResource IconDelete}" Margin="0"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerAccidentCommand}"
+                                            ToolTip="Impossible une fois l'accident déclaré à la CNSS."/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Contrôles -->
+                            <Border Grid.Row="1" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}"
+                                    BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,6"
+                                    Visibility="{Binding AccidentOuvert, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DateLimiteLibelle, Mode=OneWay}" FontWeight="SemiBold" TextWrapping="Wrap"
+                                               Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,4"/>
+                                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding AlertesAccident}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="80"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border CornerRadius="3" Padding="4,0" Margin="0,1,6,1" VerticalAlignment="Top"
+                                                                Background="{Binding Couleur, Mode=OneWay}">
+                                                            <TextBlock Text="{Binding NiveauLibelle, Mode=OneWay}" Foreground="White" FontSize="10"
+                                                                       FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Message, Mode=OneWay}" TextWrapping="Wrap" FontSize="11.5"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Formulaire -->
+                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                          Visibility="{Binding AccidentOuvert, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel Margin="0,0,8,0" IsEnabled="{Binding PeutModifier, Mode=OneWay}">
+
+                                    <TextBlock Text="1. VICTIME ET ACCIDENT" Style="{StaticResource Section}" Margin="0,4,0,6"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Victime *" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding Salaries}" SelectedItem="{Binding SalarieAccident}"
+                                                      DisplayMemberPath="FullNameWithId" Height="28"
+                                                      IsEnabled="{Binding SalarieAccidentModifiable, Mode=OneWay}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Nature" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding NaturesAccident}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                      SelectedValue="{Binding AccidentEnCours.Nature}" Height="28"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Date de l'accident (ou de constatation) *" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding AccidentEnCours.DateAccident}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Heure" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding AccidentEnCours.Heure, UpdateSourceTrigger=LostFocus}"
+                                                     ToolTip="Par exemple : 14 h 30"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Lieu" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Text="{Binding AccidentEnCours.Lieu, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+                                    <TextBlock Text="Circonstances détaillées (activité, déroulement, objet ou machine en cause)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding AccidentEnCours.Circonstances, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Siège des lésions" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding SiegesLesion}" IsEditable="True" Height="28"
+                                                      Text="{Binding AccidentEnCours.SiegeLesion, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Nature des lésions" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding NaturesLesion}" IsEditable="True" Height="28"
+                                                      Text="{Binding AccidentEnCours.NatureLesion, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Témoins (noms et coordonnées)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Text="{Binding AccidentEnCours.Temoins, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+                                    <TextBlock Text="Premiers soins et structure de prise en charge (à la charge de l'employeur)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Text="{Binding AccidentEnCours.PremiersSoins, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+
+                                    <TextBlock Text="2. ARRÊT DE TRAVAIL" Style="{StaticResource Section}"/>
+                                    <WrapPanel Margin="0,0,0,4">
+                                        <CheckBox Content="Arrêt de travail prescrit" Style="{StaticResource FormCheckBoxStyle}"
+                                                  IsChecked="{Binding AccidentEnCours.AvecArret}" Margin="0,4,18,4"/>
+                                        <CheckBox Content="Accident mortel" Style="{StaticResource FormCheckBoxStyle}"
+                                                  IsChecked="{Binding AccidentEnCours.Mortel}" Margin="0,4,0,4"/>
+                                    </WrapPanel>
+                                    <StackPanel IsEnabled="{Binding ArretSaisissable, Mode=OneWay}">
+                                        <UniformGrid Columns="3">
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Premier jour d'arrêt" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding AccidentEnCours.DebutArret}"/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Dernier jour d'arrêt" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding AccidentEnCours.FinArret}"
+                                                            ToolTip="Fin prévue sur le certificat médical, puis fin réelle (prolongation)."/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Reprise du travail le" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding AccidentEnCours.DateReprise}"/>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                        <TextBlock Style="{StaticResource Hint}"
+                                                   Text="L'arrêt (dates de début et de fin connues) est reporté dans les congés et absences comme « Accident du travail » : le salaire est maintenu. Une prolongation se saisit en modifiant le dernier jour d'arrêt, même si l'arrêt a commencé dans une période de paie clôturée : seuls les jours des mois encore ouverts peuvent changer."/>
+                                        <Button Content="Programmer la visite de reprise" Tag="{StaticResource IconAdd}" HorizontalAlignment="Left"
+                                                Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ProgrammerRepriseCommand}" Margin="0,0,0,6"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="3. DÉCLARATIONS (48 HEURES OUVRABLES)" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Déclaré à la CNSS le" Style="{StaticResource FieldLabel}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding AccidentEnCours.DateDeclarationCnss}"/>
+                                                <Button Grid.Column="1" Content="Aujourd'hui" Style="{StaticResource SecondaryButtonStyle}" Margin="6,0,0,0"
+                                                        Command="{Binding DeclareCnssAujourdhuiCommand}"/>
+                                            </Grid>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Déclaré à l'inspection du travail le" Style="{StaticResource FieldLabel}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding AccidentEnCours.DateDeclarationInspection}"/>
+                                                <Button Grid.Column="1" Content="Aujourd'hui" Style="{StaticResource SecondaryButtonStyle}" Margin="6,0,0,0"
+                                                        Command="{Binding DeclareInspectionAujourdhuiCommand}"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Référence de la déclaration ou n° du carnet d'accident délivré par la CNSS" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Text="{Binding AccidentEnCours.ReferenceCnss, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+
+                                    <TextBlock Text="4. INDEMNISATION" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Rémunération journalière retenue (FCFA)" Style="{StaticResource FieldLabel}"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Style="{StaticResource Saisie}" HorizontalContentAlignment="Right"
+                                                         Text="{Binding AccidentEnCours.SalaireJournalier, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"/>
+                                                <Button Grid.Column="1" Content="Proposer" Style="{StaticResource SecondaryButtonStyle}" Margin="6,0,0,0"
+                                                        Command="{Binding ProposerSalaireCommand}"/>
+                                            </Grid>
+                                            <TextBlock Text="{Binding SalaireProposeLibelle, Mode=OneWay}" Style="{StaticResource Hint}" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Taux d'incapacité permanente fixé par la CNSS (%)" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Width="90" HorizontalAlignment="Left" HorizontalContentAlignment="Right"
+                                                     Text="{Binding AccidentEnCours.TauxIpp, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Commentaire" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding AccidentEnCours.Commentaire, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,10"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 2. Visites médicales ───────── -->
+            <TabItem Header="Visites médicales">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="6*" MinWidth="420"/>
+                        <ColumnDefinition Width="4*" MinWidth="330"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*" MinHeight="120"/>
+                        </Grid.RowDefinitions>
+                        <Border Style="{StaticResource Toolbar}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Style="{StaticResource Saisie}" Text="{Binding RechercheVisite, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Filtrer : matricule, nom, poste ou médecin"/>
+                                <Button Grid.Column="1" Content="Nouvelle visite" Tag="{StaticResource IconAdd}" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding NouvelleVisiteCommand}"/>
+                            </Grid>
+                        </Border>
+                        <TabControl Grid.Row="1" SelectedIndex="{Binding VueVisitesIndex, Mode=TwoWay}">
+                            <TabItem Header="Situation par salarié">
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <DataGrid ItemsSource="{Binding VueSituations}" SelectedItem="{Binding SituationSelectionnee}"
+                                              Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                              AutoGenerateColumns="False" CellStyle="{StaticResource CelluleEcheance}">
+                                        <DataGrid.InputBindings>
+                                            <MouseBinding Gesture="LeftDoubleClick" Command="{Binding ProgrammerVisiteSituationCommand}"/>
+                                        </DataGrid.InputBindings>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="130"/>
+                                            <DataGridTextColumn Header="Poste" Binding="{Binding Poste, Mode=OneWay}" Width="140"/>
+                                            <DataGridTextColumn Header="Périodicité" Binding="{Binding PeriodiciteLibelle, Mode=OneWay}" Width="75"/>
+                                            <DataGridTextColumn Header="Dernière visite" Binding="{Binding DerniereVisiteLibelle, Mode=OneWay}" Width="150"/>
+                                            <DataGridTextColumn Header="Avis" Binding="{Binding AptitudeLibelle, Mode=OneWay}" Width="115"/>
+                                            <DataGridTextColumn Header="Prochaine visite" Binding="{Binding ProchaineLibelle, Mode=OneWay}" Width="190"/>
+                                            <DataGridTextColumn Header="Délai" Binding="{Binding DelaiLibelle, Mode=OneWay}" Width="115"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Content="Programmer / ouvrir la visite" Tag="{StaticResource IconView}"
+                                                Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ProgrammerVisiteSituationCommand}"/>
+                                        <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                   Text="Salariés actifs : sans visite, la visite d'embauche est due dès l'entrée."/>
+                                    </StackPanel>
+                                </Grid>
+                            </TabItem>
+                            <TabItem Header="Historique des visites">
+                                <DataGrid ItemsSource="{Binding VueVisites}" SelectedItem="{Binding VisiteSelectionnee}" Margin="0,6,0,0"
+                                          Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single" AutoGenerateColumns="False">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="130"/>
+                                        <DataGridTextColumn Header="Visite" Binding="{Binding TypeLibelle, Mode=OneWay}" Width="135"/>
+                                        <DataGridTextColumn Header="Date" Binding="{Binding DateLibelle, Mode=OneWay}" Width="85"/>
+                                        <DataGridTextColumn Header="Avis" Binding="{Binding AptitudeLibelle, Mode=OneWay}" Width="125"/>
+                                        <DataGridTextColumn Header="Médecin / service" Binding="{Binding Medecin, Mode=OneWay}" Width="150"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="14,10" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TitreVisite, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <StackPanel Visibility="{Binding VisiteOuverte, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        IsEnabled="{Binding PeutModifier, Mode=OneWay}">
+                                <TextBlock Text="Salarié *" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding Salaries}" SelectedItem="{Binding SalarieVisite}"
+                                          DisplayMemberPath="FullNameWithId" Height="28" Margin="0,0,0,8"/>
+                                <TextBlock Text="Type de visite" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding TypesVisite}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                          SelectedValue="{Binding VisiteEnCours.Type}" Height="28" Margin="0,0,0,8"/>
+                                <UniformGrid Columns="2">
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Convoqué(e) pour le" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding VisiteEnCours.DatePrevue}"/>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Visite passée le" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding VisiteEnCours.DateVisite}"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="Médecin ou service de santé au travail" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Text="{Binding VisiteEnCours.Medecin, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8"/>
+                                <TextBlock Text="Avis d'aptitude" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding Aptitudes}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                          SelectedValue="{Binding VisiteEnCours.Aptitude}" Height="28" Margin="0,0,0,8"/>
+                                <TextBlock Text="Réserves ou aménagements de poste demandés" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding VisiteEnCours.Restrictions, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,4"/>
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="Seul l'avis d'aptitude et ses conséquences sur le poste concernent l'employeur : ne saisissez aucun diagnostic ni information médicale."/>
+                                <TextBlock Text="Prochaine visite fixée par le médecin (vide : selon la périodicité)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding VisiteEnCours.ProchaineVisite}" HorizontalAlignment="Left" Width="160" Margin="0,0,0,8"/>
+                                <TextBlock Text="Commentaire" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Text="{Binding VisiteEnCours.Commentaire, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                        Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerVisiteCommand}"/>
+                                <Button Content="Supprimer" Tag="{StaticResource IconDelete}" Margin="0"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerVisiteCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 3. Équipements de protection ───────── -->
+            <TabItem Header="Équipements de protection">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="6*" MinWidth="420"/>
+                        <ColumnDefinition Width="4*" MinWidth="330"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*" MinHeight="120"/>
+                        </Grid.RowDefinitions>
+                        <Border Style="{StaticResource Toolbar}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Style="{StaticResource Saisie}" Text="{Binding RechercheDotation, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Filtrer : matricule, nom ou équipement"/>
+                                <CheckBox Grid.Column="1" Content="En service seulement" Style="{StaticResource FormCheckBoxStyle}"
+                                          IsChecked="{Binding SeulementEnService}" Margin="12,0,12,0" VerticalAlignment="Center"/>
+                                <Button Grid.Column="2" Content="Nouvelle remise" Tag="{StaticResource IconAdd}" Margin="0"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding NouvelleDotationCommand}"/>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                            <DataGrid ItemsSource="{Binding VueDotations}" SelectedItem="{Binding DotationSelectionnee}"
+                                      Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                      AutoGenerateColumns="False" BorderThickness="0">
+                                <DataGrid.CellStyle>
+                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource GridCellStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Etat}" Value="Rendu">
+                                                <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Etat}" Value="PerduOuUse">
+                                                <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.CellStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="130"/>
+                                    <DataGridTextColumn Header="Équipement" Binding="{Binding TypeEpiLibelle, Mode=OneWay}" Width="170"/>
+                                    <DataGridTextColumn Header="Qté" Binding="{Binding Quantite, Mode=OneWay}" Width="45"
+                                                        HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                    <DataGridTextColumn Header="Taille" Binding="{Binding Taille, Mode=OneWay}" Width="60"/>
+                                    <DataGridTextColumn Header="Remis le" Binding="{Binding DateRemise, Mode=OneWay, StringFormat={}{0:dd/MM/yyyy}}" Width="85"/>
+                                    <DataGridTextColumn Header="À renouveler" Binding="{Binding RenouvellementLibelle, Mode=OneWay}" Width="90"/>
+                                    <DataGridTextColumn Header="État" Binding="{Binding EtatLibelle, Mode=OneWay}" Width="130"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="14,10" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TitreDotation, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <StackPanel Visibility="{Binding DotationOuverte, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        IsEnabled="{Binding PeutModifier, Mode=OneWay}">
+                                <TextBlock Text="Salarié *" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding Salaries}" SelectedItem="{Binding SalarieDotation}"
+                                          DisplayMemberPath="FullNameWithId" Height="28" Margin="0,0,0,8"/>
+                                <TextBlock Text="Équipement *" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding TypesEpiProposes}" SelectedValuePath="Id" DisplayMemberPath="Libelle"
+                                          SelectedValue="{Binding DotationEnCours.TypeEpiId}" Height="28" Margin="0,0,0,8"/>
+                                <UniformGrid Columns="3">
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Remis le *" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding DotationEnCours.DateRemise}"/>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Quantité" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Style="{StaticResource Saisie}" HorizontalContentAlignment="Right"
+                                                 Text="{Binding DotationEnCours.Quantite, UpdateSourceTrigger=LostFocus}"/>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Taille / pointure" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Style="{StaticResource Saisie}" Text="{Binding DotationEnCours.Taille, UpdateSourceTrigger=LostFocus}"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="À renouveler le (vide : remise + durée de vie de l'EPI)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding DotationEnCours.DateRenouvellement}" HorizontalAlignment="Left" Width="160" Margin="0,0,0,8"/>
+                                <UniformGrid Columns="2">
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="État" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox ItemsSource="{Binding EtatsDotation}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                  SelectedValue="{Binding DotationEnCours.Etat}" Height="28"/>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Rendu / constaté le" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding DotationEnCours.DateRetour}"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="Commentaire" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Text="{Binding DotationEnCours.Commentaire, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8"/>
+                            </StackPanel>
+                            <WrapPanel Margin="0,8,0,0">
+                                <Button Content="Enregistrer" Tag="{StaticResource IconSave}" Margin="0,0,6,6"
+                                        Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerDotationCommand}"/>
+                                <Button Content="Renouveler" Tag="{StaticResource IconRefresh}" Margin="0,0,6,6"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding RenouvelerDotationCommand}"
+                                        ToolTip="Note l'équipement actuel « Rendu » aujourd'hui et prépare une nouvelle remise."/>
+                                <Button Content="Fiche de dotation" Tag="{StaticResource IconPdf}" Margin="0,0,6,6"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding FicheDotationCommand}"
+                                        ToolTip="Fiche PDF de tous les EPI en service du salarié, à faire signer (décharge)."/>
+                                <Button Content="Supprimer" Tag="{StaticResource IconDelete}" Margin="0,0,0,6"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerDotationCommand}"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 4. Indemnités journalières ───────── -->
+            <TabItem Header="Indemnités journalières">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource Toolbar}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Année" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox Width="80" Height="28" ItemsSource="{Binding Annees}" SelectedItem="{Binding AnneeIndemnites}" Margin="0,0,14,0"/>
+                            <TextBlock Text="Mois" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox Width="140" Height="28" ItemsSource="{Binding MoisListe}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                      SelectedValue="{Binding MoisIndemnites}"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Grid.Row="1" Style="{StaticResource Hint}" Margin="2,0,0,8"
+                               Text="Le salaire de la victime est maintenu en entier par l'entreprise ; la CNSS doit les indemnités journalières (2/3 de la rémunération journalière à partir du lendemain de l'accident, chaque jour d'arrêt, ouvrable ou non) : cet état sert à les réclamer. Le tiers restant et le jour de l'accident sont à la charge de l'employeur. Un arrêt sans date de fin est compté jusqu'à aujourd'hui."/>
+                    <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+                        <DataGrid ItemsSource="{Binding Indemnites}" Style="{StaticResource FormDataGridStyle}" IsReadOnly="True"
+                                  AutoGenerateColumns="False" BorderThickness="0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Mois" Binding="{Binding MoisLibelle, Mode=OneWay}" Width="115"/>
+                                <DataGridTextColumn Header="Accident" Binding="{Binding Reference, Mode=OneWay}" Width="105"/>
+                                <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}" Width="85"/>
+                                <DataGridTextColumn Header="Victime" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="140"/>
+                                <DataGridTextColumn Header="Période" Binding="{Binding PeriodeLibelle, Mode=OneWay}" Width="140"/>
+                                <DataGridTextColumn Header="Jours" Binding="{Binding Jours, Mode=OneWay}" Width="55"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Rémun. journalière" Binding="{Binding SalaireJournalier, Mode=OneWay, StringFormat={}{0:N0}}" Width="120"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="IJ due par la CNSS" Binding="{Binding MontantCnss, Mode=OneWay, StringFormat={}{0:N0}}" Width="125"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Part employeur" Binding="{Binding PartEmployeur, Mode=OneWay, StringFormat={}{0:N0}}" Width="110"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                    <WrapPanel Grid.Row="3" Margin="0,8,0,0">
+                        <Border Style="{StaticResource KpiCard}">
+                            <StackPanel>
+                                <TextBlock Text="JOURS INDEMNISÉS" Style="{StaticResource KpiLabel}"/>
+                                <TextBlock Text="{Binding TotalJoursIndemnises, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KpiCard}">
+                            <StackPanel>
+                                <TextBlock Text="À RÉCLAMER À LA CNSS (FCFA)" Style="{StaticResource KpiLabel}"/>
+                                <TextBlock Text="{Binding TotalIndemnitesCnss, Mode=OneWay, StringFormat={}{0:N0}}" Style="{StaticResource KpiValue}" Foreground="{StaticResource AccentBrush2}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KpiCard}">
+                            <StackPanel>
+                                <TextBlock Text="PART EMPLOYEUR (FCFA)" Style="{StaticResource KpiLabel}"/>
+                                <TextBlock Text="{Binding TotalPartEmployeur, Mode=OneWay, StringFormat={}{0:N0}}" Style="{StaticResource KpiValue}"/>
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
+
+                    <!-- Suivi des remboursements de la CNSS, arrêt par arrêt -->
+                    <StackPanel Grid.Row="4" Margin="0,4,0,0">
+                        <TextBlock Text="SUIVI DES REMBOURSEMENTS DE LA CNSS" Style="{StaticResource Section}" Margin="0,8,0,4"/>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Un arrêt indemnisé par ligne : ceux de l'année choisie et tous ceux dont la CNSS doit encore un montant. Le montant réclamé est celui calculé ci-dessus pour tout l'arrêt (jusqu'à aujourd'hui tant que la fin n'est pas connue). Le statut se déduit de la saisie : « À déposer » tant que le dossier n'est pas déposé, « Déposé », « Remboursé partiellement », puis « Remboursé » quand la somme reçue atteint le montant réclamé."/>
+                    </StackPanel>
+                    <Border Grid.Row="5" Style="{StaticResource CardBorderStyle}" Padding="0">
+                        <DataGrid ItemsSource="{Binding Remboursements}" SelectedItem="{Binding RemboursementSelectionne}"
+                                  Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                  AutoGenerateColumns="False" BorderThickness="0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Accident" Binding="{Binding Reference, Mode=OneWay}" Width="105"/>
+                                <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}" Width="85"/>
+                                <DataGridTextColumn Header="Victime" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="140"/>
+                                <DataGridTextColumn Header="Période indemnisée" Binding="{Binding PeriodeLibelle, Mode=OneWay}" Width="190"/>
+                                <DataGridTextColumn Header="Jours" Binding="{Binding Jours, Mode=OneWay}" Width="55"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Réclamé" Binding="{Binding MontantReclame, Mode=OneWay, StringFormat={}{0:N0}}" Width="100"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Déposé le" Binding="{Binding DateDepot, Mode=OneWay, StringFormat={}{0:dd/MM/yyyy}}" Width="90"/>
+                                <DataGridTextColumn Header="Remboursé" Binding="{Binding MontantRembourse, Mode=OneWay, StringFormat={}{0:N0}}" Width="100"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Remboursé le" Binding="{Binding DateRemboursement, Mode=OneWay, StringFormat={}{0:dd/MM/yyyy}}" Width="95"/>
+                                <DataGridTextColumn Header="Restant dû" Binding="{Binding RestantDu, Mode=OneWay, StringFormat={}{0:N0}}" Width="100"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Statut" Binding="{Binding StatutLibelle, Mode=OneWay}" Width="160"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                    <Grid Grid.Row="6" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Toolbar}" Margin="0,0,10,0">
+                            <StackPanel>
+                                <TextBlock Text="{Binding TitreRemboursement, Mode=OneWay}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <WrapPanel IsEnabled="{Binding RemboursementOuvert, Mode=OneWay}">
+                                    <StackPanel Style="{StaticResource Field}" Width="210">
+                                        <TextBlock Text="Dossier déposé à la CNSS le" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding DateDepotIJ}"/>
+                                            <Button Grid.Column="1" Content="Aujourd'hui" Style="{StaticResource SecondaryButtonStyle}" Margin="6,0,0,0"
+                                                    Command="{Binding DeposeIJAujourdhuiCommand}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}" Width="170">
+                                        <TextBlock Text="Montant remboursé (FCFA)" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Style="{StaticResource Saisie}" HorizontalContentAlignment="Right"
+                                                 Text="{Binding MontantRembourseIJ, Converter={StaticResource MontantConverter}, UpdateSourceTrigger=LostFocus}"
+                                                 ToolTip="Total des sommes reçues de la CNSS pour cet arrêt."/>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}" Width="140">
+                                        <TextBlock Text="Remboursé le" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding DateRemboursementIJ}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,6">
+                                        <Button Content="Remboursement intégral" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding RemboursementIntegralCommand}"
+                                                ToolTip="Porte le montant remboursé au montant réclamé (date du jour si aucune date n'est saisie)."/>
+                                        <Button Content="Enregistrer le suivi" Tag="{StaticResource IconSave}" Margin="0"
+                                                Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerRemboursementCommand}"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel Grid.Column="1" VerticalAlignment="Top">
+                            <Border Style="{StaticResource KpiCard}">
+                                <StackPanel>
+                                    <TextBlock Text="DOSSIERS À DÉPOSER" Style="{StaticResource KpiLabel}"/>
+                                    <TextBlock Text="{Binding NombreDossiersADeposer, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource KpiCard}">
+                                <StackPanel>
+                                    <TextBlock Text="REMBOURSÉ PAR LA CNSS (FCFA)" Style="{StaticResource KpiLabel}"/>
+                                    <TextBlock Text="{Binding TotalRembourseCnss, Mode=OneWay, StringFormat={}{0:N0}}" Style="{StaticResource KpiValue}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource KpiCard}" Margin="0">
+                                <StackPanel>
+                                    <TextBlock Text="RESTANT DÛ PAR LA CNSS (FCFA)" Style="{StaticResource KpiLabel}"/>
+                                    <TextBlock Text="{Binding TotalRestantDuCnss, Mode=OneWay, StringFormat={}{0:N0}}" Style="{StaticResource KpiValue}" Foreground="{StaticResource DangerBrush}"/>
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 5. Paramètres & catalogue ───────── -->
+            <TabItem Header="Paramètres &amp; catalogue des EPI">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*" MinWidth="270"/>
+                            <ColumnDefinition Width="3*" MinWidth="300"/>
+                            <ColumnDefinition Width="4*" MinWidth="360"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Paramètres -->
+                        <Border Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,8,0" VerticalAlignment="Top">
+                            <StackPanel DataContext="{Binding ParametresEnCours}">
+                                <TextBlock Text="PARAMÈTRES DU DOSSIER" Style="{StaticResource SectionLabelStyle}"/>
+                                <TextBlock Text="Périodicité des visites médicales (mois)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding PeriodiciteVisiteMois, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Visite de reprise après un arrêt (maladie ou accident) de plus de (jours)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding RepriseApresArretJours, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Alerter (jours avant une échéance)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding AlerteAvanceJours, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="Ces délais de visites dépendent du service de santé au travail et de la convention collective : valeurs indicatives."/>
+
+                                <TextBlock Text="RÈGLES CNSS" Style="{StaticResource SectionLabelStyle}" Margin="0,10,0,6"/>
+                                <TextBlock Text="Délai de déclaration (jours ouvrables ; 48 h = 2)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding DelaiDeclarationJoursOuvrables, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Indemnité journalière CNSS (% de la rémunération journalière)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding TauxIndemniteJournalierePourcent, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Rémunération journalière : salaire mensuel ÷" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding JoursMoisReference, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="Loi n° 004-2021/AN : déclaration dans les 48 heures ouvrables ; indemnité journalière égale aux 2/3 de la rémunération journalière à partir du lendemain de l'accident."/>
+
+                                <Button Content="Enregistrer les paramètres" Tag="{StaticResource IconSave}" HorizontalAlignment="Left"
+                                        Style="{StaticResource MenuButtonStyle}"
+                                        Command="{Binding DataContext.EnregistrerParametresCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Périodicités par poste -->
+                        <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,8,0" VerticalAlignment="Top">
+                            <StackPanel>
+                                <TextBlock Text="PÉRIODICITÉ DES VISITES PAR POSTE" Style="{StaticResource SectionLabelStyle}"/>
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="Postes à risque (travail en hauteur, produits chimiques, bruit…) : indiquez une périodicité propre en mois. Vide : celle du dossier."/>
+                                <DataGrid ItemsSource="{Binding Periodicites}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                          HeadersVisibility="Column" RowHeaderWidth="0" MinHeight="140" MaxHeight="420" GridLinesVisibility="Horizontal"
+                                          BorderThickness="1" BorderBrush="{StaticResource RuleBrush}" Margin="0,0,0,8" SelectionUnit="Cell">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Poste" Binding="{Binding Designation, Mode=OneWay}" Width="*" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="Titulaires" Binding="{Binding Titulaires, Mode=OneWay}" Width="70" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="Mois" Width="60"
+                                                            Binding="{Binding Mois, TargetNullValue='', UpdateSourceTrigger=LostFocus}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <TextBlock Text="Aucun poste actif : créez les postes dans « Suivi des postes &amp; budget » (RH-02).">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Periodicites.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Button Content="Enregistrer les périodicités" Tag="{StaticResource IconSave}" HorizontalAlignment="Left"
+                                        Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerPeriodicitesCommand}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Catalogue des EPI -->
+                        <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="14,10" VerticalAlignment="Top">
+                            <StackPanel>
+                                <TextBlock Text="CATALOGUE DES ÉQUIPEMENTS DE PROTECTION" Style="{StaticResource SectionLabelStyle}"/>
+                                <DataGrid ItemsSource="{Binding TypesEpi}" SelectedItem="{Binding TypeEpiSelectionne}"
+                                          Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                          AutoGenerateColumns="False" MinHeight="140" MaxHeight="300" Margin="0,0,0,10">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Équipement" Binding="{Binding Libelle, Mode=OneWay}" Width="*"/>
+                                        <DataGridTextColumn Header="Durée de vie" Binding="{Binding DureeLibelle, Mode=OneWay}" Width="100"/>
+                                        <DataGridTextColumn Header="Norme" Binding="{Binding Norme, Mode=OneWay}" Width="90"/>
+                                        <DataGridCheckBoxColumn Header="Actif" Binding="{Binding Actif, Mode=OneWay}" Width="45"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel DataContext="{Binding TypeEpiEnCours}">
+                                    <TextBlock Text="Équipement *" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Margin="0,0,10,6" Text="{Binding Libelle, UpdateSourceTrigger=LostFocus}"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Durée de vie (mois ; 0 = sans échéance)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding DureeVieMois, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Norme / référence" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding Norme, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <CheckBox Content="Proposé à la remise (actif)" Style="{StaticResource FormCheckBoxStyle}" IsChecked="{Binding Actif}" Margin="0,4,0,4"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button Content="Nouvel équipement" Tag="{StaticResource IconAdd}"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding NouveauTypeEpiCommand}"/>
+                                    <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                            Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerTypeEpiCommand}"/>
+                                    <Button Content="Supprimer" Tag="{StaticResource IconDelete}" Margin="0"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerTypeEpiCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- ═══════════ Barre de statut ═══════════ -->
+        <Border Grid.Row="3" Margin="0,8,0,0" Padding="8,4" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+        </Border>
+    </Grid>
+</UserControl>

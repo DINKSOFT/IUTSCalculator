@@ -7,13 +7,13 @@ using System.Windows;
 // Les informations générales relatives à un assembly dépendent de
 // l'ensemble d'attributs suivant. Pour modifier les informations
 // associées à un assembly.
-[assembly: AssemblyTitle("IUTSCalculator")]
+[assembly: AssemblyTitle("Sigma Paie & RH")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("IUTSCalculator")]
-[assembly: AssemblyCopyright("Copyright ©  2025")]
-[assembly: AssemblyTrademark("")]
+[assembly: AssemblyProduct("Sigma Paie & RH")]
+[assembly: AssemblyCopyright("Copyright © 2025-2026")]
+[assembly: AssemblyTrademark("DiansieGroup")]
 [assembly: AssemblyCulture("")]
 
 // L'affectation de la valeur false à ComVisible rend les types invisibles dans cet assembly
@@ -48,5 +48,9 @@ using System.Windows;
 //      Numéro de build
 //      Révision
 //
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+// Règle de Sigma Paie & RH (voir ETAT-DEVELOPPEMENT.md, §4) : 1.<dernière phase livrée>.<SchemaCible>.<révision>.
+// À CHAQUE livraison : changer la révision (ou le niveau de schéma s'il a changé) ET la date
+// de AssemblyInformationalVersion, qui est le libellé affiché dans le programme.
+[assembly: AssemblyVersion("1.4.38.1")]
+[assembly: AssemblyFileVersion("1.4.38.1")]
+[assembly: AssemblyInformationalVersion("1.4.38.1 du 22/10/2026")]

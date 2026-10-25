@@ -35,13 +35,18 @@
         <Grid Grid.Row="0" Margin="0,0,0,16">
             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
                 <TextBlock Text="Écritures de paie SYSCOHADA" Style="{StaticResource ScreenTitleStyle}"/>
-                <TextBlock Text="Pièce d'Opérations Diverses (OD de paie) : centralisation mensuelle équilibrée des charges et tiers"
+                <TextBlock Text="Pièce de paie mensuelle : centralisation équilibrée des charges et des tiers, exportable vers Sage 100c Comptabilité"
                            FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Export Sage 100c" Tag="{StaticResource IconExport}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        ToolTip="Fichier d'import Sage 100c Comptabilité (texte délimité par des points-virgules, encodé Windows-1252) : JO_Num, EC_Reference, Date, EC_Piece, CG_Num, CT_Num, EC_Intitule, Sens, Montant. Refusé si la pièce n'est pas équilibrée."
+                        Command="{Binding ExporterSageCommand}"/>
                 <Button Content="Fichier d'import (.txt)" Tag="{StaticResource IconSave}"
                         Style="{StaticResource SecondaryButtonStyle}"
+                        ToolTip="Fichier texte générique (Date;Journal;Piece;Compte;Libelle;Debit;Credit, UTF-8) — ce n'est pas le format d'import de Sage."
                         Command="{Binding ExporterTxtCommand}"/>
                 <Button Content="Exporter vers Excel" Tag="{StaticResource IconExcel}"
                         Style="{StaticResource SecondaryButtonStyle}"
@@ -88,15 +93,20 @@
                                FontSize="14" FontWeight="SemiBold"
                                Foreground="{StaticResource InkBrush}"
                                HorizontalAlignment="Right"/>
-                    <TextBlock Text="{Binding PieceComptable.NumeroPiece, FallbackValue='Pièce : OD-PAIE'}"
+                    <TextBlock Text="{Binding PieceComptable.NumeroPiece, StringFormat='Pièce : {0}', FallbackValue='Pièce : —'}"
+                               FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
+                               HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                    <TextBlock Text="{Binding LongueurComptesLibelle, Mode=OneWay}"
                                FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
                                HorizontalAlignment="Right" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
+        <TabControl Grid.Row="2">
         <!-- ═══════════ Résultat (Tableau comptable) ═══════════ -->
-        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="0">
+        <TabItem Header="Écriture du mois">
+        <Border Style="{StaticResource CardBorderStyle}" Padding="0">
             <DockPanel>
                 <!-- En-tête de la carte avec statut d'équilibre et badge brouillon -->
                 <Border DockPanel.Dock="Top"
@@ -110,7 +120,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="JOURNAL D'OPÉRATIONS DIVERSES (OD)"
+                            <TextBlock Text="{Binding EnteteJournal, Mode=OneWay}"
                                        Style="{StaticResource SectionLabelStyle}" Margin="0,0,12,0"
                                        VerticalAlignment="Center"/>
 
@@ -273,6 +283,128 @@
                 </DataGrid>
             </DockPanel>
         </Border>
+        </TabItem>
+
+        <!-- ═══════════ Paramètres comptables du dossier (défaut 20) ═══════════ -->
+        <TabItem Header="Paramètres comptables">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="4,8,4,4">
+                    <Border Padding="12,8" Margin="0,0,0,10" CornerRadius="3"
+                            Background="{StaticResource WarningTintBrush}"
+                            BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+                            Visibility="{Binding ParametresNonEnregistrables, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="La base de ce dossier n'a pas encore reçu la mise à niveau des paramètres comptables (schéma v38) : les valeurs d'origine sont utilisées et ne peuvent pas être modifiées."
+                                   TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource InkBrush}"/>
+                    </Border>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="260"/>
+                            <ColumnDefinition Width="*" MinWidth="260"/>
+                            <ColumnDefinition Width="*" MinWidth="260"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Journal, pièce, longueur -->
+                        <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,8,0" VerticalAlignment="Top">
+                            <StackPanel DataContext="{Binding Parametres}">
+                                <TextBlock Text="JOURNAL ET PIÈCE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="Code journal (JO_Num)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Width="110" HorizontalAlignment="Left" MaxLength="6"
+                                         Text="{Binding CodeJournal, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Libellé du journal" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                         Text="{Binding LibelleJournal, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="N° de pièce (EC_Piece)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                         Text="{Binding FormatPiece, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Référence (EC_Reference)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}"
+                                         Text="{Binding FormatReference, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Variables : {AAAA} année, {AA} année sur 2 chiffres, {MM} mois. Sage limite la pièce à 13 caractères et la référence à 17."
+                                           TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="Longueur des comptes généraux (0 = automatique)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Width="80" HorizontalAlignment="Left"
+                                         Text="{Binding LongueurComptes, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Les comptes plus courts sont complétés par des zéros à droite (6611 → 661100). Automatique : longueur du plus long compte utilisé (Plan de paie et comptes ci-contre)."
+                                           TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" Margin="0,0,0,8"/>
+
+                                <CheckBox Content="Ligne d'en-tête (noms des colonnes) dans le fichier Sage" Style="{StaticResource FormCheckBoxStyle}" Margin="0,4,0,4"
+                                          IsChecked="{Binding EnTeteFichierSage}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Comptes de charges -->
+                        <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,8,0" VerticalAlignment="Top">
+                            <StackPanel DataContext="{Binding Parametres}">
+                                <TextBlock Text="COMPTES DE CHARGES (DÉBIT)" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="Charges sociales patronales CNSS" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteChargesCnss, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Taxe patronale et d'apprentissage (charge)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteChargeTpa, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Text="COMPTES DE REPLI" Style="{StaticResource SectionLabelStyle}" Margin="0,8,0,4"/>
+                                <TextBlock Text="Utilisés seulement quand la rubrique du Plan de paie n'a pas de compte."
+                                           TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Salaire de base (et absences)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteSalaireBase, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Indemnité de logement" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteIndemniteLogement, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Indemnité de transport" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteIndemniteTransport, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Indemnité de fonction" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteIndemniteFonction, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Indemnité de sujétion" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteIndemniteSujetion, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Gains variables" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteGainsVariables, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Comptes de tiers -->
+                        <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="14,10" VerticalAlignment="Top">
+                            <StackPanel DataContext="{Binding Parametres}">
+                                <TextBlock Text="COMPTES DE TIERS (CRÉDIT)" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,8"/>
+                                <TextBlock Text="CNSS à payer (parts salariale et patronale)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteCnss, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="IUTS retenu à reverser" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteIuts, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="TPA à payer" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteTpa, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Retenue spéciale à reverser" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteRetenueSpeciale, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Net à payer (rémunérations dues)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteNetAPayer, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Retenues diverses (repli)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource FormTextBoxStyle}" Text="{Binding CompteRetenuesDiverses, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Les comptes IUTS et CNSS se règlent ici : les comptes de contrepartie des rubriques IUTS et CNSS du Plan de paie ne sont pas utilisés par l'écriture."
+                                           TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <TextBlock Text="{Binding ApercuParametres, Mode=OneWay}" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource InkBrush}" Margin="2,12,0,8"/>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Enregistrer les paramètres" Tag="{StaticResource IconSave}"
+                                Style="{StaticResource MenuButtonStyle}"
+                                Command="{Binding EnregistrerParametresCommand}"/>
+                        <Button Content="Annuler les modifications" Tag="{StaticResource IconCancel}"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding AnnulerParametresCommand}"/>
+                        <Button Content="Rétablir les valeurs d'origine" Tag="{StaticResource IconReset}"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                ToolTip="Remet dans le formulaire les comptes que le programme utilisait avant le paramétrage ; il reste à enregistrer."
+                                Command="{Binding RetablirParametresCommand}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding MessageParametres}" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource InkMutedBrush}" Margin="2,10,0,0"/>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+        </TabControl>
 
         <!-- ═══════════ Anomalies et barre d'état ═══════════ -->
         <StackPanel Grid.Row="3" Margin="0,14,0,0">

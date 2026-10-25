@@ -110,6 +110,10 @@
                                           SelectedItem="{Binding SelectedMotifOption}"
                                           DisplayMemberPath="Libelle"
                                           Height="30" Margin="0,0,0,10"/>
+                                <!-- Passerelle RH-06 : licenciement disciplinaire notifié -->
+                                <TextBlock Text="{Binding InfoDiscipline, Mode=OneWay}" TextWrapping="Wrap" FontSize="11"
+                                           Foreground="{StaticResource AccentBrush2}" Margin="0,-4,0,10"
+                                           Visibility="{Binding AInfoDiscipline, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                                 <!-- Statut du préavis -->
                                 <TextBlock Text="Statut du préavis légal" Style="{StaticResource FieldLabel}"/>
@@ -117,6 +121,12 @@
                                           SelectedItem="{Binding SelectedPreavisOption}"
                                           DisplayMemberPath="Libelle"
                                           Height="30" Margin="0,0,0,10"/>
+
+                                <!-- Durée du préavis (défaut n° 8 du guide) -->
+                                <TextBlock Text="Durée du préavis (mois)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding DureePreavisManuelle, UpdateSourceTrigger=LostFocus, TargetNullValue=''}"
+                                         ToolTip="Laisser vide pour la durée de la catégorie : 3 mois pour les cadres, agents de maîtrise et techniciens, 1 mois pour les autres salariés payés au mois (CCI-BF art. 35). Saisissez la durée prévue par le contrat ou la convention si elle diffère."
+                                         Height="28" Padding="6,2" VerticalContentAlignment="Center" Margin="0,0,0,10"/>
 
                                 <!-- Jours travaillés dans le mois de sortie -->
                                 <Grid Margin="0,0,0,10">
@@ -129,6 +139,7 @@
                                     <StackPanel Grid.Column="0">
                                         <TextBlock Text="Jours de présence" Style="{StaticResource FieldLabel}"/>
                                         <TextBox Text="{Binding JoursPresence, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="Indicatif. Le bulletin de sortie proratise le salaire à la date de sortie ; les absences du mois se saisissent dans « Congés et absences »."
                                                  Height="28" Padding="6,2" VerticalContentAlignment="Center"/>
                                     </StackPanel>
 
@@ -305,7 +316,7 @@
                                                         <ColumnDefinition Width="1.25*"/>
                                                         <ColumnDefinition Width="1.3*"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="Dernier salaire (salaire de présence)" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                    <TextBlock Grid.Column="0" Text="Paie du mois de sortie (prorata, variables et primes du mois)" VerticalAlignment="Center" TextWrapping="Wrap"/>
                                                     <TextBlock Grid.Column="1" Text="{Binding SoldeCourant.JoursPresence, StringFormat='{}{0:0.##} j ouvrés', Mode=OneWay}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource InkSubtleBrush}"/>
                                                     <TextBlock Grid.Column="2" Text="Imposable" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource InkSubtleBrush}"/>
                                                     <TextBlock Grid.Column="3" Text="{Binding SoldeCourant.SalairePresence, StringFormat='{}{0:N0}', Mode=OneWay}" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -417,7 +428,7 @@
                                                         <ColumnDefinition Width="1.25*"/>
                                                         <ColumnDefinition Width="1.3*"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="Retenue IUTS (estimée sur éléments imposables)" Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                    <TextBlock Grid.Column="0" Text="Retenue IUTS (bulletin de sortie, barème en vigueur)" Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
                                                     <TextBlock Grid.Column="1" Text="-" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource InkSubtleBrush}"/>
                                                     <TextBlock Grid.Column="2" Text="Retenue fiscale" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource InkSubtleBrush}"/>
                                                     <TextBlock Grid.Column="3" Text="{Binding SoldeCourant.EstimationIUTS, StringFormat='{}-{0:N0}', Mode=OneWay}" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -433,7 +444,7 @@
                                                         <ColumnDefinition Width="1.25*"/>
                                                         <ColumnDefinition Width="1.3*"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="Retenue CNSS salariale (5,5% branche retraite)" Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                    <TextBlock Grid.Column="0" Text="Retenue CNSS salariale (bulletin de sortie, assiette plafonnée)" Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
                                                     <TextBlock Grid.Column="1" Text="-" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource InkSubtleBrush}"/>
                                                     <TextBlock Grid.Column="2" Text="Cotisation sociale" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource InkSubtleBrush}"/>
                                                     <TextBlock Grid.Column="3" Text="{Binding SoldeCourant.EstimationCNSS, StringFormat='{}-{0:N0}', Mode=OneWay}" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>

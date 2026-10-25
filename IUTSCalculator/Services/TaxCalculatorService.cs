@@ -382,10 +382,15 @@ namespace IUTSCalculator.Services
 
             // Art.111 CGI : la déduction pour pension/retraite est plafonnée à 8% du SALAIRE DE
             // BASE uniquement (à l'exclusion des indemnités) — pas du salaire brut total.
+            // Un mois d'entrée ou de sortie, le plafond suit lui aussi la base effectivement due.
             decimal pensionContribution = Math.Min(cnssEmployeePourDeductionRetraite,
-                employee.BaseSalary * _taxDataService.ConstantValues.MaxPensionContributionRate);
+                employee.BaseSalary * apport.FractionContrat * _taxDataService.ConstantValues.MaxPensionContributionRate);
 
-            decimal professionalDeduction = CalculateProfessionalDeduction(employee);
+            // Abattement sur la base effectivement due : un mois d'entrée ou de sortie, il
+            // suit le prorata du contrat (sinon une entrée le 21 gardait l'abattement d'un
+            // mois entier sur un brut d'un tiers de mois). Les absences ordinaires ne changent
+            // pas l'abattement (comportement existant).
+            decimal professionalDeduction = CalculateProfessionalDeduction(employee) * apport.FractionContrat;
             calculation.ProfessionalDeduction = professionalDeduction;
 
             decimal rawTaxableIncome = grossIncome - exemptAmount - pensionContribution - professionalDeduction;

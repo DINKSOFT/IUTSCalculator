@@ -311,23 +311,47 @@
                                   DisplayMemberPath="FullName"
                                   Height="30" Margin="0,0,0,10"/>
 
-                        <!-- Date de simulation -->
-                        <TextBlock Text="Date d'évaluation de la paie" Style="{StaticResource FieldLabel}"/>
-                        <DatePicker SelectedDate="{Binding DateSimulation}" Height="30" Margin="0,0,0,16"/>
+                        <!-- Mois de paie : l'ancienneté est arrêtée au 1er du mois (règle unique de l'application) -->
+                        <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Mois de paie" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding MoisDisponibles}" SelectedItem="{Binding MoisSimulation}"
+                                          DisplayMemberPath="Nom" Height="30"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Année" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding AnneesDisponibles}" SelectedItem="{Binding AnneeSimulation}" Height="30"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding DateCalculLibelle, Mode=OneWay}" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
+                                   TextWrapping="Wrap" Margin="0,2,0,12"/>
 
                         <!-- Carte récapitulative de simulation -->
                         <Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource RuleBrush}"
                                 BorderThickness="1" CornerRadius="4" Padding="14,12" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="SITUATION CONTRACTUELLE" Style="{StaticResource SubSectionHeader}" Foreground="{StaticResource InkMutedBrush}"/>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="Reprendre la fiche" Style="{StaticResource SecondaryButtonStyle}"
+                                            Padding="8,2" Margin="0" Command="{Binding ReprendreFicheCommand}"
+                                            ToolTip="Rétablir la date d'entrée, la catégorie, l'échelon et le salaire de la fiche du salarié"/>
+                                    <TextBlock Text="SITUATION CONTRACTUELLE" Style="{StaticResource SubSectionHeader}" Foreground="{StaticResource InkMutedBrush}"
+                                               Margin="0" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <TextBlock Text="Reprise de la fiche du salarié ; modifiable pour simuler (la fiche n'est pas modifiée)."
+                                           FontSize="10.5" Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap" Margin="0,0,0,6"/>
 
                                 <Grid Margin="0,2">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="140"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Date d'embauche :" Foreground="{StaticResource InkMutedBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEmployeeForSimulation.HireDate, StringFormat={}{0:dd/MM/yyyy}}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Date d'entrée :" Foreground="{StaticResource InkMutedBrush}" VerticalAlignment="Center"/>
+                                    <DatePicker Grid.Column="1" SelectedDate="{Binding DateEntreeSimulation}" Height="28"/>
                                 </Grid>
 
                                 <Grid Margin="0,2">
@@ -336,34 +360,31 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Ancienneté révolue :" Foreground="{StaticResource InkMutedBrush}"/>
-                                    <TextBlock Grid.Column="1">
-                                        <Run Text="{Binding ResultatSimulation.Annees, Mode=OneWay}" FontWeight="SemiBold"/>
-                                        <Run Text="ans"/>
-                                        <Run Text="{Binding ResultatSimulation.Mois, Mode=OneWay}"/>
-                                        <Run Text="mois"/>
-                                    </TextBlock>
+                                    <TextBlock Grid.Column="1" Text="{Binding AncienneteLibelle, Mode=OneWay}" FontWeight="SemiBold"/>
                                 </Grid>
 
                                 <Grid Margin="0,2">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="54"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Catégorie / Échelon :" Foreground="{StaticResource InkMutedBrush}"/>
-                                    <TextBlock Grid.Column="1">
-                                        <Run Text="{Binding SelectedEmployeeForSimulation.Category, Mode=OneWay}" FontWeight="SemiBold"/>
-                                        <Run Text="— Éch."/>
-                                        <Run Text="{Binding SelectedEmployeeForSimulation.Echelon, Mode=OneWay}" FontWeight="SemiBold"/>
-                                    </TextBlock>
+                                    <TextBlock Text="Catégorie / Échelon :" Foreground="{StaticResource InkMutedBrush}" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding CategorieSimulation, UpdateSourceTrigger=LostFocus}" Height="28" Padding="4,2"
+                                             VerticalContentAlignment="Center" ToolTip="Catégorie de la grille"/>
+                                    <TextBox Grid.Column="3" Text="{Binding EchelonSimulation, UpdateSourceTrigger=LostFocus}" Height="28" Padding="4,2"
+                                             VerticalContentAlignment="Center" ToolTip="Échelon de la grille"/>
                                 </Grid>
 
                                 <Grid Margin="0,2">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="140"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Salaire de base contractuel :" Foreground="{StaticResource InkMutedBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedEmployeeForSimulation.BaseSalary, StringFormat={}{0:N0} FCFA}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Salaire de base contractuel :" Foreground="{StaticResource InkMutedBrush}" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding SalaireBaseSimulation, UpdateSourceTrigger=LostFocus, StringFormat={}{0:N0}}"
+                                             Height="28" Padding="4,2" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
                                 </Grid>
 
                                 <Separator Margin="0,8" Background="{StaticResource RuleBrush}"/>
@@ -375,17 +396,27 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Taux conventionnel :" Foreground="{StaticResource InkMutedBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding ResultatSimulation.TauxPourcentage, StringFormat={}{0:0.##} %}" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                    <TextBlock Text="Minimum de la grille :" Foreground="{StaticResource InkMutedBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding MinimumGrilleLibelle, Mode=OneWay}" FontWeight="SemiBold"/>
                                 </Grid>
 
                                 <Grid Margin="0,2">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Assiette de calcul :" Foreground="{StaticResource InkMutedBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding ResultatSimulation.BaseDeCalcul, StringFormat={}{0:N0} FCFA}"/>
+                                    <TextBlock Text="Base de calcul utilisée :" Foreground="{StaticResource InkMutedBrush}" Margin="0,0,8,0"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding BaseCalculLibelle, Mode=OneWay}" TextWrapping="Wrap" TextAlignment="Right"/>
+                                </Grid>
+
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Taux conventionnel :" Foreground="{StaticResource InkMutedBrush}" Margin="0,0,8,0"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding TauxLibelle, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
+                                               TextWrapping="Wrap" TextAlignment="Right"/>
                                 </Grid>
 
                                 <Grid Margin="0,4,0,2">
@@ -394,27 +425,39 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Prime d'ancienneté (PRIMEANC) :" FontWeight="SemiBold"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding ResultatSimulation.Montant, StringFormat={}{0:N0} FCFA}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource AccentBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding PrimeLibelle, Mode=OneWay}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource AccentBrush}"/>
                                 </Grid>
+
+                                <TextBlock Text="{Binding NoteApplicationPaie, Mode=OneWay}" FontSize="10.5" Foreground="{StaticResource InkSubtleBrush}"
+                                           TextWrapping="Wrap" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Indicateur de conformité conventionnelle -->
+                        <!-- Indicateur de conformité conventionnelle (salaire saisi ≥ minimum de la grille ?) -->
                         <Border Background="#F0FDF4" BorderBrush="#22C55E" BorderThickness="1" CornerRadius="4" Padding="12,10" Margin="0,0,0,10"
-                                Visibility="{Binding ResultatSimulation.EstConformeSalaireDeBase, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                Visibility="{Binding EstConforme, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel>
                                 <TextBlock Text="✔ CONFORMITÉ SALARIALE RESPECTÉE" FontWeight="Bold" Foreground="#15803D" Margin="0,0,0,4"/>
-                                <TextBlock Text="Le salaire de base du salarié est égal ou supérieur au minimum garanti par la convention collective."
+                                <TextBlock Text="{Binding MessageConformite, Mode=OneWay}"
                                            FontSize="11" Foreground="#166534" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="#FEF2F2" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="4" Padding="12,10"
-                                Visibility="{Binding ResultatSimulation.EstNonConformeSalaireDeBase, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border Background="#FEF2F2" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="4" Padding="12,10" Margin="0,0,0,10"
+                                Visibility="{Binding EstNonConforme, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel>
                                 <TextBlock Text="⚠ ALERTE DE NON-CONFORMITÉ CONVENTIONNELLE" FontWeight="Bold" Foreground="#B91C1C" Margin="0,0,0,4"/>
-                                <TextBlock Text="{Binding ResultatSimulation.MessageConformite}"
+                                <TextBlock Text="{Binding MessageConformite, Mode=OneWay}"
                                            FontSize="11" Foreground="#991B1B" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="12,10"
+                                Visibility="{Binding EstConformiteIndeterminee, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="CONFORMITÉ NON VÉRIFIÉE" FontWeight="Bold" Foreground="{StaticResource InkMutedBrush}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding MessageConformite, Mode=OneWay}"
+                                           FontSize="11" Foreground="{StaticResource InkMutedBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 

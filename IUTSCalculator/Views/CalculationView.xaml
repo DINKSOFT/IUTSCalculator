@@ -193,8 +193,9 @@
                                 <Label    Grid.Row="2" Grid.Column="0" Content="Catégorie" Style="{StaticResource FieldLabel}"/>
                                 <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
                                           Style="{StaticResource FormComboBoxStyle}"
+                                          IsEditable="True"
                                           ItemsSource="{Binding EmployeeCategories}"
-                                          SelectedItem="{Binding CurrentEmployee.Category}"/>
+                                          Text="{Binding CurrentEmployee.Category, UpdateSourceTrigger=LostFocus}"/>
 
                                 <Label   Grid.Row="3" Grid.Column="0" Content="Charges familiales" Style="{StaticResource FieldLabel}"/>
                                 <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource MoneyBox}"

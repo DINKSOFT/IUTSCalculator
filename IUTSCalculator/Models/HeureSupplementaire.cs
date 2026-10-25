@@ -9,11 +9,20 @@ namespace IUTSCalculator.Models
     /// <summary>
     /// Décompte et valorisation des heures supplémentaires d'un salarié pour un mois donné (module PAI-03).
     ///
-    /// Les 4 catégories légales de majoration (Code du Travail du Burkina Faso & CCIP) :
-    ///   • 15% (taux 115%) : 8 premières heures supplémentaires de jour en semaine (41e à 48e heure hebdo).
-    ///   • 30% (taux 130%) : heures supplémentaires de jour en semaine au-delà de la 48e heure.
-    ///   • 50% (taux 150%) : heures supplémentaires de nuit en semaine (22h à 5h) OU de jour dimanches/jours fériés.
-    ///   • 100% (taux 200%) : heures supplémentaires de nuit dimanches/jours fériés.
+    /// Cinq tranches de majoration, dont les TAUX viennent du barème daté
+    /// <see cref="BaremeHeuresSup"/> applicable au mois (RH-08, octobre 2026) :
+    ///   • <see cref="Heures15"/>  : tranche 1 — 8 premières heures supplémentaires de la semaine (41e à 48e) ;
+    ///   • <see cref="Heures30"/>  : tranche 2 — heures supplémentaires au-delà de la 48e heure ;
+    ///   • <see cref="Heures50"/>  : heures supplémentaires de nuit d'un jour ouvrable ;
+    ///   • <see cref="Heures60"/>  : heures supplémentaires de jour, dimanche ou jour férié ;
+    ///   • <see cref="Heures100"/> : heures supplémentaires de nuit, dimanche ou jour férié.
+    ///
+    /// Les noms des propriétés (et des colonnes SQLite) sont ceux de PAI-03 et ne disent
+    /// plus le taux : Heures30 est majoré au taux de la tranche 2 du barème (35 % depuis
+    /// octobre 2026), Heures100 au taux férié de nuit (120 %). Ils sont conservés pour ne
+    /// pas migrer les données saisies. Sans barème appliqué, les taux par défaut sont
+    /// exactement les anciens littéraux (15/30/50/100, dimanche de jour à 50 %) : un mois
+    /// antérieur recalculé reste identique au centime.
     /// </summary>
     public class HeureSupplementaire : INotifyPropertyChanged
     {
@@ -32,12 +41,21 @@ namespace IUTSCalculator.Models
         private decimal _heures30;
         private decimal _heures50;
         private decimal _heures100;
+        private decimal _heures60;
+
+        // Majorations en proportion. Valeurs par défaut = anciens littéraux de PAI-03.
+        private decimal _tauxTranche1 = 0.15m;
+        private decimal _tauxTranche2 = 0.30m;
+        private decimal _tauxNuit = 0.50m;
+        private decimal _tauxFerieJour = 0.50m;
+        private decimal _tauxFerieNuit = 1.00m;
 
         private decimal _tauxHoraireBase;
         private decimal _montant15;
         private decimal _montant30;
         private decimal _montant50;
         private decimal _montant100;
+        private decimal _montant60;
         private decimal _montantTotal;
 
         private string _commentaire;
@@ -159,7 +177,58 @@ namespace IUTSCalculator.Models
             }
         }
 
-        public decimal TotalHeures => _heures15 + _heures30 + _heures50 + _heures100;
+        /// <summary>Heures supplémentaires de jour, dimanche ou jour férié (tranche ajoutée par RH-08).</summary>
+        public decimal Heures60
+        {
+            get => _heures60;
+            set
+            {
+                if (_heures60 != value)
+                {
+                    _heures60 = value < 0m ? 0m : value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(TotalHeures));
+                    RecalculerMontants();
+                    EstModifie = true;
+                }
+            }
+        }
+
+        public decimal TotalHeures => _heures15 + _heures30 + _heures50 + _heures60 + _heures100;
+
+        // ── Taux du barème applicable ────────────────────────────────────────
+
+        public decimal TauxTranche1 => _tauxTranche1;
+        public decimal TauxTranche2 => _tauxTranche2;
+        public decimal TauxNuit => _tauxNuit;
+        public decimal TauxFerieJour => _tauxFerieJour;
+        public decimal TauxFerieNuit => _tauxFerieNuit;
+
+        /// <summary>
+        /// Applique les majorations d'un barème daté puis revalorise. Un barème nul laisse
+        /// les taux en place (par défaut ceux de PAI-03). <paramref name="revaloriser"/> à
+        /// faux garde les montants tels qu'enregistrés (lecture d'une ligne en base).
+        /// </summary>
+        public void AppliquerBareme(BaremeHeuresSup bareme, bool revaloriser = true)
+        {
+            if (bareme != null)
+            {
+                _tauxTranche1 = bareme.TauxTranche1;
+                _tauxTranche2 = bareme.TauxTranche2;
+                _tauxNuit = bareme.TauxNuit;
+                _tauxFerieJour = bareme.TauxFerieJour;
+                _tauxFerieNuit = bareme.TauxFerieNuit;
+
+                OnPropertyChanged(nameof(TauxTranche1));
+                OnPropertyChanged(nameof(TauxTranche2));
+                OnPropertyChanged(nameof(TauxNuit));
+                OnPropertyChanged(nameof(TauxFerieJour));
+                OnPropertyChanged(nameof(TauxFerieNuit));
+            }
+
+            if (revaloriser)
+                RecalculerMontants();
+        }
 
         public decimal TauxHoraireBase
         {
@@ -189,6 +258,12 @@ namespace IUTSCalculator.Models
         {
             get => _montant100;
             set { _montant100 = value; OnPropertyChanged(); }
+        }
+
+        public decimal Montant60
+        {
+            get => _montant60;
+            set { _montant60 = value; OnPropertyChanged(); }
         }
 
         public decimal MontantTotal
@@ -230,7 +305,7 @@ namespace IUTSCalculator.Models
         }
 
         /// <summary>
-        /// Recalcule le taux horaire de base et la valorisation monétaire des 4 tranches d'heures supplémentaires.
+        /// Recalcule le taux horaire de base et la valorisation monétaire des 5 tranches d'heures supplémentaires.
         /// </summary>
         public void RecalculerMontants()
         {
@@ -243,18 +318,20 @@ namespace IUTSCalculator.Models
                 _tauxHoraireBase = 0m;
             }
 
-            _montant15 = Math.Round(_heures15 * _tauxHoraireBase * 1.15m, 0);
-            _montant30 = Math.Round(_heures30 * _tauxHoraireBase * 1.30m, 0);
-            _montant50 = Math.Round(_heures50 * _tauxHoraireBase * 1.50m, 0);
-            _montant100 = Math.Round(_heures100 * _tauxHoraireBase * 2.00m, 0);
+            _montant15 = Math.Round(_heures15 * _tauxHoraireBase * (1m + _tauxTranche1), 0);
+            _montant30 = Math.Round(_heures30 * _tauxHoraireBase * (1m + _tauxTranche2), 0);
+            _montant50 = Math.Round(_heures50 * _tauxHoraireBase * (1m + _tauxNuit), 0);
+            _montant60 = Math.Round(_heures60 * _tauxHoraireBase * (1m + _tauxFerieJour), 0);
+            _montant100 = Math.Round(_heures100 * _tauxHoraireBase * (1m + _tauxFerieNuit), 0);
 
-            _montantTotal = _montant15 + _montant30 + _montant50 + _montant100;
+            _montantTotal = _montant15 + _montant30 + _montant50 + _montant60 + _montant100;
 
             OnPropertyChanged(nameof(TauxHoraireBase));
             OnPropertyChanged(nameof(Montant15));
             OnPropertyChanged(nameof(Montant30));
             OnPropertyChanged(nameof(Montant50));
             OnPropertyChanged(nameof(Montant100));
+            OnPropertyChanged(nameof(Montant60));
             OnPropertyChanged(nameof(MontantTotal));
         }
 

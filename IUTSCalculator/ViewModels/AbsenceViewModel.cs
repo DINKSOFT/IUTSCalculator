@@ -739,6 +739,18 @@ namespace IUTSCalculator.ViewModels
             AbsenceEnCours.NombreJours = Absence.JoursEntre(
                 AbsenceEnCours.DateDebut, AbsenceEnCours.DateFin, true);
 
+            // Un dimanche seul : s'il est saisi en absence, c'est qu'il devait être travaillé.
+            if (AbsenceEnCours.NombreJours == 0m
+                && AbsenceEnCours.DateDebut.Date == AbsenceEnCours.DateFin.Date
+                && AbsenceEnCours.DateDebut.DayOfWeek == DayOfWeek.Sunday)
+            {
+                AbsenceEnCours.NombreJours = 1m;
+                StatusMessage = string.Format(
+                    "Absence d'un dimanche ({0:dd/MM}) : 1 jour proposé. Si ce dimanche n'était pas travaillé, il n'y a pas d'absence à saisir.",
+                    AbsenceEnCours.DateDebut);
+                return;
+            }
+
             StatusMessage = string.Format(
                 "{0:0.##} jour(s) ouvrable(s) entre le {1:dd/MM} et le {2:dd/MM}, dimanches exclus.",
                 AbsenceEnCours.NombreJours, AbsenceEnCours.DateDebut, AbsenceEnCours.DateFin);

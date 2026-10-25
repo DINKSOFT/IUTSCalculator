@@ -355,9 +355,12 @@ namespace IUTSCalculator.Services
 
                 string statutTexte = V("STATUT");
                 string statutCle = CleNormalisee(statutTexte);
-                if (statutCle.Length == 0 || statutCle == "ACTIF") employe.StatutSalarie = 0;
-                else if (statutCle == "SORTI" || statutCle == "SORTIE" || statutCle == "INACTIF") employe.StatutSalarie = 1;
-                else if (statutCle == "SUSPENDU" || statutCle == "SUSPENDUE") employe.StatutSalarie = 2;
+                // Les libellés affichés par l'application sont reconnus, précisions comprises :
+                // « Sorti (Fin de contrat) », « Sortie — démission », « Suspendu (mise à pied) »…
+                // (défaut n° 22 du guide : « Sorti (Fin de contrat) » était lu comme Actif).
+                if (statutCle.Length == 0 || statutCle == "ACTIF" || statutCle == "ACTIVE" || statutCle.StartsWith("ENPOSTE")) employe.StatutSalarie = 0;
+                else if (statutCle.StartsWith("SORTI") || statutCle == "INACTIF" || statutCle == "INACTIVE" || statutCle.StartsWith("PARTI")) employe.StatutSalarie = 1;
+                else if (statutCle.StartsWith("SUSPENDU")) employe.StatutSalarie = 2;
                 else
                 {
                     employe.StatutSalarie = 0;

@@ -22,7 +22,8 @@ namespace IUTSCalculator.Services
             IEnumerable<EntreeAudit> entrees,
             Dossier dossier,
             FiltreAudit filtre,
-            string cheminFichier)
+            string cheminFichier,
+            string empreinteDeTete = null)
         {
             if (entrees == null) throw new ArgumentNullException(nameof(entrees));
             if (string.IsNullOrWhiteSpace(cheminFichier)) throw new ArgumentNullException(nameof(cheminFichier));
@@ -50,7 +51,7 @@ namespace IUTSCalculator.Services
                     row += 2;
 
                     // 2. Titre du rapport
-                    ws.Range(row, 1, row, 11).Merge();
+                    ws.Range(row, 1, row, 14).Merge();
                     ws.Cell(row, 1).Value = (XLCellValue)"JOURNAL D'AUDIT ET DE TRAÇABILITÉ DES OPÉRATIONS DE PAIE";
                     ws.Cell(row, 1).Style.Font.Bold = true;
                     ws.Cell(row, 1).Style.Font.FontSize = 13;
@@ -79,6 +80,17 @@ namespace IUTSCalculator.Services
                         ws.Cell(row, 6).Style.Font.FontSize = 9;
                         ws.Cell(row, 6).Style.Font.Italic = true;
                     }
+                    row++;
+
+                    // Point de repère externe du scellement : l'empreinte de la dernière
+                    // entrée du journal au moment de l'édition. Notée ou imprimée, elle
+                    // permet de prouver plus tard qu'aucune entrée antérieure n'a été réécrite.
+                    if (!string.IsNullOrWhiteSpace(empreinteDeTete))
+                    {
+                        ws.Cell(row, 1).Value = (XLCellValue)("Empreinte de tête du journal (SHA-256) à l'édition : " + empreinteDeTete);
+                        ws.Cell(row, 1).Style.Font.FontSize = 9;
+                        ws.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#48534F");
+                    }
                     row += 2;
 
                     // 4. En-têtes de colonnes
@@ -86,7 +98,8 @@ namespace IUTSCalculator.Services
                     {
                         "N°", "Date", "Heure", "Utilisateur", "Poste / Machine",
                         "Module / Entité", "Réf. / Matricule", "Action effectuée",
-                        "Champ modifié", "Ancienne valeur", "Nouvelle valeur", "Détails et observations"
+                        "Champ modifié", "Ancienne valeur", "Nouvelle valeur", "Détails et observations",
+                        "Scellement", "Empreinte (SHA-256)"
                     };
 
                     for (int c = 0; c < headers.Length; c++)
@@ -139,8 +152,10 @@ namespace IUTSCalculator.Services
                         ws.Cell(row, 10).Value = (XLCellValue)(e.AncienneValeur ?? "");
                         ws.Cell(row, 11).Value = (XLCellValue)(e.NouvelleValeur ?? "");
                         ws.Cell(row, 12).Value = (XLCellValue)(e.Details ?? "");
+                        ws.Cell(row, 13).Value = (XLCellValue)e.StatutScellement;
+                        ws.Cell(row, 14).Value = (XLCellValue)(e.Empreinte ?? "");
 
-                        for (int c = 1; c <= 12; c++)
+                        for (int c = 1; c <= 14; c++)
                         {
                             ws.Cell(row, c).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                             ws.Cell(row, c).Style.Border.OutsideBorderColor = CouleurBordure;
@@ -157,7 +172,7 @@ namespace IUTSCalculator.Services
                     {
                         ws.Cell(row, 1).Value = (XLCellValue)string.Format("Total : {0} événement(s) tracé(s)", index - 1);
                         ws.Cell(row, 1).Style.Font.Bold = true;
-                        ws.Range(row, 1, row, 12).Merge();
+                        ws.Range(row, 1, row, 14).Merge();
                         ws.Row(row).Height = 20;
                     }
 
@@ -174,12 +189,12 @@ namespace IUTSCalculator.Services
 
             var sb = new StringBuilder();
             // BOM UTF-8 pour ouverture directe sous Excel sans problème d'accents
-            sb.AppendLine("Id;Date;Heure;Utilisateur;Machine;Module;Reference;Action;Champ;AncienneValeur;NouvelleValeur;Details");
+            sb.AppendLine("Id;Date;Heure;Utilisateur;Machine;Module;Reference;Action;Champ;AncienneValeur;NouvelleValeur;Details;Scellement;Empreinte");
 
             foreach (var e in entrees)
             {
                 sb.AppendLine(string.Format(
-                    "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11}",
+                    "{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11};{12};{13}",
                     e.Id,
                     EchapperCsv(e.DateCourte),
                     EchapperCsv(e.Heure),
@@ -191,7 +206,9 @@ namespace IUTSCalculator.Services
                     EchapperCsv(e.ChampModifie),
                     EchapperCsv(e.AncienneValeur),
                     EchapperCsv(e.NouvelleValeur),
-                    EchapperCsv(e.Details)));
+                    EchapperCsv(e.Details),
+                    EchapperCsv(e.StatutScellement),
+                    EchapperCsv(e.Empreinte)));
             }
 
             await Task.Run(() => File.WriteAllText(cheminFichier, sb.ToString(), new UTF8Encoding(true)));

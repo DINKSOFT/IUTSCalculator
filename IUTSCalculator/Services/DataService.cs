@@ -42,6 +42,83 @@ namespace IUTSCalculator.Services
             };
         }
 
+        /// <summary>
+        /// Recharge la liste des catégories proposées sur les fiches : les deux valeurs
+        /// historiques, puis les catégories des grilles conventionnelles du dossier (dans
+        /// l'ordre des grilles), puis toute catégorie déjà portée par un salarié.
+        ///
+        /// La liste se limitait aux deux valeurs historiques : un salarié classé avec un
+        /// libellé de grille (« Agents de Maîtrise »…) — indispensable pour la prime
+        /// d'ancienneté et le contrôle du minimum — ne pouvait ni être choisi ni être
+        /// affiché, et sa catégorie risquait d'être perdue à l'enregistrement.
+        /// La collection est modifiée après l'attente : appeler depuis le thread de l'écran.
+        /// </summary>
+        public async Task RafraichirCategoriesAsync()
+        {
+            var valeurs = new List<string> { "Cadre Supérieur", "Cadre Inférieur" };
+            try
+            {
+                using (var conn = _sqliteService.CreateConnection())
+                {
+                    if (TableExiste(conn, "GrillesSalaires"))
+                    {
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            cmd.CommandText = "SELECT Categorie, MIN(Ordre) AS O FROM GrillesSalaires " +
+                                              "WHERE TRIM(IFNULL(Categorie,'')) <> '' GROUP BY Categorie ORDER BY O, Categorie;";
+                            using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                            {
+                                while (await reader.ReadAsync())
+                                    valeurs.Add(Convert.ToString(reader["Categorie"]).Trim());
+                            }
+                        }
+                    }
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT DISTINCT TRIM(Category) FROM Employees WHERE TRIM(IFNULL(Category,'')) <> '' ORDER BY 1;";
+                        using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                                valeurs.Add(Convert.ToString(reader[0]).Trim());
+                        }
+                    }
+                }
+            }
+            catch (SQLiteException)
+            {
+                // Base en cours de création : on garde au moins les valeurs historiques.
+            }
+
+            var distinctes = new List<string>();
+            foreach (var v in valeurs)
+            {
+                if (!distinctes.Exists(d => string.Equals(d, v, StringComparison.OrdinalIgnoreCase)))
+                    distinctes.Add(v);
+            }
+
+            // Mise à jour en place : les écrans liés gardent la même collection.
+            for (int i = EmployeeCategories.Count - 1; i >= 0; i--)
+            {
+                if (!distinctes.Contains(EmployeeCategories[i]))
+                    EmployeeCategories.RemoveAt(i);
+            }
+            for (int i = 0; i < distinctes.Count; i++)
+            {
+                if (!EmployeeCategories.Contains(distinctes[i]))
+                    EmployeeCategories.Insert(Math.Min(i, EmployeeCategories.Count), distinctes[i]);
+            }
+        }
+
+        private static bool TableExiste(SQLiteConnection conn, string table)
+        {
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@n;";
+                cmd.Parameters.AddWithValue("@n", table);
+                return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+            }
+        }
+
         #region Gestion des employés
 
         /// <summary>
@@ -54,7 +131,7 @@ namespace IUTSCalculator.Services
             "EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, " +
             "FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, " +
             "Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, " +
-            "DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie, PosteId, ManagerMatricule";
+            "DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie, PosteId, ManagerMatricule, SoldeCongesReprise, DateRepriseConges, TypeContrat";
 
         /// <summary>
         /// Construit un employé à partir de la ligne courante du lecteur. Point de passage
@@ -104,7 +181,10 @@ namespace IUTSCalculator.Services
                 MotifDepart = DbValue.TextFromDb(reader["MotifDepart"]),
                 StatutSalarie = DbValue.IntFromDb(reader["StatutSalarie"]),
                 PosteId = DbValue.IntNullableFromDb(reader["PosteId"]),
-                ManagerMatricule = DbValue.TextFromDb(reader["ManagerMatricule"])
+                ManagerMatricule = DbValue.TextFromDb(reader["ManagerMatricule"]),
+                SoldeCongesReprise = DbValue.DecimalFromDb(reader["SoldeCongesReprise"]),
+                DateRepriseConges = DbValue.DateNullableFromDb(reader["DateRepriseConges"]),
+                TypeContrat = DbValue.TextFromDb(reader["TypeContrat"])
             };
         }
 
@@ -172,11 +252,33 @@ namespace IUTSCalculator.Services
 
                 if (lignesValides.Count > 0)
                 {
+                    // Une ligne de mise à jour remplace la fiche — mais seulement pour ce que le
+                    // modèle CSV contient. Le poste et le manager (organigramme), et la reprise
+                    // du solde de congés n'en font pas partie : réimporter les effaçait
+                    // (défaut n° 22 du guide). Ils sont repris de la fiche existante.
+                    var parMatricule = existants
+                        .Where(e => !string.IsNullOrWhiteSpace(e.EmployeeId))
+                        .GroupBy(e => e.EmployeeId, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
                     using (var conn = _sqliteService.CreateConnection())
                     using (var tx = conn.BeginTransaction())
                     {
                         foreach (var l in lignesValides)
                         {
+                            Employee existant;
+                            if (l.EstMiseAJour && l.Employe != null && !string.IsNullOrWhiteSpace(l.Employe.EmployeeId)
+                                && parMatricule.TryGetValue(l.Employe.EmployeeId, out existant))
+                            {
+                                if (!l.Employe.PosteId.HasValue) l.Employe.PosteId = existant.PosteId;
+                                if (string.IsNullOrWhiteSpace(l.Employe.ManagerMatricule)) l.Employe.ManagerMatricule = existant.ManagerMatricule;
+                                if (string.IsNullOrWhiteSpace(l.Employe.TypeContrat)) l.Employe.TypeContrat = existant.TypeContrat;
+                                if (!l.Employe.DateRepriseConges.HasValue)
+                                {
+                                    l.Employe.DateRepriseConges = existant.DateRepriseConges;
+                                    l.Employe.SoldeCongesReprise = existant.SoldeCongesReprise;
+                                }
+                            }
                             await AddEmployeeAsync(l.Employe, conn, tx);
                             if (l.EstMiseAJour) rapport.MisAJour++; else rapport.Ajoutes++;
                         }
@@ -232,7 +334,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private async Task AddEmployeeAsync(Employee employee, SQLiteConnection conn, SQLiteTransaction tx)
+        internal async Task AddEmployeeAsync(Employee employee, SQLiteConnection conn, SQLiteTransaction tx)
         {
             if (employee == null)
                 throw new ArgumentNullException(nameof(employee));
@@ -245,9 +347,9 @@ namespace IUTSCalculator.Services
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
                     INSERT OR REPLACE INTO Employees
-                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie, PosteId, ManagerMatricule)
+                    (EmployeeId, FirstName, LastName, BaseSalary, HousingAllowance, TransportAllowance, FunctionAllowance, SujetionAllowance, FamilyCharges, IsSpouseWorking, PensionContribution, Category, Service, IsHigherCategory, Fonction, DateEntree, SituationMatrimoniale, NumeroCnss, DateNaissance, LieuNaissance, Sexe, Nationalite, NumeroCnib, DateDelivranceCnib, LieuDelivranceCnib, Adresse, Telephone, Email, NumeroIfu, Banque, NumeroCompte, ModeReglement, ConventionId, Echelon, DateSortie, MotifDepart, StatutSalarie, PosteId, ManagerMatricule, SoldeCongesReprise, DateRepriseConges, TypeContrat)
                     VALUES
-                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @Service, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie, @PosteId, @ManagerMatricule);";
+                    (@EmployeeId, @FirstName, @LastName, @BaseSalary, @HousingAllowance, @TransportAllowance, @FunctionAllowance, @SujetionAllowance, @FamilyCharges, @IsSpouseWorking, @PensionContribution, @Category, @Service, @IsHigherCategory, @Fonction, @DateEntree, @SituationMatrimoniale, @NumeroCnss, @DateNaissance, @LieuNaissance, @Sexe, @Nationalite, @NumeroCnib, @DateDelivranceCnib, @LieuDelivranceCnib, @Adresse, @Telephone, @Email, @NumeroIfu, @Banque, @NumeroCompte, @ModeReglement, @ConventionId, @Echelon, @DateSortie, @MotifDepart, @StatutSalarie, @PosteId, @ManagerMatricule, @SoldeCongesReprise, @DateRepriseConges, @TypeContrat);";
 
                 cmd.Parameters.AddWithValue("@EmployeeId", employee.EmployeeId);
                 cmd.Parameters.AddWithValue("@FirstName", employee.FirstName ?? "");
@@ -289,6 +391,9 @@ namespace IUTSCalculator.Services
                 cmd.Parameters.AddWithValue("@StatutSalarie", employee.StatutSalarie);
                 cmd.Parameters.AddWithValue("@PosteId", employee.PosteId.HasValue ? (object)employee.PosteId.Value : DBNull.Value);
                 cmd.Parameters.AddWithValue("@ManagerMatricule", employee.ManagerMatricule ?? "");
+                cmd.Parameters.AddWithValue("@SoldeCongesReprise", DbValue.DecimalToDb(employee.SoldeCongesReprise));
+                cmd.Parameters.AddWithValue("@DateRepriseConges", DbValue.DateNullableToDb(employee.DateRepriseConges));
+                cmd.Parameters.AddWithValue("@TypeContrat", employee.TypeContrat ?? "");
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -462,6 +567,7 @@ namespace IUTSCalculator.Services
             calculation.CalculationDate = fin;
 
             string employeeId = calculation.Employee != null ? calculation.Employee.EmployeeId : null;
+            int remplaces = 0;
 
             using (var conn = _sqliteService.CreateConnection())
             using (var tx = conn.BeginTransaction())
@@ -481,7 +587,7 @@ namespace IUTSCalculator.Services
                             cmd.Parameters.AddWithValue("@employe", employeeId);
                             cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
                             cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.AddDays(1).AddTicks(-1)));
-                            await cmd.ExecuteNonQueryAsync();
+                            remplaces = await cmd.ExecuteNonQueryAsync();
                         }
                     }
 
@@ -495,6 +601,9 @@ namespace IUTSCalculator.Services
                     // qu'on réaffichera, sans rien recalculer, si le bulletin est rappelé.
                     if (bulletin != null)
                         await ArchiverBulletinAsync(conn, tx, calculation.Id, bulletin);
+
+                    // Journal d'audit (entité « Calcul »), dans la même transaction.
+                    await AuditService.AuditerEnregistrementCalculAsync(conn, tx, calculation, periode, bulletin != null, remplaces);
 
                     tx.Commit();
                 }
@@ -584,6 +693,33 @@ namespace IUTSCalculator.Services
             }
         }
 
+        /// <summary>
+        /// Numéro du solde de tout compte validé dont la date de sortie tombe dans ce mois
+        /// pour ce salarié, ou null. Le bulletin de ce mois est alors son bulletin de sortie :
+        /// les écrans de calcul ne doivent pas le remplacer par une paie ordinaire.
+        /// </summary>
+        public async Task<int?> SoldeToutCompteDuMoisAsync(string employeeId, DateTime periode)
+        {
+            if (string.IsNullOrWhiteSpace(employeeId)) return null;
+            var debut = new DateTime(periode.Year, periode.Month, 1);
+            var fin = debut.AddMonths(1).AddDays(-1);
+            using (var conn = _sqliteService.CreateConnection())
+            {
+                if (!TableExiste(conn, "SoldesToutCompte")) return null;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT Id FROM SoldesToutCompte WHERE EmployeeId = @e " +
+                                      "AND DateSortie >= @d AND DateSortie <= @f ORDER BY Id DESC LIMIT 1;";
+                    cmd.Parameters.AddWithValue("@e", employeeId);
+                    cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(debut));
+                    cmd.Parameters.AddWithValue("@f", DbValue.DateToDb(fin.AddDays(1).AddTicks(-1)));
+                    object o = await cmd.ExecuteScalarAsync();
+                    if (o == null || o == DBNull.Value) return null;
+                    return Convert.ToInt32(o);
+                }
+            }
+        }
+
         /// <summary>Vrai si un bulletin est enregistré pour ce salarié et ce mois.</summary>
         public async Task<bool> BulletinEnregistreAsync(string employeeId, DateTime periode)
         {
@@ -616,6 +752,7 @@ namespace IUTSCalculator.Services
             using (var tx = conn.BeginTransaction())
             {
                 await AddCalculationToHistoryAsync(calculation, conn, tx);
+                await AuditService.AuditerEnregistrementCalculAsync(conn, tx, calculation, calculation.CalculationDate, false);
                 tx.Commit();
             }
         }
@@ -818,17 +955,19 @@ namespace IUTSCalculator.Services
                 {
                     DateTime dateCalcul = DateTime.MinValue;
                     bool trouve = false;
+                    string employeId = null;
 
                     using (var cmdLecture = conn.CreateCommand())
                     {
                         cmdLecture.Transaction = tx;
-                        cmdLecture.CommandText = "SELECT CalculationDate FROM TaxCalculations WHERE Id = @Id";
+                        cmdLecture.CommandText = "SELECT CalculationDate, EmployeeId FROM TaxCalculations WHERE Id = @Id";
                         cmdLecture.Parameters.AddWithValue("@Id", calculationId);
                         using (var reader = (SQLiteDataReader)await cmdLecture.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
                             {
                                 dateCalcul = DbValue.DateFromDb(reader["CalculationDate"], DateTime.Now);
+                                employeId = DbValue.TextFromDb(reader["EmployeeId"]);
                                 trouve = true;
                             }
                         }
@@ -849,6 +988,9 @@ namespace IUTSCalculator.Services
                         cmd.Parameters.AddWithValue("@Id", calculationId);
                         await cmd.ExecuteNonQueryAsync();
                     }
+
+                    if (trouve)
+                        await AuditService.AuditerSuppressionCalculAsync(conn, tx, calculationId, dateCalcul, employeId);
 
                     tx.Commit();
                 }

@@ -339,6 +339,16 @@ namespace IUTSCalculator.Services
                 },
                 new Rubrique
                 {
+                    Code = "PANIER", Libelle = "Prime de panier",
+                    Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
+                    SoumisIUTS = true, SoumisCNSS = true,
+                    Ordre = 62, Active = true, EstSysteme = false,
+                    CompteComptable = "6612", CompteContrepartie = "4221",
+                    Commentaire = "Nombre de paniers (postes travaillés) en quantité. " +
+                                  "Alimentée par la Gestion des temps (RH-08)."
+                },
+                new Rubrique
+                {
                     Code = "PRIME", Libelle = "Prime exceptionnelle",
                     Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
                     SoumisIUTS = true, SoumisCNSS = true,
@@ -385,12 +395,53 @@ namespace IUTSCalculator.Services
                     Commentaire = "Revenu imposable, mais hors assiette CNSS : elle ne correspond à aucune période travaillée."
                 },
 
+                // ── Rubriques du bulletin de sortie (solde de tout compte) ───
+                new Rubrique
+                {
+                    Code = "INDCONGES", Libelle = "Indemnité compensatrice de congés payés",
+                    Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
+                    SoumisIUTS = true, SoumisCNSS = true, SoumisTPA = true,
+                    Ordre = 71, Active = true, EstSysteme = false,
+                    CompteComptable = "6612", CompteContrepartie = "4221",
+                    Commentaire = "Congés acquis et non pris à la rupture : un salaire, imposable et cotisable " +
+                                  "(instruction DGI sur l'imposition des sommes perçues suite à un licenciement)."
+                },
+                new Rubrique
+                {
+                    Code = "INDDEPART", Libelle = "Indemnité de licenciement / de départ",
+                    Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
+                    SoumisIUTS = false, SoumisCNSS = false, SoumisTPA = false,
+                    Ordre = 72, Active = true, EstSysteme = false,
+                    CompteComptable = "6638", CompteContrepartie = "4221",
+                    Commentaire = "Indemnité de licenciement, de fin de service ou de départ à la retraite (CCI-BF art. 35 et 38). " +
+                                  "Exonérée d'IUTS (art. 106-5 du CGI) ; ce n'est pas un salaire : hors CNSS et hors TPA."
+                },
+                new Rubrique
+                {
+                    Code = "INDDIVERS", Libelle = "Indemnités diverses de sortie",
+                    Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
+                    SoumisIUTS = true, SoumisCNSS = true, SoumisTPA = true,
+                    Ordre = 73, Active = true, EstSysteme = false,
+                    CompteComptable = "6638", CompteContrepartie = "4221",
+                    Commentaire = "Sommes diverses versées au départ. Des dommages-intérêts pour rupture abusive sont " +
+                                  "exonérés d'IUTS : décochez alors les cases concernées."
+                },
+                new Rubrique
+                {
+                    Code = "RETSORTIE", Libelle = "Retenue de sortie",
+                    Sens = SensRubrique.Retenue, ModeCalcul = ModeCalculRubrique.MontantFixe,
+                    Ordre = 125, Active = true, EstSysteme = false,
+                    CompteComptable = "4221", CompteContrepartie = "4281",
+                    Commentaire = "Déduction diverse du solde de tout compte (matériel non restitué, trop-perçu…)."
+                },
+
                 // ── Gains hors impôt et hors cotisations ─────────────────────
                 new Rubrique
                 {
                     Code = "REMBFRAIS", Libelle = "Remboursement de frais",
                     Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
-                    SoumisIUTS = false, SoumisCNSS = false,
+                    // Ni salaire ni avantage : hors assiette de la TPA comme de l'IUTS et de la CNSS.
+                    SoumisIUTS = false, SoumisCNSS = false, SoumisTPA = false,
                     Ordre = 75, Active = true, EstSysteme = false,
                     CompteComptable = "6181", CompteContrepartie = "4221",
                     Commentaire = "Remboursement d'une dépense avancée par le salarié : ce n'est pas un revenu. " +
@@ -400,7 +451,7 @@ namespace IUTSCalculator.Services
                 {
                     Code = "FRAISMISS", Libelle = "Frais de mission",
                     Sens = SensRubrique.Gain, ModeCalcul = ModeCalculRubrique.MontantFixe,
-                    SoumisIUTS = false, SoumisCNSS = false,
+                    SoumisIUTS = false, SoumisCNSS = false, SoumisTPA = false,
                     Ordre = 76, Active = true, EstSysteme = false,
                     CompteComptable = "6185", CompteContrepartie = "4221",
                     Commentaire = "Indemnité de déplacement couvrant une dépense réelle. Une indemnité forfaitaire " +

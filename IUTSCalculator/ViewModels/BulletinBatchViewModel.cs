@@ -112,19 +112,17 @@ namespace IUTSCalculator.ViewModels
             set => SetProperty(ref _congesPrisJours, value);
         }
 
-        private string _modeReglement = "Virement bancaire";
+        // « Mode de la fiche » par défaut : chaque salarié garde le mode de règlement de
+        // sa fiche (virement, chèque, espèces, mobile money) — défaut n° 5 du guide.
+        private string _modeReglement = ModesReglementPaie.ModeDeLaFiche;
         public string ModeReglement
         {
             get => _modeReglement;
             set => SetProperty(ref _modeReglement, value);
         }
 
-        public ObservableCollection<string> ModesReglement { get; } = new ObservableCollection<string>
-        {
-            "Virement bancaire",
-            "Chèque",
-            "Espèces"
-        };
+        public ObservableCollection<string> ModesReglement { get; } =
+            new ObservableCollection<string>(ModesReglementPaie.Liste());
 
         private string _outputFolder;
         /// <summary>Dossier de destination des PDF générés (choisi via le bouton "Choisir le dossier...")</summary>
@@ -1049,7 +1047,7 @@ namespace IUTSCalculator.ViewModels
 
             try
             {
-                return await _rappelPaieService.ObtenirRappelsAsync(periode.Year, periode.Month, null, StatutRappelPaie.EnAttente);
+                return await _rappelPaieService.ObtenirRappelsDuMoisAsync(periode.Year, periode.Month);
             }
             catch (Exception ex)
             {

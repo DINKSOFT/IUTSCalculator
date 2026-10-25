@@ -322,6 +322,20 @@ namespace IUTSCalculator.Models
 
         public double TauxProgression => _montantTotalDu > 0 ? Math.Min(100.0, (double)(_totalAmorti / _montantTotalDu * 100m)) : 0.0;
 
+        /// <summary>Nature de la saisie en clair, pour le libellé du bulletin.</summary>
+        public static string LibelleCourtType(TypeSaisieOpposition type)
+        {
+            switch (type)
+            {
+                case TypeSaisieOpposition.PensionAlimentaire: return "Pension alimentaire";
+                case TypeSaisieOpposition.AvisATiersDetenteur: return "Avis à tiers détenteur";
+                case TypeSaisieOpposition.SaisieArretJudiciaire: return "Saisie-arrêt judiciaire";
+                case TypeSaisieOpposition.CessionVolontaire: return "Cession volontaire de salaire";
+                case TypeSaisieOpposition.AutreOpposition: return "Opposition";
+                default: return type.ToString();
+            }
+        }
+
         public string TypeLibelle
         {
             get

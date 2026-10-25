@@ -1,0 +1,460 @@
+<UserControl x:Class="IUTSCalculator.Views.SuiviPostesBudgetView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:models="clr-namespace:IUTSCalculator.Models"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:SuiviPostesBudgetViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1250" d:DesignHeight="780">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <Style x:Key="StatCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+
+        <Style x:Key="TabHeaderBtnStyle" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource InkMutedBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource RuleBrush}" BorderThickness="1,1,1,0"
+                                CornerRadius="4,4,0,0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1,2,1,0"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SurfaceAltBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource GroundBrush}">
+        <Grid.RowDefinitions>
+            <!-- En-tête -->
+            <RowDefinition Height="Auto"/>
+            <!-- Onglets de navigation -->
+            <RowDefinition Height="Auto"/>
+            <!-- Contenu principal -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             EN-TÊTE DE L'ÉCRAN
+             ═══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}"
+                BorderThickness="0,0,0,1" Padding="20,14">
+            <DockPanel LastChildFill="True">
+                <!-- Boutons d'actions globaux -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Button Content="Actualiser" Tag="{StaticResource IconRefresh}"
+                            Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"
+                            Command="{Binding RechargerCommand}"/>
+
+                    <Button Content="Exporter Excel (3 volets)" Tag="{StaticResource IconExcel}"
+                            Style="{StaticResource MenuButtonStyle}" Margin="0"
+                            Command="{Binding ExporterExcelCommand}"/>
+                </StackPanel>
+
+                <!-- Titre & Sous-titre -->
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="SUIVI BUDGÉTAIRE DES POSTES &amp; GPEC" Style="{StaticResource ScreenTitleStyle}"/>
+                    <TextBlock Text="Effectifs budgétés vs pourvus, alertes d'occupation, et catalogue des compétences"
+                               FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ONGLETS DE NAVIGATION DU MODULE
+             ═══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="1" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}"
+                BorderThickness="0,0,0,1" Padding="20,8,20,0">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton Content="Tableau de bord « Budget vs Pourvu »"
+                             Style="{StaticResource TabHeaderBtnStyle}"
+                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource StringEqualsConverter}, ConverterParameter=0, Mode=TwoWay}"/>
+
+                <RadioButton Content="Référentiel des Compétences"
+                             Style="{StaticResource TabHeaderBtnStyle}"
+                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource StringEqualsConverter}, ConverterParameter=1, Mode=TwoWay}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             CONTENU DES ONGLETS
+             ═══════════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="2" Margin="20,14,20,16">
+
+            <!-- ───────── ONGLET 0 : TABLEAU DE BORD BUDGET VS POURVU ───────── -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedTabIndex}" Value="0">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid>
+                <Grid.RowDefinitions>
+                    <!-- Cartes KPIs -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Barre de filtres & recherche -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Tableau principal des postes budgétés -->
+                    <RowDefinition Height="3*" MinHeight="200"/>
+                    <!-- Volet détail titulaire & compétences du poste sélectionné (jamais écrasé sous 220px : voir ScrollViewer parent) -->
+                    <RowDefinition Height="2*" MinHeight="220"/>
+                </Grid.RowDefinitions>
+
+                <!-- Cartes d'indicateurs KPIs -->
+                <Grid Grid.Row="0" Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Total Postes -->
+                    <Border Grid.Column="0" Style="{StaticResource StatCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="POSTES OUVERTS" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="{Binding TotalPostes}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource InkBrush}"/>
+                            <TextBlock Text="Nomenclature globale" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Effectif Requis (Budgété) -->
+                    <Border Grid.Column="1" Style="{StaticResource StatCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="EFFECTIF BUDGÉTÉ" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="{Binding TotalBudgete}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="Cible organisationnelle" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Effectif Pourvu (Réel) -->
+                    <Border Grid.Column="2" Style="{StaticResource StatCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="EFFECTIF POURVU" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="{Binding TotalPourvu}" FontSize="20" FontWeight="Bold" Foreground="#1F7A4D"/>
+                            <TextBlock Text="Salariés actifs en poste" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Postes Vacants -->
+                    <Border Grid.Column="3" Style="{StaticResource StatCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="POSTES VACANTS" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="{Binding TotalVacants}" FontSize="20" FontWeight="Bold" Foreground="#9C2F28"/>
+                            <TextBlock Text="0 titulaire actif affecté" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Sureffectif -->
+                    <Border Grid.Column="4" Style="{StaticResource StatCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="SUREFFECTIF" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="{Binding TotalSureffectif}" FontSize="20" FontWeight="Bold" Foreground="#6A1B9A"/>
+                            <TextBlock Text="Pourvus &gt; Budgétés" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Taux d'occupation global -->
+                    <Border Grid.Column="5" Style="{StaticResource StatCardStyle}" Margin="0">
+                        <StackPanel>
+                            <TextBlock Text="TAUX D'OCCUPATION" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="{Binding TauxOccupationGlobalTexte}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource PrimaryBlueDarkBrush}"/>
+                            <TextBlock Text="Ratio pourvu / budgété" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Barre de filtres & recherche -->
+                <Border Grid.Row="1" Style="{StaticResource StatCardStyle}" Margin="0,0,0,10" Padding="12,8">
+                    <DockPanel LastChildFill="True">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                            <TextBlock Text="Filtrer par statut :" Style="{StaticResource FormTextBlockLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox Width="125" Style="{StaticResource FormComboBoxStyle}"
+                                      SelectedValue="{Binding FiltreStatut}"
+                                      SelectedValuePath="Content"
+                                      Margin="0,0,16,0">
+                                <ComboBoxItem Content="Tous"/>
+                                <ComboBoxItem Content="Vacant"/>
+                                <ComboBoxItem Content="Partiel"/>
+                                <ComboBoxItem Content="Pourvu"/>
+                                <ComboBoxItem Content="Sureffectif"/>
+                            </ComboBox>
+
+                            <TextBlock Text="Direction / Service :" Style="{StaticResource FormTextBlockLabelStyle}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox Width="160" Style="{StaticResource FormComboBoxStyle}"
+                                      ItemsSource="{Binding ServicesDisponibles}"
+                                      SelectedItem="{Binding FiltreService}"
+                                      Margin="0,0,16,0"/>
+                        </StackPanel>
+
+                        <!-- Recherche textuelle -->
+                        <Grid HorizontalAlignment="Right" Width="260">
+                            <TextBox Text="{Binding RechercheTexte, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource FormTextBoxStyle}"
+                                     Padding="24,5,6,5"/>
+                            <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                       Foreground="{StaticResource InkSubtleBrush}"
+                                       VerticalAlignment="Center" HorizontalAlignment="Left" Margin="8,0,0,0" IsHitTestVisible="False"/>
+                        </Grid>
+                    </DockPanel>
+                </Border>
+
+                <!-- Tableau principal des postes -->
+                <DataGrid Grid.Row="2" ItemsSource="{Binding PostesBudget}"
+                          SelectedItem="{Binding PosteBudgetSelectionne}"
+                          Style="{StaticResource FormDataGridStyle}"
+                          IsReadOnly="True" AutoGenerateColumns="False" Margin="0,0,0,10">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Code" Binding="{Binding Code, Mode=OneWay}" Width="85"/>
+                        <DataGridTextColumn Header="Intitulé du Poste" Binding="{Binding Intitule, Mode=OneWay}" Width="180"/>
+                        <DataGridTextColumn Header="Direction / Service" Binding="{Binding UniteLibelle, Mode=OneWay}" Width="140"/>
+                        <DataGridTextColumn Header="Classification" Binding="{Binding Classification, Mode=OneWay}" Width="100"/>
+                        <DataGridTextColumn Header="Budgété" Binding="{Binding EffectifBudgete, Mode=OneWay}" Width="65"/>
+                        <DataGridTextColumn Header="Pourvu" Binding="{Binding EffectifPourvu, Mode=OneWay}" Width="65"/>
+                        <DataGridTextColumn Header="Écart" Binding="{Binding EcartEffectif, Mode=OneWay}" Width="60"/>
+                        <DataGridTextColumn Header="Occupation" Binding="{Binding TauxOccupationTexte, Mode=OneWay}" Width="80"/>
+
+                        <!-- Badge Statut GPEC avec couleur dynamique -->
+                        <DataGridTemplateColumn Header="Statut GPEC" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="3" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#EDEFED"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Vacant">
+                                                        <Setter Property="Background" Value="#FDE8E7"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Partiel">
+                                                        <Setter Property="Background" Value="#FDF8EE"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Pourvu">
+                                                        <Setter Property="Background" Value="#E6F0ED"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Sureffectif">
+                                                        <Setter Property="Background" Value="#F3E5F5"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding StatutGpecTexte}" FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#48534F"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Vacant">
+                                                            <Setter Property="Foreground" Value="#9C2F28"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Partiel">
+                                                            <Setter Property="Foreground" Value="#A8690E"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Pourvu">
+                                                            <Setter Property="Foreground" Value="#1F7A4D"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatutOccupationGpec}" Value="Sureffectif">
+                                                            <Setter Property="Foreground" Value="#6A1B9A"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="Titulaires Actuels" Binding="{Binding TitulairesResume, Mode=OneWay}" Width="*"/>
+                        <DataGridTextColumn Header="Min Convention" Binding="{Binding SalaireMinConventionnelFormate, Mode=OneWay}" Width="110"/>
+                        <DataGridTextColumn Header="Fourchette Budgétée" Binding="{Binding FourchetteBudgetaireFormatee, Mode=OneWay}" Width="135"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Volet détail du poste sélectionné (Titulaires + Compétences) -->
+                <Border Grid.Row="3" Style="{StaticResource StatCardStyle}" Padding="14" Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <!-- Titulaires actuels -->
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="14"/>
+                            <!-- Compétences requises -->
+                            <ColumnDefinition Width="1.2*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Titulaires actuels -->
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                                <TextBlock Text="TITULAIRES ACTUELS DU POSTE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding PosteBudgetSelectionne.Intitule, StringFormat='— {0}'}"
+                                           FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                            </DockPanel>
+
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding PosteBudgetSelectionne.Titulaires}"
+                                      Style="{StaticResource FormDataGridStyle}"
+                                      IsReadOnly="True" AutoGenerateColumns="False">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Matricule" Binding="{Binding Matricule, Mode=OneWay}" Width="80"/>
+                                    <DataGridTextColumn Header="Nom &amp; Prénoms" Binding="{Binding NomComplet, Mode=OneWay}" Width="*"/>
+                                    <DataGridTextColumn Header="Embauche" Binding="{Binding DateEmbaucheTexte, Mode=OneWay}" Width="85"/>
+                                    <DataGridTextColumn Header="Contrat" Binding="{Binding TypeContrat, Mode=OneWay}" Width="70"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+
+                        <!-- Compétences requises -->
+                        <Grid Grid.Column="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                                <TextBlock Text="COMPÉTENCES REQUISES PAR LA FICHE DE POSTE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center"/>
+                            </DockPanel>
+
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding PosteBudgetSelectionne.CompetencesRequises}"
+                                      Style="{StaticResource FormDataGridStyle}"
+                                      IsReadOnly="True" AutoGenerateColumns="False">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Code" Binding="{Binding CompetenceCode, Mode=OneWay}" Width="80"/>
+                                    <DataGridTextColumn Header="Compétence" Binding="{Binding CompetenceLibelle, Mode=OneWay}" Width="*"/>
+                                    <DataGridTextColumn Header="Domaine" Binding="{Binding DomaineLibelle, Mode=OneWay}" Width="100"/>
+                                    <DataGridTextColumn Header="Niveau Requis" Binding="{Binding NiveauEtoiles, Mode=OneWay}" Width="80"/>
+                                    <DataGridCheckBoxColumn Header="Obligatoire" Binding="{Binding EstObligatoire, Mode=OneWay}" Width="75"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Grid>
+                </Border>
+                </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ───────── ONGLET 1 : RÉFÉRENTIEL DES COMPÉTENCES ───────── -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedTabIndex}" Value="1">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="1.2*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Tableau gauche des compétences -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                        <TextBlock Text="CATALOGUE D'ENTREPRISE DES COMPÉTENCES" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center"/>
+                        <Button Content="Nouvelle compétence" Tag="{StaticResource IconAdd}"
+                                Style="{StaticResource MenuButtonStyle}" HorizontalAlignment="Right" Padding="10,4"
+                                Command="{Binding NouvelleCompetenceCommand}"/>
+                    </DockPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding Competences}"
+                              SelectedItem="{Binding CompetenceSelectionnee}"
+                              Style="{StaticResource FormDataGridStyle}"
+                              IsReadOnly="True" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Code" Binding="{Binding Code, Mode=OneWay}" Width="85"/>
+                            <DataGridTextColumn Header="Domaine" Binding="{Binding DomaineLibelle, Mode=OneWay}" Width="130"/>
+                            <DataGridTextColumn Header="Libellé de la compétence" Binding="{Binding Libelle, Mode=OneWay}" Width="*"/>
+                            <DataGridTextColumn Header="Postes Associés" Binding="{Binding NombrePostesAssocies, Mode=OneWay}" Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <!-- Formulaire latéral droit d'édition de compétence -->
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="16" Background="{StaticResource SurfaceAltBrush}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="FICHE DE COMPÉTENCE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Code Compétence :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                            <TextBox Text="{Binding CompetenceEnEdition.Code, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Libellé de la compétence :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                            <TextBox Text="{Binding CompetenceEnEdition.Libelle, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Domaine de compétence :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                            <ComboBox ItemsSource="{Binding DomainesDisponibles}"
+                                      SelectedItem="{Binding CompetenceEnEdition.Domaine}"
+                                      Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Description &amp; Critères d'évaluation :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                            <TextBox Text="{Binding CompetenceEnEdition.Description, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="80" TextWrapping="Wrap" AcceptsReturn="True"
+                                     Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,16"/>
+
+                            <!-- Boutons d'action -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="Supprimer" Tag="{StaticResource IconDelete}"
+                                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"
+                                        Command="{Binding SupprimerCompetenceCommand}"
+                                        Visibility="{Binding EstEnEditionCompetence, Converter={StaticResource BoolToVis}}"/>
+                                <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                        Style="{StaticResource MenuButtonStyle}" Margin="0"
+                                        Command="{Binding EnregistrerCompetenceCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

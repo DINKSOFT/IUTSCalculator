@@ -125,14 +125,29 @@ namespace IUTSCalculator.Services
         public async Task EnregistrerUniteAsync(UniteOrganisationnelle unite)
         {
             if (unite == null) throw new ArgumentNullException(nameof(unite));
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
+            {
+                await EnregistrerUniteAsync(conn, tx, unite);
+                tx.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Enregistrement d'une unité dans une transaction fournie par l'appelant : utilisé
+        /// seul (ci-dessus) ou par l'initialisation de la structure, qui crée toutes ses
+        /// unités et tous ses postes dans UNE transaction (tout ou rien).
+        /// </summary>
+        private async Task EnregistrerUniteAsync(SQLiteConnection conn, SQLiteTransaction tx, UniteOrganisationnelle unite)
+        {
+            if (unite == null) throw new ArgumentNullException(nameof(unite));
             if (string.IsNullOrWhiteSpace(unite.Code)) throw new InvalidOperationException("Le code de l'unité est obligatoire.");
             if (string.IsNullOrWhiteSpace(unite.Libelle)) throw new InvalidOperationException("Le libellé de l'unité est obligatoire.");
 
             unite.Code = unite.Code.Trim().ToUpperInvariant();
             unite.Libelle = unite.Libelle.Trim();
 
-            using (var conn = _sqliteService.CreateConnection())
-            using (var tx = conn.BeginTransaction())
             {
                 // Vérifier unicité du code
                 using (var cmd = conn.CreateCommand())
@@ -218,8 +233,6 @@ namespace IUTSCalculator.Services
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
-
-                tx.Commit();
             }
         }
 
@@ -317,13 +330,22 @@ namespace IUTSCalculator.Services
                         pos.Id, pos.Code, pos.Intitule, pos.UniteId, pos.SuperieurPosteId,
                         pos.TitulaireMatricule, pos.Classification, pos.Missions,
                         pos.EffectifRequis, pos.Actif, pos.Ordre, pos.DateCreation,
+                        pos.FinalitePrincipale, pos.ActivitesCles, pos.NiveauEtudeRequis, pos.DiplomeRequis,
+                        pos.ExperienceMinimaleAnnees, pos.ConditionsTravail, pos.ConventionId,
+                        pos.CategorieConventionnelle, pos.EchelonConventionnel,
+                        pos.SalaireMinimumConventionnel, pos.SalaireMinBudgete, pos.SalaireMaxBudgete,
                         u.Libelle AS UniteLibelle,
                         sup.Intitule AS SuperieurPosteIntitule,
-                        e.FirstName || ' ' || e.LastName AS TitulaireNom
+                        conv.Libelle AS ConventionLibelle,
+                        e.FirstName || ' ' || e.LastName AS TitulaireNom,
+                        COUNT(CASE WHEN e_all.StatutSalarie = 0 THEN 1 END) AS EffectifPourvuReel
                     FROM Postes pos
                     LEFT JOIN UnitesOrganisationnelles u ON pos.UniteId = u.Id
                     LEFT JOIN Postes sup ON pos.SuperieurPosteId = sup.Id
+                    LEFT JOIN ConventionsCollectives conv ON pos.ConventionId = conv.Id
                     LEFT JOIN Employees e ON pos.TitulaireMatricule = e.EmployeeId
+                    LEFT JOIN Employees e_all ON e_all.PosteId = pos.Id
+                    GROUP BY pos.Id
                     ORDER BY pos.Ordre ASC, pos.Intitule ASC;";
 
                 using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
@@ -346,7 +368,23 @@ namespace IUTSCalculator.Services
                             EffectifRequis = Math.Max(1, DbValue.IntFromDb(reader["EffectifRequis"])),
                             Actif = DbValue.IntFromDb(reader["Actif"]) == 1,
                             Ordre = DbValue.IntFromDb(reader["Ordre"]),
-                            DateCreation = DbValue.DateFromDb(reader["DateCreation"], DateTime.Now)
+                            DateCreation = DbValue.DateFromDb(reader["DateCreation"], DateTime.Now),
+
+                            // Propriétés RH-02 étendues
+                            FinalitePrincipale = DbValue.TextFromDb(reader["FinalitePrincipale"]),
+                            ActivitesCles = DbValue.TextFromDb(reader["ActivitesCles"]),
+                            NiveauEtudeRequis = DbValue.TextFromDb(reader["NiveauEtudeRequis"]),
+                            DiplomeRequis = DbValue.TextFromDb(reader["DiplomeRequis"]),
+                            ExperienceMinimaleAnnees = DbValue.IntFromDb(reader["ExperienceMinimaleAnnees"]),
+                            ConditionsTravail = DbValue.TextFromDb(reader["ConditionsTravail"]),
+                            ConventionId = DbValue.IntNullableFromDb(reader["ConventionId"]),
+                            ConventionLibelle = DbValue.TextFromDb(reader["ConventionLibelle"]),
+                            CategorieConventionnelle = DbValue.TextFromDb(reader["CategorieConventionnelle"]),
+                            EchelonConventionnel = DbValue.TextFromDb(reader["EchelonConventionnel"]),
+                            SalaireMinimumConventionnel = DbValue.MoneyFromDb(reader["SalaireMinimumConventionnel"]),
+                            SalaireMinBudgete = DbValue.MoneyFromDb(reader["SalaireMinBudgete"]),
+                            SalaireMaxBudgete = DbValue.MoneyFromDb(reader["SalaireMaxBudgete"]),
+                            EffectifPourvu = DbValue.IntFromDb(reader["EffectifPourvuReel"])
                         };
                         postes.Add(p);
                     }
@@ -364,14 +402,25 @@ namespace IUTSCalculator.Services
         public async Task EnregistrerPosteAsync(Poste poste)
         {
             if (poste == null) throw new ArgumentNullException(nameof(poste));
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
+            {
+                await EnregistrerPosteAsync(conn, tx, poste);
+                tx.Commit();
+            }
+        }
+
+        /// <summary>Enregistrement d'un poste dans une transaction fournie par l'appelant.</summary>
+        private async Task EnregistrerPosteAsync(SQLiteConnection conn, SQLiteTransaction tx, Poste poste)
+        {
+            if (poste == null) throw new ArgumentNullException(nameof(poste));
             if (string.IsNullOrWhiteSpace(poste.Code)) throw new InvalidOperationException("Le code du poste est obligatoire.");
             if (string.IsNullOrWhiteSpace(poste.Intitule)) throw new InvalidOperationException("L'intitulé du poste est obligatoire.");
 
             poste.Code = poste.Code.Trim().ToUpperInvariant();
             poste.Intitule = poste.Intitule.Trim();
 
-            using (var conn = _sqliteService.CreateConnection())
-            using (var tx = conn.BeginTransaction())
             {
                 // Unicité du code poste
                 using (var cmd = conn.CreateCommand())
@@ -407,9 +456,17 @@ namespace IUTSCalculator.Services
                         cmd.Transaction = tx;
                         cmd.CommandText = @"
                             INSERT INTO Postes
-                            (Code, Intitule, UniteId, SuperieurPosteId, TitulaireMatricule, Classification, Missions, EffectifRequis, Actif, Ordre, DateCreation)
+                            (Code, Intitule, UniteId, SuperieurPosteId, TitulaireMatricule, Classification, Missions,
+                             EffectifRequis, Actif, Ordre, DateCreation,
+                             FinalitePrincipale, ActivitesCles, NiveauEtudeRequis, DiplomeRequis, ExperienceMinimaleAnnees,
+                             ConditionsTravail, ConventionId, CategorieConventionnelle, EchelonConventionnel,
+                             SalaireMinimumConventionnel, SalaireMinBudgete, SalaireMaxBudgete)
                             VALUES
-                            (@Code, @Intitule, @UniteId, @SuperieurPosteId, @TitulaireMatricule, @Classification, @Missions, @EffectifRequis, @Actif, @Ordre, @DateCreation);
+                            (@Code, @Intitule, @UniteId, @SuperieurPosteId, @TitulaireMatricule, @Classification, @Missions,
+                             @EffectifRequis, @Actif, @Ordre, @DateCreation,
+                             @FinalitePrincipale, @ActivitesCles, @NiveauEtudeRequis, @DiplomeRequis, @ExperienceMinimaleAnnees,
+                             @ConditionsTravail, @ConventionId, @CategorieConventionnelle, @EchelonConventionnel,
+                             @SalaireMinimumConventionnel, @SalaireMinBudgete, @SalaireMaxBudgete);
                             SELECT last_insert_rowid();";
 
                         cmd.Parameters.AddWithValue("@Code", poste.Code);
@@ -423,6 +480,19 @@ namespace IUTSCalculator.Services
                         cmd.Parameters.AddWithValue("@Actif", poste.Actif ? 1 : 0);
                         cmd.Parameters.AddWithValue("@Ordre", poste.Ordre);
                         cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+
+                        cmd.Parameters.AddWithValue("@FinalitePrincipale", (object)poste.FinalitePrincipale ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ActivitesCles", (object)poste.ActivitesCles ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@NiveauEtudeRequis", (object)poste.NiveauEtudeRequis ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@DiplomeRequis", (object)poste.DiplomeRequis ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ExperienceMinimaleAnnees", poste.ExperienceMinimaleAnnees);
+                        cmd.Parameters.AddWithValue("@ConditionsTravail", (object)poste.ConditionsTravail ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ConventionId", poste.ConventionId.HasValue ? (object)poste.ConventionId.Value : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@CategorieConventionnelle", (object)poste.CategorieConventionnelle ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@EchelonConventionnel", (object)poste.EchelonConventionnel ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@SalaireMinimumConventionnel", DbValue.MoneyToDb(poste.SalaireMinimumConventionnel));
+                        cmd.Parameters.AddWithValue("@SalaireMinBudgete", DbValue.MoneyToDb(poste.SalaireMinBudgete));
+                        cmd.Parameters.AddWithValue("@SalaireMaxBudgete", DbValue.MoneyToDb(poste.SalaireMaxBudgete));
 
                         var newId = await cmd.ExecuteScalarAsync();
                         poste.Id = Convert.ToInt32(newId);
@@ -445,7 +515,19 @@ namespace IUTSCalculator.Services
                                 Missions = @Missions,
                                 EffectifRequis = @EffectifRequis,
                                 Actif = @Actif,
-                                Ordre = @Ordre
+                                Ordre = @Ordre,
+                                FinalitePrincipale = @FinalitePrincipale,
+                                ActivitesCles = @ActivitesCles,
+                                NiveauEtudeRequis = @NiveauEtudeRequis,
+                                DiplomeRequis = @DiplomeRequis,
+                                ExperienceMinimaleAnnees = @ExperienceMinimaleAnnees,
+                                ConditionsTravail = @ConditionsTravail,
+                                ConventionId = @ConventionId,
+                                CategorieConventionnelle = @CategorieConventionnelle,
+                                EchelonConventionnel = @EchelonConventionnel,
+                                SalaireMinimumConventionnel = @SalaireMinimumConventionnel,
+                                SalaireMinBudgete = @SalaireMinBudgete,
+                                SalaireMaxBudgete = @SalaireMaxBudgete
                             WHERE Id = @Id;";
 
                         cmd.Parameters.AddWithValue("@Code", poste.Code);
@@ -458,6 +540,20 @@ namespace IUTSCalculator.Services
                         cmd.Parameters.AddWithValue("@EffectifRequis", Math.Max(1, poste.EffectifRequis));
                         cmd.Parameters.AddWithValue("@Actif", poste.Actif ? 1 : 0);
                         cmd.Parameters.AddWithValue("@Ordre", poste.Ordre);
+
+                        cmd.Parameters.AddWithValue("@FinalitePrincipale", (object)poste.FinalitePrincipale ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ActivitesCles", (object)poste.ActivitesCles ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@NiveauEtudeRequis", (object)poste.NiveauEtudeRequis ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@DiplomeRequis", (object)poste.DiplomeRequis ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ExperienceMinimaleAnnees", poste.ExperienceMinimaleAnnees);
+                        cmd.Parameters.AddWithValue("@ConditionsTravail", (object)poste.ConditionsTravail ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ConventionId", poste.ConventionId.HasValue ? (object)poste.ConventionId.Value : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@CategorieConventionnelle", (object)poste.CategorieConventionnelle ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@EchelonConventionnel", (object)poste.EchelonConventionnel ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@SalaireMinimumConventionnel", DbValue.MoneyToDb(poste.SalaireMinimumConventionnel));
+                        cmd.Parameters.AddWithValue("@SalaireMinBudgete", DbValue.MoneyToDb(poste.SalaireMinBudgete));
+                        cmd.Parameters.AddWithValue("@SalaireMaxBudgete", DbValue.MoneyToDb(poste.SalaireMaxBudgete));
+
                         cmd.Parameters.AddWithValue("@Id", poste.Id);
 
                         await cmd.ExecuteNonQueryAsync();
@@ -477,8 +573,6 @@ namespace IUTSCalculator.Services
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
-
-                tx.Commit();
             }
         }
 
@@ -555,6 +649,243 @@ namespace IUTSCalculator.Services
 
                 tx.Commit();
             }
+        }
+
+        #endregion
+
+        #region Compétences et Titulaires d'un Poste (module RH-02)
+
+        /// <summary>
+        /// Charge la liste des compétences exigées pour un poste.
+        /// </summary>
+        public async Task<List<PosteCompetence>> ChargerCompetencesPosteAsync(int posteId)
+        {
+            var liste = new List<PosteCompetence>();
+            if (posteId <= 0) return liste;
+
+            using (var conn = _sqliteService.CreateConnection())
+            {
+                // Colonne ajoutée par la migration 38 : lue seulement si elle existe, pour
+                // qu'une base pas encore mise à niveau continue de fonctionner.
+                bool avecControle = ColonneExiste(conn, null, "PosteCompetences", ColonneNiveauAVerifier);
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT pc.Id, pc.PosteId, pc.CompetenceId, pc.NiveauRequis, pc.EstObligatoire, pc.Commentaire,
+                               " + (avecControle ? "pc." + ColonneNiveauAVerifier : "0") + @" AS NiveauAVerifier,
+                               c.Code AS CompetenceCode, c.Libelle AS CompetenceLibelle, c.Domaine
+                        FROM PosteCompetences pc
+                        INNER JOIN Competences c ON pc.CompetenceId = c.Id
+                        WHERE pc.PosteId = @PosteId
+                        ORDER BY pc.EstObligatoire DESC, c.Domaine ASC, c.Libelle ASC;";
+                    cmd.Parameters.AddWithValue("@PosteId", posteId);
+
+                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            liste.Add(new PosteCompetence
+                            {
+                                Id = DbValue.IntFromDb(reader["Id"]),
+                                PosteId = DbValue.IntFromDb(reader["PosteId"]),
+                                CompetenceId = DbValue.IntFromDb(reader["CompetenceId"]),
+                                CompetenceCode = DbValue.TextFromDb(reader["CompetenceCode"]),
+                                CompetenceLibelle = DbValue.TextFromDb(reader["CompetenceLibelle"]),
+                                Domaine = (DomaineCompetence)DbValue.IntFromDb(reader["Domaine"]),
+                                // La valeur enregistrée EST le niveau (1 à 4), sans décalage.
+                                NiveauRequis = (NiveauMaitrise)Math.Max(1, Math.Min(4, DbValue.IntFromDb(reader["NiveauRequis"]))),
+                                EstObligatoire = DbValue.IntFromDb(reader["EstObligatoire"]) == 1,
+                                Commentaire = DbValue.TextFromDb(reader["Commentaire"]),
+                                NiveauAVerifier = DbValue.IntFromDb(reader["NiveauAVerifier"]) == 1
+                            });
+                        }
+                    }
+                }
+            }
+
+            return liste;
+        }
+
+        /// <summary>
+        /// Colonne posée par la migration 38 sur les exigences enregistrées AVANT la
+        /// correction du sélecteur de niveau (voir <see cref="PosteCompetence.NiveauAVerifier"/>).
+        /// </summary>
+        private const string ColonneNiveauAVerifier = "NiveauAVerifier";
+
+        /// <summary>
+        /// Ajoute ou modifie une exigence de compétence pour un poste. Une compétence ne
+        /// figure qu'une fois par poste : l'ajouter à nouveau met à jour son niveau et sa
+        /// criticité (c'est ainsi qu'on confirme un niveau « à vérifier »).
+        /// </summary>
+        public async Task EnregistrerCompetencePosteAsync(PosteCompetence pc)
+        {
+            if (pc == null) throw new ArgumentNullException(nameof(pc));
+            if (pc.PosteId <= 0 || pc.CompetenceId <= 0) throw new InvalidOperationException("Poste et compétence valides requis.");
+
+            int niveau = (int)pc.NiveauRequis;
+            if (niveau < 1 || niveau > 4)
+                throw new InvalidOperationException("Le niveau de maîtrise requis doit être compris entre 1 et 4.");
+
+            using (var conn = _sqliteService.CreateConnection())
+            {
+                bool avecControle = ColonneExiste(conn, null, "PosteCompetences", ColonneNiveauAVerifier);
+
+                if (pc.Id == 0)
+                {
+                    using (var cmdExistant = conn.CreateCommand())
+                    {
+                        cmdExistant.CommandText = "SELECT Id FROM PosteCompetences WHERE PosteId = @PosteId AND CompetenceId = @CompetenceId ORDER BY Id LIMIT 1;";
+                        cmdExistant.Parameters.AddWithValue("@PosteId", pc.PosteId);
+                        cmdExistant.Parameters.AddWithValue("@CompetenceId", pc.CompetenceId);
+                        var existant = await cmdExistant.ExecuteScalarAsync();
+                        if (existant != null && existant != DBNull.Value)
+                            pc.Id = Convert.ToInt32(existant);
+                    }
+                }
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    // Un niveau saisi ou resaisi avec le sélecteur corrigé est fiable : il
+                    // n'est plus « à vérifier ».
+                    string controle = avecControle ? ", " + ColonneNiveauAVerifier : "";
+                    if (pc.Id == 0)
+                    {
+                        cmd.CommandText = @"
+                            INSERT INTO PosteCompetences (PosteId, CompetenceId, NiveauRequis, EstObligatoire, Commentaire" + controle + @")
+                            VALUES (@PosteId, @CompetenceId, @NiveauRequis, @EstObligatoire, @Commentaire" + (avecControle ? ", 0" : "") + @");
+                            SELECT last_insert_rowid();";
+                    }
+                    else
+                    {
+                        cmd.CommandText = @"
+                            UPDATE PosteCompetences
+                            SET NiveauRequis = @NiveauRequis, EstObligatoire = @EstObligatoire, Commentaire = @Commentaire" +
+                            (avecControle ? ", " + ColonneNiveauAVerifier + " = 0" : "") + @"
+                            WHERE Id = @Id;";
+                        cmd.Parameters.AddWithValue("@Id", pc.Id);
+                    }
+
+                    cmd.Parameters.AddWithValue("@PosteId", pc.PosteId);
+                    cmd.Parameters.AddWithValue("@CompetenceId", pc.CompetenceId);
+                    cmd.Parameters.AddWithValue("@NiveauRequis", niveau);
+                    cmd.Parameters.AddWithValue("@EstObligatoire", pc.EstObligatoire ? 1 : 0);
+                    cmd.Parameters.AddWithValue("@Commentaire", (object)pc.Commentaire ?? DBNull.Value);
+
+                    if (pc.Id == 0)
+                    {
+                        var newId = await cmd.ExecuteScalarAsync();
+                        pc.Id = Convert.ToInt32(newId);
+                    }
+                    else
+                    {
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+
+            pc.NiveauAVerifier = false;
+        }
+
+        private static bool ColonneExiste(SQLiteConnection conn, SQLiteTransaction tx, string table, string colonne)
+        {
+            using (var cmd = conn.CreateCommand())
+            {
+                if (tx != null) cmd.Transaction = tx;
+                // PRAGMA n'accepte pas de paramètre : le nom de table vient d'une constante interne.
+                cmd.CommandText = "PRAGMA table_info(" + table + ");";
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        if (string.Equals(Convert.ToString(reader["name"]), colonne, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Supprime une compétence rattachée à un poste par son identifiant unique.
+        /// </summary>
+        public async Task SupprimerCompetencePosteAsync(int posteCompetenceId)
+        {
+            if (posteCompetenceId <= 0) return;
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM PosteCompetences WHERE Id = @Id;";
+                cmd.Parameters.AddWithValue("@Id", posteCompetenceId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        /// <summary>
+        /// Supprime une compétence rattachée à un poste par couple (posteId, competenceId).
+        /// </summary>
+        public async Task SupprimerCompetencePosteAsync(int posteId, int competenceId)
+        {
+            if (posteId <= 0 || competenceId <= 0) return;
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM PosteCompetences WHERE PosteId = @PosteId AND CompetenceId = @CompetenceId;";
+                cmd.Parameters.AddWithValue("@PosteId", posteId);
+                cmd.Parameters.AddWithValue("@CompetenceId", competenceId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        /// <summary>
+        /// Charge la liste des salariés actuellement affectés à ce poste (modèle GPEC multi-titulaires).
+        /// </summary>
+        public async Task<List<TitulairePosteLigne>> ChargerTitulairesPosteAsync(int posteId)
+        {
+            var titulaires = new List<TitulairePosteLigne>();
+            if (posteId <= 0) return titulaires;
+
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT EmployeeId, FirstName, LastName, Service, Category, Echelon, DateEntree, StatutSalarie
+                    FROM Employees
+                    WHERE PosteId = @PosteId
+                    ORDER BY StatutSalarie ASC, LastName ASC, FirstName ASC;";
+                cmd.Parameters.AddWithValue("@PosteId", posteId);
+
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var dateEntree = DbValue.DateNullableFromDb(reader["DateEntree"]);
+                        string anciennete = "-";
+                        if (dateEntree.HasValue)
+                        {
+                            var annees = DateTime.Today.Year - dateEntree.Value.Year;
+                            if (DateTime.Today < dateEntree.Value.AddYears(annees)) annees--;
+                            anciennete = annees > 0 ? $"{annees} an(s)" : "< 1 an";
+                        }
+
+                        titulaires.Add(new TitulairePosteLigne
+                        {
+                            EmployeeId = DbValue.TextFromDb(reader["EmployeeId"]),
+                            NomComplet = $"{DbValue.TextFromDb(reader["FirstName"])} {DbValue.TextFromDb(reader["LastName"])}".Trim(),
+                            Department = DbValue.TextFromDb(reader["Service"]),
+                            Categorie = DbValue.TextFromDb(reader["Category"]),
+                            Echelon = DbValue.TextFromDb(reader["Echelon"]),
+                            DateEmbauche = dateEntree,
+                            AncienneteTexte = anciennete,
+                            StatutSalarie = DbValue.IntFromDb(reader["StatutSalarie"])
+                        });
+                    }
+                }
+            }
+
+            return titulaires;
         }
 
         #endregion
@@ -740,14 +1071,16 @@ namespace IUTSCalculator.Services
                             Titre = p.Intitule,
                             SousTitre = string.IsNullOrWhiteSpace(p.Classification) ? "Poste" : p.Classification,
                             TypeNoeud = "Poste",
-                            BadgeType = p.StatutOccupation,
+                            BadgeType = $"{p.EffectifPourvu}/{p.EffectifRequis} ({p.StatutOccupationGpec})",
                             ResponsableOuTitulaire = p.TitulaireNom,
                             Matricule = p.TitulaireMatricule,
                             InitialeAvatar = p.InitialesTitulaire,
-                            EffectifDirect = p.EstPourvu ? 1 : 0,
-                            EffectifTotal = p.EffectifRequis,
+                            EffectifDirect = p.EffectifPourvu,
+                            EffectifTotal = p.EffectifPourvu,
+                            EffectifBudgete = p.EffectifRequis,
+                            EffectifPourvu = p.EffectifPourvu,
                             NombrePostes = 1,
-                            CouleurEntete = p.EstPourvu ? "#2A5B84" : "#9C2F28",
+                            CouleurEntete = p.CouleurStatutGpec,
                             IsExpanded = false,
                             PosteAssocie = p
                         };
@@ -780,16 +1113,137 @@ namespace IUTSCalculator.Services
         #region Initialisation et Découverte Automatique
 
         /// <summary>
-        /// Initialise une structure d'organigramme par défaut.
-        /// Si des fiches salariés portent déjà des services distincts (PIL-01), crée les unités correspondantes.
-        /// Sinon, génère une ossature standard d'entreprise burkinabè (DG, DAF, DRH, DTECH, DCOM).
+        /// Initialise une structure d'organigramme par défaut et renvoie le nombre d'unités créées.
+        /// - Organigramme vide et fiches salariés portant des services (PIL-01) : une Direction
+        ///   Générale et une unité par service distinct ;
+        /// - organigramme vide sans service : ossature standard d'entreprise burkinabè (DG, DAF,
+        ///   DRH, DTECH, DCOM, services et postes clés) ;
+        /// - organigramme déjà renseigné : seuls les services des fiches salariés qui n'ont pas
+        ///   encore d'unité sont ajoutés (rien n'est supprimé ni modifié). C'est aussi ce qui
+        ///   permet de compléter une structure laissée incomplète par l'ancienne initialisation.
+        ///
+        /// Les codes sont générés UNIQUES : deux libellés qui commencent pareil (« Direction
+        /// générale » et « Direction d'usine » donnaient tous deux SRV-DIR) reçoivent un
+        /// suffixe numérique (SRV-DIR, SRV-DIR-2…), et aucun code déjà pris par une unité
+        /// (ou par un poste, pour les postes) n'est réutilisé. Tout est créé dans une seule
+        /// transaction : en cas d'erreur, rien n'est enregistré.
         /// </summary>
-        public async Task InitialiserStructureDefautAsync()
+        public async Task<int> InitialiserStructureDefautAsync()
         {
             var unitesExistantes = await ChargerUnitesAsync();
-            if (unitesExistantes.Count > 0) return;
+            var servicesPresents = await ChargerServicesDesSalariesAsync();
+            int creees = 0;
 
-            // Vérifier si des services distincts existent dans la table Employees
+            using (var conn = _sqliteService.CreateConnection())
+            using (var tx = conn.BeginTransaction())
+            {
+                var codesUnites = await ChargerCodesAsync(conn, tx, "UnitesOrganisationnelles");
+
+                if (unitesExistantes.Count > 0)
+                {
+                    // Complément : rattacher les nouveaux services à la Direction Générale existante.
+                    var racine = unitesExistantes
+                        .Where(u => u.TypeUnite == TypeUniteOrganisationnelle.DirectionGenerale)
+                        .OrderBy(u => u.Ordre).ThenBy(u => u.Id)
+                        .FirstOrDefault();
+                    int ordre = Math.Max(10, unitesExistantes.Max(u => u.Ordre) + 1);
+
+                    foreach (var srv in ServicesSansUnite(servicesPresents, unitesExistantes.Select(u => u.Libelle)))
+                    {
+                        await EnregistrerUniteAsync(conn, tx, new UniteOrganisationnelle
+                        {
+                            Code = CodeUnique(GenererCodeCourt(srv), codesUnites),
+                            Libelle = srv,
+                            TypeUnite = TypeUniteOrganisationnelle.Service,
+                            ParentId = racine?.Id,
+                            Couleur = "#14675A",
+                            Ordre = ordre++
+                        });
+                        creees++;
+                    }
+                }
+                else if (servicesPresents.Count > 0)
+                {
+                    // Créer une Direction Générale racine
+                    var dg = new UniteOrganisationnelle
+                    {
+                        Code = CodeUnique("DG", codesUnites),
+                        Libelle = "Direction Générale",
+                        TypeUnite = TypeUniteOrganisationnelle.DirectionGenerale,
+                        Couleur = "#0A3E35",
+                        Ordre = 1
+                    };
+                    await EnregistrerUniteAsync(conn, tx, dg);
+                    creees++;
+
+                    // Créer chaque service rattaché à la DG. Un service libellé exactement
+                    // « Direction Générale » est la DG elle-même : une seconde unité du même
+                    // libellé compterait deux fois les mêmes salariés.
+                    int ordre = 10;
+                    foreach (var srv in ServicesSansUnite(servicesPresents, new[] { dg.Libelle }))
+                    {
+                        await EnregistrerUniteAsync(conn, tx, new UniteOrganisationnelle
+                        {
+                            Code = CodeUnique(GenererCodeCourt(srv), codesUnites),
+                            Libelle = srv,
+                            TypeUnite = TypeUniteOrganisationnelle.Service,
+                            ParentId = dg.Id,
+                            Couleur = "#14675A",
+                            Ordre = ordre++
+                        });
+                        creees++;
+                    }
+                }
+                else
+                {
+                    var codesPostes = await ChargerCodesAsync(conn, tx, "Postes");
+
+                    // Structure standard type burkinabè
+                    var dg = new UniteOrganisationnelle { Code = CodeUnique("DG", codesUnites), Libelle = "Direction Générale", TypeUnite = TypeUniteOrganisationnelle.DirectionGenerale, Couleur = "#0A3E35", Ordre = 1 };
+                    await EnregistrerUniteAsync(conn, tx, dg);
+
+                    var daf = new UniteOrganisationnelle { Code = CodeUnique("DAF", codesUnites), Libelle = "Direction Administrative et Financière", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#1E40AF", Ordre = 2 };
+                    await EnregistrerUniteAsync(conn, tx, daf);
+
+                    var drh = new UniteOrganisationnelle { Code = CodeUnique("DRH", codesUnites), Libelle = "Direction des Ressources Humaines", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#14675A", Ordre = 3 };
+                    await EnregistrerUniteAsync(conn, tx, drh);
+
+                    var dtech = new UniteOrganisationnelle { Code = CodeUnique("DTECH", codesUnites), Libelle = "Direction Technique & Exploitation", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#B45309", Ordre = 4 };
+                    await EnregistrerUniteAsync(conn, tx, dtech);
+
+                    var dcom = new UniteOrganisationnelle { Code = CodeUnique("DCOM", codesUnites), Libelle = "Direction Commerciale & Marketing", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#7C3AED", Ordre = 5 };
+                    await EnregistrerUniteAsync(conn, tx, dcom);
+
+                    // Services sous DAF et DRH
+                    await EnregistrerUniteAsync(conn, tx, new UniteOrganisationnelle { Code = CodeUnique("SRV-COMPTA", codesUnites), Libelle = "Service Comptabilité & Trésorerie", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = daf.Id, Couleur = "#2563EB", Ordre = 10 });
+                    await EnregistrerUniteAsync(conn, tx, new UniteOrganisationnelle { Code = CodeUnique("SRV-PAIE", codesUnites), Libelle = "Service Paie & Administration", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = drh.Id, Couleur = "#059669", Ordre = 20 });
+                    await EnregistrerUniteAsync(conn, tx, new UniteOrganisationnelle { Code = CodeUnique("SRV-REC", codesUnites), Libelle = "Service Recrutement & Formation", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = drh.Id, Couleur = "#10B981", Ordre = 21 });
+                    await EnregistrerUniteAsync(conn, tx, new UniteOrganisationnelle { Code = CodeUnique("SRV-INFO", codesUnites), Libelle = "Service Informatique & Systèmes", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = dtech.Id, Couleur = "#D97706", Ordre = 30 });
+                    creees += 9;
+
+                    // Postes clés types
+                    var pDG = new Poste { Code = CodeUnique("POSTE-DG", codesPostes), Intitule = "Directeur Général", UniteId = dg.Id, Classification = "Cadre Dirigeant", Missions = "Direction stratégique et générale de l'entreprise", EffectifRequis = 1, Ordre = 1 };
+                    await EnregistrerPosteAsync(conn, tx, pDG);
+
+                    var pDAF = new Poste { Code = CodeUnique("POSTE-DAF", codesPostes), Intitule = "Directeur Administratif et Financier", UniteId = daf.Id, SuperieurPosteId = pDG.Id, Classification = "Cadre Supérieur", Missions = "Gestion financière, comptable et trésorerie", EffectifRequis = 1, Ordre = 2 };
+                    await EnregistrerPosteAsync(conn, tx, pDAF);
+
+                    var pDRH = new Poste { Code = CodeUnique("POSTE-DRH", codesPostes), Intitule = "Directeur des Ressources Humaines", UniteId = drh.Id, SuperieurPosteId = pDG.Id, Classification = "Cadre Supérieur", Missions = "Politique RH, paie, dialogue social", EffectifRequis = 1, Ordre = 3 };
+                    await EnregistrerPosteAsync(conn, tx, pDRH);
+
+                    var pPaie = new Poste { Code = CodeUnique("POSTE-PAIE", codesPostes), Intitule = "Responsable Paie & RH", UniteId = drh.Id, SuperieurPosteId = pDRH.Id, Classification = "Cadre Moyen", Missions = "Gestion de la paie, déclarations CNSS et IUTS", EffectifRequis = 1, Ordre = 4 };
+                    await EnregistrerPosteAsync(conn, tx, pPaie);
+                }
+
+                tx.Commit();
+            }
+
+            return creees;
+        }
+
+        /// <summary>Services distincts portés par les fiches salariés (libellés tels quels, sans les vides).</summary>
+        private async Task<List<string>> ChargerServicesDesSalariesAsync()
+        {
             var servicesPresents = new List<string>();
             using (var conn = _sqliteService.CreateConnection())
             using (var cmd = conn.CreateCommand())
@@ -804,82 +1258,76 @@ namespace IUTSCalculator.Services
                     }
                 }
             }
-
-            if (servicesPresents.Count > 0)
-            {
-                // Créer une Direction Générale racine
-                var dg = new UniteOrganisationnelle
-                {
-                    Code = "DG",
-                    Libelle = "Direction Générale",
-                    TypeUnite = TypeUniteOrganisationnelle.DirectionGenerale,
-                    Couleur = "#0A3E35",
-                    Ordre = 1
-                };
-                await EnregistrerUniteAsync(dg);
-
-                // Créer chaque service rattaché à la DG
-                int ordre = 10;
-                foreach (var srv in servicesPresents)
-                {
-                    string code = GenererCodeCourt(srv);
-                    var u = new UniteOrganisationnelle
-                    {
-                        Code = code,
-                        Libelle = srv,
-                        TypeUnite = TypeUniteOrganisationnelle.Service,
-                        ParentId = dg.Id,
-                        Couleur = "#14675A",
-                        Ordre = ordre++
-                    };
-                    await EnregistrerUniteAsync(u);
-                }
-            }
-            else
-            {
-                // Structure standard type burkinabè
-                var dg = new UniteOrganisationnelle { Code = "DG", Libelle = "Direction Générale", TypeUnite = TypeUniteOrganisationnelle.DirectionGenerale, Couleur = "#0A3E35", Ordre = 1 };
-                await EnregistrerUniteAsync(dg);
-
-                var daf = new UniteOrganisationnelle { Code = "DAF", Libelle = "Direction Administrative et Financière", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#1E40AF", Ordre = 2 };
-                await EnregistrerUniteAsync(daf);
-
-                var drh = new UniteOrganisationnelle { Code = "DRH", Libelle = "Direction des Ressources Humaines", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#14675A", Ordre = 3 };
-                await EnregistrerUniteAsync(drh);
-
-                var dtech = new UniteOrganisationnelle { Code = "DTECH", Libelle = "Direction Technique & Exploitation", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#B45309", Ordre = 4 };
-                await EnregistrerUniteAsync(dtech);
-
-                var dcom = new UniteOrganisationnelle { Code = "DCOM", Libelle = "Direction Commerciale & Marketing", TypeUnite = TypeUniteOrganisationnelle.Direction, ParentId = dg.Id, Couleur = "#7C3AED", Ordre = 5 };
-                await EnregistrerUniteAsync(dcom);
-
-                // Services sous DAF et DRH
-                await EnregistrerUniteAsync(new UniteOrganisationnelle { Code = "SRV-COMPTA", Libelle = "Service Comptabilité & Trésorerie", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = daf.Id, Couleur = "#2563EB", Ordre = 10 });
-                await EnregistrerUniteAsync(new UniteOrganisationnelle { Code = "SRV-PAIE", Libelle = "Service Paie & Administration", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = drh.Id, Couleur = "#059669", Ordre = 20 });
-                await EnregistrerUniteAsync(new UniteOrganisationnelle { Code = "SRV-REC", Libelle = "Service Recrutement & Formation", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = drh.Id, Couleur = "#10B981", Ordre = 21 });
-                await EnregistrerUniteAsync(new UniteOrganisationnelle { Code = "SRV-INFO", Libelle = "Service Informatique & Systèmes", TypeUnite = TypeUniteOrganisationnelle.Service, ParentId = dtech.Id, Couleur = "#D97706", Ordre = 30 });
-
-                // Postes clés types
-                var pDG = new Poste { Code = "POSTE-DG", Intitule = "Directeur Général", UniteId = dg.Id, Classification = "Cadre Dirigeant", Missions = "Direction stratégique et générale de l'entreprise", EffectifRequis = 1, Ordre = 1 };
-                await EnregistrerPosteAsync(pDG);
-
-                var pDAF = new Poste { Code = "POSTE-DAF", Intitule = "Directeur Administratif et Financier", UniteId = daf.Id, SuperieurPosteId = pDG.Id, Classification = "Cadre Supérieur", Missions = "Gestion financière, comptable et trésorerie", EffectifRequis = 1, Ordre = 2 };
-                await EnregistrerPosteAsync(pDAF);
-
-                var pDRH = new Poste { Code = "POSTE-DRH", Intitule = "Directeur des Ressources Humaines", UniteId = drh.Id, SuperieurPosteId = pDG.Id, Classification = "Cadre Supérieur", Missions = "Politique RH, paie, dialogue social", EffectifRequis = 1, Ordre = 3 };
-                await EnregistrerPosteAsync(pDRH);
-
-                var pPaie = new Poste { Code = "POSTE-PAIE", Intitule = "Responsable Paie & RH", UniteId = drh.Id, SuperieurPosteId = pDRH.Id, Classification = "Cadre Moyen", Missions = "Gestion de la paie, déclarations CNSS et IUTS", EffectifRequis = 1, Ordre = 4 };
-                await EnregistrerPosteAsync(pPaie);
-            }
+            return servicesPresents;
         }
 
-        private static string GenererCodeCourt(string libelle)
+        private static async Task<HashSet<string>> ChargerCodesAsync(SQLiteConnection conn, SQLiteTransaction tx, string table)
+        {
+            var codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                // Nom de table : constante interne (UnitesOrganisationnelles ou Postes).
+                cmd.CommandText = "SELECT Code FROM " + table + " WHERE Code IS NOT NULL;";
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var c = DbValue.TextFromDb(reader["Code"]);
+                        if (!string.IsNullOrWhiteSpace(c)) codes.Add(c.Trim());
+                    }
+                }
+            }
+            return codes;
+        }
+
+        /// <summary>
+        /// Services à créer : ceux dont aucune unité ne porte déjà le libellé, en comparant
+        /// comme le décompte des effectifs (libellé exact, espaces de bord ignorés), sans doublon.
+        /// </summary>
+        public static List<string> ServicesSansUnite(IEnumerable<string> services, IEnumerable<string> libellesExistants)
+        {
+            var pris = new HashSet<string>(
+                (libellesExistants ?? Enumerable.Empty<string>()).Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => l.Trim()),
+                StringComparer.Ordinal);
+            var resultat = new List<string>();
+            foreach (var s in services ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(s)) continue;
+                var libelle = s.Trim();
+                if (pris.Add(libelle)) resultat.Add(libelle);
+            }
+            return resultat;
+        }
+
+        /// <summary>
+        /// Rend un code unique parmi <paramref name="codesPris"/> (comparaison sans casse) en
+        /// lui ajoutant au besoin un suffixe numérique (-2, -3…), puis le réserve. La longueur
+        /// de 12 caractères des codes générés est conservée en raccourcissant la racine.
+        /// </summary>
+        public static string CodeUnique(string codeSouhaite, ISet<string> codesPris)
+        {
+            var racine = string.IsNullOrWhiteSpace(codeSouhaite) ? "SRV" : codeSouhaite.Trim().ToUpperInvariant();
+            var code = racine;
+            int n = 2;
+            while (codesPris.Contains(code))
+            {
+                string suffixe = "-" + n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                int longueurMax = Math.Max(1, Math.Max(12, racine.Length) - suffixe.Length);
+                code = (racine.Length > longueurMax ? racine.Substring(0, longueurMax) : racine).TrimEnd('-') + suffixe;
+                n++;
+            }
+            codesPris.Add(code);
+            return code;
+        }
+
+        public static string GenererCodeCourt(string libelle)
         {
             if (string.IsNullOrWhiteSpace(libelle)) return "SRV";
 
             var clean = libelle.Trim().ToUpperInvariant();
-            var mots = clean.Split(new[] { ' ', '-', '_', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var mots = clean.Split(new[] { ' ', '-', '_', '/', '\'', '’' }, StringSplitOptions.RemoveEmptyEntries);
+            if (mots.Length == 0) return "SRV";
             if (mots.Length == 1)
             {
                 return mots[0].Length <= 8 ? mots[0] : mots[0].Substring(0, 6);

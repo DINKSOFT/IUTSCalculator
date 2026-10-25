@@ -1,4 +1,4 @@
-<Window x:Class="IUTSCalculator.MainWindow"
+﻿<Window x:Class="IUTSCalculator.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -85,6 +85,34 @@
 
             <DataTemplate DataType="{x:Type viewModels:OrganigrammeViewModel}">
                 <views:OrganigrammeView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:SuiviPostesBudgetViewModel}">
+                <views:SuiviPostesBudgetView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:EntretiensEvaluationsViewModel}">
+                <views:EntretiensEvaluationsView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:FormationViewModel}">
+                <views:FormationView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:RecrutementViewModel}">
+                <views:RecrutementView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:GestionTempsViewModel}">
+                <views:GestionTempsView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:DisciplineViewModel}">
+                <views:DisciplineView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type viewModels:SanteSecuriteViewModel}">
+                <views:SanteSecuriteView />
             </DataTemplate>
 
             <DataTemplate DataType="{x:Type viewModels:EcriturePaieViewModel}">
@@ -636,6 +664,118 @@
                             </Button.Style>
                         </Button>
 
+                        <Button Tag="{StaticResource IconBuilding}" Content="Suivi budgétaire des postes"
+                                Command="{Binding NavigateToSuiviPostesCommand}"
+                                Visibility="{Binding IsNavSuiviPostesVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Suivi Budgétaire des Postes">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconEmploye}" Content="Entretiens &amp; évaluations"
+                                Command="{Binding NavigateToEntretiensCommand}"
+                                Visibility="{Binding IsNavEntretiensVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Entretiens &amp; Évaluations">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconBuilding}" Content="Formation &amp; TPA"
+                                Command="{Binding NavigateToFormationCommand}"
+                                Visibility="{Binding IsNavFormationVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Formation &amp; TPA">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconPeople}" Content="Recrutement &amp; vivier"
+                                Command="{Binding NavigateToRecrutementCommand}"
+                                Visibility="{Binding IsNavRecrutementVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Recrutement &amp; Candidatures">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconWarning}" Content="Discipline &amp; procédures"
+                                Command="{Binding NavigateToDisciplineCommand}"
+                                Visibility="{Binding IsNavDisciplineVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Discipline &amp; procédures">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconHealth}" Content="Santé &amp; sécurité au travail"
+                                Command="{Binding NavigateToSanteSecuriteCommand}"
+                                Visibility="{Binding IsNavSanteSecuriteVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Santé &amp; sécurité au travail">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Tag="{StaticResource IconHistory}" Content="Gestion des temps &amp; rotations"
+                                Command="{Binding NavigateToGestionTempsCommand}"
+                                Visibility="{Binding IsNavGestionTempsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource NavItemStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentViewModel.Title}" Value="Gestion des temps &amp; rotations">
+                                            <Setter Property="Background" Value="{StaticResource AccentBrush2}"/>
+                                            <Setter Property="Foreground" Value="{StaticResource WhiteBrush}"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <!-- ───── PARAMÉTRAGE ───── -->
                         <TextBlock Text="PARAMÉTRAGE" Style="{StaticResource NavGroupHeaderStyle}"
                                    Visibility="{Binding IsNavGroupParametrageVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
@@ -928,6 +1068,17 @@
                                 Click="ChangeDossier_Click"/>
                     </StackPanel>
 
+                    <!-- Profil « Lecture seule » : rappel permanent (défaut n° 10). Les écritures
+                         sont refusées par la base elle-même (GardeLectureSeule). -->
+                    <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Padding="12,4" CornerRadius="4"
+                            Background="#FFF4E5" BorderBrush="#E8A33D" BorderThickness="1"
+                            Visibility="{Binding IsReadOnly, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            ToolTip="Votre profil permet de consulter le dossier. Toute modification est refusée.">
+                        <TextBlock Text="LECTURE SEULE — consultation uniquement"
+                                   FontSize="11" FontWeight="SemiBold" Foreground="#8A4B00"/>
+                    </Border>
+
                     <Menu HorizontalAlignment="Right" VerticalAlignment="Center"
                           Background="Transparent" BorderThickness="0" Padding="0">
                         <MenuItem Padding="8,4">
@@ -938,6 +1089,10 @@
                                            Foreground="{StaticResource InkMutedBrush}"/>
                             </MenuItem.Header>
 
+                            <MenuItem x:Name="MenuUtilisateurCourant" IsEnabled="False"/>
+                            <MenuItem x:Name="MenuGestionUtilisateurs" Header="Gestion des utilisateurs…" Click="GererUtilisateurs_Click"/>
+                            <MenuItem Header="Se déconnecter" Click="Deconnexion_Click"/>
+                            <Separator/>
                             <MenuItem Header="Nouveau calcul" Command="{Binding NewCalculationCommand}"/>
                             <MenuItem Header="Enregistrer" Command="{Binding SaveDataCommand}"/>
                             <MenuItem Header="Exporter en PDF" Command="{Binding ExportToPdfCommand}"/>
@@ -946,9 +1101,11 @@
                                       InputGestureText="Ctrl+B"
                                       Command="{Binding ToggleNavRailCommand}"/>
                             <MenuItem Header="Changer de dossier..." Click="ChangeDossier_Click"/>
+                            <MenuItem Header="Sauvegarder les données…" Click="Sauvegarder_Click"/>
                             <MenuItem Header="Préférences d'affichage" Click="DisplayPreferences_Click"/>
                             <Separator/>
                             <MenuItem Header="Documentation" Click="OpenDocumentation_Click"/>
+                            <MenuItem Header="Activer le logiciel / licence…" Click="ActiverLicence_Click"/>
                             <MenuItem Header="À propos" Click="About_Click"/>
                             <Separator/>
                             <MenuItem Header="Quitter" Click="Exit_Click"/>
@@ -975,6 +1132,8 @@
                                FontSize="11" Foreground="{StaticResource InkSubtleBrush}">
                         <Run Text="Dossier : "/>
                         <Run Text="{Binding CurrentDossierName, Mode=OneWay}"/>
+                        <Run Text="   ·   "/>
+                        <Run Text="{Binding VersionProgramme, Mode=OneWay}"/>
                     </TextBlock>
                 </Grid>
             </Border>

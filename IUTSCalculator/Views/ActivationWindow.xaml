@@ -1,0 +1,96 @@
+<Window x:Class="IUTSCalculator.Views.ActivationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="Activation de Sigma Paie &amp; RH"
+        Height="640" Width="760"
+        MinHeight="600" MinWidth="700"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        Background="{StaticResource GrayLightBrush}"
+        FontFamily="Segoe UI">
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- En-tête -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="Activation du logiciel" FontSize="22" FontWeight="Bold"
+                       Foreground="{StaticResource PrimaryBlueDarkerBrush}"/>
+            <TextBlock x:Name="SousTitre" FontSize="12" Margin="0,4,0,0"
+                       Foreground="{StaticResource GrayDarkBrush}" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Étape 1 : code de demande -->
+        <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="16" Margin="0,0,0,14"
+                BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="Étape 1 — Communiquez votre code de demande à l'éditeur"
+                           FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource InkBrush}"/>
+                <TextBlock Text="Ce code identifie cet ordinateur. Envoyez-le par WhatsApp ou par e-mail ; en retour vous recevrez un fichier de licence."
+                           FontSize="11" Foreground="{StaticResource GrayDarkBrush}" TextWrapping="Wrap" Margin="0,3,0,8"/>
+                <Border Background="{StaticResource GrayLightBrush}" CornerRadius="4" Padding="10,8"
+                        BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1">
+                    <DockPanel>
+                        <Button x:Name="BoutonCopier" Content="Copier" DockPanel.Dock="Right"
+                                Style="{StaticResource MenuButtonStyle}" MinWidth="80" Margin="8,0,0,0"
+                                Click="Copier_Click"/>
+                        <TextBox x:Name="ZoneCode" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                 FontFamily="Consolas" FontSize="15" FontWeight="Bold"
+                                 Foreground="{StaticResource PrimaryBlueDarkerBrush}"
+                                 VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Étape 2 : saisie de la licence -->
+        <Border Grid.Row="2" Background="White" CornerRadius="8" Padding="16"
+                BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Étape 2 — Importez la licence reçue"
+                           FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource InkBrush}"/>
+                <TextBlock Grid.Row="1" Text="Choisissez le fichier .lic qui vous a été envoyé, ou collez son contenu ci-dessous."
+                           FontSize="11" Foreground="{StaticResource GrayDarkBrush}" TextWrapping="Wrap" Margin="0,3,0,8"/>
+
+                <TextBox x:Name="ZoneLicence" Grid.Row="2" AcceptsReturn="True" TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11"
+                         MinHeight="120" Padding="8"
+                         BorderBrush="{StaticResource GrayMediumBrush}" BorderThickness="1"/>
+
+                <TextBlock x:Name="MessageEtat" Grid.Row="3" Margin="0,10,0,0" TextWrapping="Wrap"
+                           FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource RedBrush}"/>
+            </Grid>
+        </Border>
+
+        <!-- Boutons -->
+        <DockPanel Grid.Row="3" Margin="0,16,0,0" LastChildFill="False">
+            <Button x:Name="BoutonImporter" Content="Importer un fichier .lic…" DockPanel.Dock="Left"
+                    Style="{StaticResource SecondaryButtonStyle}" MinWidth="190" Height="36"
+                    Click="Importer_Click"/>
+
+            <Button x:Name="BoutonActiver" Content="Activer" DockPanel.Dock="Right"
+                    Style="{StaticResource PrimaryButtonStyle}" MinWidth="130" Height="36" Margin="8,0,0,0"
+                    Click="Activer_Click"/>
+            <Button x:Name="BoutonEssai" Content="Continuer en évaluation" DockPanel.Dock="Right"
+                    Style="{StaticResource SecondaryButtonStyle}" MinWidth="190" Height="36"
+                    Click="Essai_Click"/>
+            <Button x:Name="BoutonQuitter" Content="Quitter" DockPanel.Dock="Right"
+                    Style="{StaticResource SecondaryButtonStyle}" MinWidth="110" Height="36" Margin="0,0,8,0"
+                    Click="Quitter_Click"/>
+        </DockPanel>
+    </Grid>
+</Window>

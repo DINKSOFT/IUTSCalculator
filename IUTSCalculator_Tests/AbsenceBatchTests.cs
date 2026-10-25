@@ -103,8 +103,7 @@ namespace IUTSCalculator.Tests
                 Ville = "Ouagadougou"
             };
 
-            string dir = Path.GetDirectoryName(typeof(AbsenceBatchTests).Assembly.Location);
-            string tempExcel = Path.Combine(dir, "modele_conges_" + Guid.NewGuid().ToString("N") + ".xlsx");
+            string tempExcel = Path.Combine(Path.GetTempPath(), "modele_conges_" + Guid.NewGuid().ToString("N") + ".xlsx");
 
             try
             {

@@ -189,6 +189,7 @@ namespace IUTSCalculator.Services
             using (var conn = _sqliteService.CreateConnection())
             {
                 await VerifierPeriodeOuverteAsync(conn, annee, mois, null);
+                await VerifierHeuresSupSansDoublonAsync(conn, annee, mois, liste);
 
                 using (var tx = conn.BeginTransaction())
                 {
@@ -271,6 +272,57 @@ namespace IUTSCalculator.Services
         /// Refuse l'écriture si la période est clôturée. Même raisonnement que le verrou
         /// des bulletins : une clôture qui n'empêche rien n'est qu'une étiquette.
         /// </summary>
+        /// <summary>Code de la rubrique de saisie libre des heures supplémentaires.</summary>
+        public const string CodeHeuresSupLibre = "HSUP";
+
+        /// <summary>
+        /// Refuse une variable HSUP pour un salarié dont les heures supplémentaires du
+        /// même mois sont déjà saisies dans le module « Heures supplémentaires » : les deux
+        /// circuits s'additionnaient sur le bulletin et les heures étaient payées deux fois
+        /// (défaut n° 23 du guide). Un seul circuit par salarié et par mois.
+        /// </summary>
+        private static async Task VerifierHeuresSupSansDoublonAsync(
+            SQLiteConnection conn, int annee, int mois, IEnumerable<VariablePaie> variables)
+        {
+            var salaries = variables
+                .Where(v => string.Equals((v.CodeRubrique ?? "").Trim(), CodeHeuresSupLibre, StringComparison.OrdinalIgnoreCase))
+                .Select(v => v.EmployeeId)
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (salaries.Count == 0) return;
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='HeuresSupplementaires';";
+                if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 0) return;
+            }
+
+            var enDouble = new List<string>();
+            foreach (var employe in salaries)
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM HeuresSupplementaires " +
+                                      "WHERE Annee = @a AND Mois = @m AND EmployeeId = @e AND MontantTotal > 0;";
+                    cmd.Parameters.AddWithValue("@a", annee);
+                    cmd.Parameters.AddWithValue("@m", mois);
+                    cmd.Parameters.AddWithValue("@e", employe);
+                    if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0)
+                        enDouble.Add(employe);
+                }
+            }
+
+            if (enDouble.Count > 0)
+            {
+                throw new InvalidOperationException(string.Format(
+                    "Variable HSUP refusée pour {0} : les heures supplémentaires de {1:00}/{2} sont déjà saisies dans " +
+                    "l'écran « Heures supplémentaires ». Utilisez un seul circuit par salarié et par mois, sinon " +
+                    "les heures seraient payées deux fois. Rien n'a été enregistré.",
+                    string.Join(", ", enDouble), mois, annee));
+            }
+        }
+
         private static async Task VerifierPeriodeOuverteAsync(
             SQLiteConnection conn, int annee, int mois, SQLiteTransaction tx)
         {

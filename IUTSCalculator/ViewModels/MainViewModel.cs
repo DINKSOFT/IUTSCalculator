@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -100,6 +100,38 @@ namespace IUTSCalculator.ViewModels
         private readonly OrganigrammeExportService _organigrammeExportService;
         private readonly OrganigrammeViewModel _organigrammeViewModel;
 
+        // Suivi budgétaire des postes & compétences (module RH-02)
+        private readonly FichePosteService _fichePosteService;
+        private readonly FichePosteExportService _fichePosteExportService;
+        private readonly SuiviPostesBudgetViewModel _suiviPostesBudgetViewModel;
+
+        // Entretiens & évaluations (module RH-03)
+        private readonly EvaluationService _evaluationService;
+        private readonly EvaluationExportService _evaluationExportService;
+        private readonly EntretiensEvaluationsViewModel _entretiensEvaluationsViewModel;
+
+        // Formation & TPA (module RH-04)
+        private readonly FormationService _formationService;
+        private readonly FormationExportService _formationExportService;
+        private readonly FormationViewModel _formationViewModel;
+
+        // Recrutement & Candidatures (module RH-05)
+        private readonly RecrutementService _recrutementService;
+        private readonly RecrutementExportService _recrutementExportService;
+        private readonly RecrutementViewModel _recrutementViewModel;
+
+        // Discipline & procédures (module RH-06)
+        private readonly DisciplineService _disciplineService;
+        private readonly DisciplineViewModel _disciplineViewModel;
+
+        // Santé & sécurité au travail (module RH-07)
+        private readonly SanteSecuriteService _santeSecuriteService;
+        private readonly SanteSecuriteViewModel _santeSecuriteViewModel;
+
+        // Gestion des temps & rotations (module RH-08)
+        private readonly GestionTempsService _gestionTempsService;
+        private readonly GestionTempsViewModel _gestionTempsViewModel;
+
         public BaseViewModel CurrentViewModel
         {
             get => _currentViewModel;
@@ -114,6 +146,9 @@ namespace IUTSCalculator.ViewModels
                 }
             }
         }
+
+        /// <summary>« Version 1.4.37.1 du 19/10/2026 » (barre d'état).</summary>
+        public string VersionProgramme => "Version " + VersionApplication.Libelle;
 
         public string ApplicationTitle
         {
@@ -166,6 +201,13 @@ namespace IUTSCalculator.ViewModels
         public ICommand NavigateToRappelsCommand { get; private set; }
         public ICommand NavigateToAvantagesNatureCommand { get; private set; }
         public ICommand NavigateToOrganigrammeCommand { get; private set; }
+        public ICommand NavigateToSuiviPostesCommand { get; private set; }
+        public ICommand NavigateToEntretiensCommand { get; private set; }
+        public ICommand NavigateToFormationCommand { get; private set; }
+        public ICommand NavigateToRecrutementCommand { get; private set; }
+        public ICommand NavigateToGestionTempsCommand { get; private set; }
+        public ICommand NavigateToDisciplineCommand { get; private set; }
+        public ICommand NavigateToSanteSecuriteCommand { get; private set; }
 
         /// <summary>
         /// Indique si la barre de menu latéral (rail de navigation) est affichée.
@@ -245,6 +287,13 @@ namespace IUTSCalculator.ViewModels
         public bool IsNavBaremeVisible => IsItemVisible("Bareme");
         public bool IsNavConventionsVisible => IsItemVisible("Conventions");
         public bool IsNavOrganigrammeVisible => IsItemVisible("Organigramme");
+        public bool IsNavSuiviPostesVisible => IsItemVisible("SuiviPostes");
+        public bool IsNavEntretiensVisible => IsItemVisible("Entretiens");
+        public bool IsNavFormationVisible => IsItemVisible("Formation");
+        public bool IsNavRecrutementVisible => IsItemVisible("Recrutement");
+        public bool IsNavGestionTempsVisible => IsItemVisible("GestionTemps");
+        public bool IsNavDisciplineVisible => IsItemVisible("Discipline");
+        public bool IsNavSanteSecuriteVisible => IsItemVisible("SanteSecurite");
 
         public bool IsNavAuditVisible => IsItemVisible("Audit");
         public bool IsNavSettingsVisible => IsItemVisible("Parametres");
@@ -271,7 +320,7 @@ namespace IUTSCalculator.ViewModels
             _currentDossier = DossierSession.Instance.CurrentDossier
                 ?? throw new InvalidOperationException("Aucun dossier n'est ouvert. Sélectionnez un dossier avant de démarrer l'application.");
 
-            ApplicationTitle = $"IUTS Calculator - Calculatrice d'Impôt Unifié sur les Traitements et Salaires — Dossier : {_currentDossier.RaisonSociale}";
+            ApplicationTitle = $"Sigma Paie & RH {VersionApplication.Court} — Dossier : {_currentDossier.RaisonSociale}";
 
             // Initialisation des services (la base de données utilisée est celle du dossier ouvert,
             // ce qui garantit qu'aucun employé n'est mélangé entre deux entreprises différentes)
@@ -375,7 +424,8 @@ namespace IUTSCalculator.ViewModels
                 _conventionCollectiveService,
                 _rappelPaieService,
                 _avantageNatureService,
-                new PeriodePaieService(sqliteCalculs));
+                new PeriodePaieService(sqliteCalculs),
+                _saisieOppositionService);
             _batchSalaryCalculationViewModel = new BatchSalaryCalculationViewModel(
                 _dataService,
                 _taxCalculatorService,
@@ -389,7 +439,9 @@ namespace IUTSCalculator.ViewModels
                 _conventionCollectiveService,
                 _rappelPaieService,
                 _avantageNatureService,
-                new PeriodePaieService(sqliteCalculs));
+                new PeriodePaieService(sqliteCalculs),
+                _saisieOppositionService,
+                new BulletinService(_taxCalculatorService));
 
             // Initialisation du ViewModel pour le bulletin de paie
             _bulletinViewModel = new BulletinViewModel(
@@ -561,22 +613,91 @@ namespace IUTSCalculator.ViewModels
                 new PretService(sqliteSolde),
                 _taxCalculatorService);
             _soldeToutCompteExportService = new SoldeToutCompteExportService();
+            // Bulletin de sortie (défaut n° 1 du guide) : même chaîne que « Bulletin de paie ».
+            var chaineSortie = new ChaineBulletinService(
+                _dataService, new BulletinService(_taxCalculatorService), new BaremeService(sqliteSolde),
+                new RubriqueService(sqliteSolde), new VariablePaieService(sqliteSolde), new AbsenceService(sqliteSolde),
+                new PretService(sqliteSolde), new ProfilPaieService(sqliteSolde), _heureSupplementaireService,
+                _conventionCollectiveService, _rappelPaieService, _avantageNatureService, _saisieOppositionService);
             _soldeToutCompteViewModel = new SoldeToutCompteViewModel(
                 sqliteSolde,
                 _dataService,
                 _soldeToutCompteService,
                 _soldeToutCompteExportService,
-                _currentDossier);
+                _currentDossier,
+                chaineSortie,
+                new RubriqueService(sqliteSolde));
 
             // Organigramme d'entreprise et rattachements hiérarchiques (module RH-01)
             var sqliteOrganigramme = new SQLiteService(_currentDossier.DbFileName);
             _organigrammeService = new OrganigrammeService(sqliteOrganigramme);
             _organigrammeExportService = new OrganigrammeExportService();
+
+            // Fiches de poste et référentiel GPEC (module RH-02)
+            var sqliteFichePoste = new SQLiteService(_currentDossier.DbFileName);
+            _fichePosteService = new FichePosteService(sqliteFichePoste);
+            _fichePosteExportService = new FichePosteExportService();
+            _suiviPostesBudgetViewModel = new SuiviPostesBudgetViewModel(
+                _fichePosteService,
+                _fichePosteExportService,
+                _organigrammeService,
+                _currentDossier);
+
             _organigrammeViewModel = new OrganigrammeViewModel(
                 _organigrammeService,
                 _organigrammeExportService,
                 _dataService,
+                _currentDossier,
+                _fichePosteService,
+                _fichePosteExportService,
+                _conventionCollectiveService);
+
+            // Entretiens & évaluations des performances (module RH-03)
+            var sqliteEvaluation = new SQLiteService(_currentDossier.DbFileName);
+            _evaluationService = new EvaluationService(sqliteEvaluation, _organigrammeService);
+            _evaluationExportService = new EvaluationExportService();
+            _entretiensEvaluationsViewModel = new EntretiensEvaluationsViewModel(
+                _evaluationService,
+                _evaluationExportService,
+                _organigrammeService,
+                _fichePosteService,
+                _dataService,
                 _currentDossier);
+
+            // Formation & TPA (module RH-04)
+            var sqliteFormation = new SQLiteService(_currentDossier.DbFileName);
+            _formationService = new FormationService(sqliteFormation);
+            _formationExportService = new FormationExportService();
+            _formationViewModel = new FormationViewModel(
+                _formationService,
+                _formationExportService,
+                _fichePosteService,
+                _dataService,
+                _currentDossier);
+
+            // Recrutement & Candidatures (module RH-05)
+            var sqliteRecrutement = new SQLiteService(_currentDossier.DbFileName);
+            _recrutementService = new RecrutementService(sqliteRecrutement, _dataService);
+            _recrutementExportService = new RecrutementExportService();
+            _recrutementViewModel = new RecrutementViewModel(
+                _recrutementService,
+                _recrutementExportService,
+                _organigrammeService,
+                _dataService);
+
+            // Gestion des temps & rotations (module RH-08). Le chargement se fait à
+            // l'affichage de l'écran (OnIsActiveChanged) : rien n'est lu au démarrage.
+            var sqliteTemps = new SQLiteService(_currentDossier.DbFileName);
+            _gestionTempsService = new GestionTempsService(sqliteTemps, _dataService);
+            _gestionTempsViewModel = new GestionTempsViewModel(_gestionTempsService, _dataService, sqliteTemps);
+
+            // Discipline & procédures (module RH-06). Chargement à l'affichage de l'écran.
+            _disciplineService = new DisciplineService(new SQLiteService(_currentDossier.DbFileName));
+            _disciplineViewModel = new DisciplineViewModel(_disciplineService, _dataService);
+
+            // Santé & sécurité au travail (module RH-07). Chargement à l'affichage de l'écran.
+            _santeSecuriteService = new SanteSecuriteService(new SQLiteService(_currentDossier.DbFileName));
+            _santeSecuriteViewModel = new SanteSecuriteViewModel(_santeSecuriteService, _dataService);
 
             // Navigation par défaut
             CurrentViewModel = _calculationViewModel;
@@ -620,11 +741,11 @@ namespace IUTSCalculator.ViewModels
 
             SaveDataCommand = new RelayCommand(
                 async () => await SaveAllDataAsync(),
-                () => !IsBusy);
+                () => !IsBusy && CanEditData);
 
             NewCalculationCommand = new RelayCommand(
                 execute: CreateNewCalculation,
-                canExecute: () => !IsBusy);
+                canExecute: () => !IsBusy && CanEditData);
 
             NavigateToEmployeeManagementCommand = new RelayCommand(NavigateToEmployeeManagement);
 
@@ -752,6 +873,50 @@ namespace IUTSCalculator.ViewModels
                 },
                 canExecute: () => true);
 
+            NavigateToSuiviPostesCommand = new RelayCommand(
+                execute: () =>
+                {
+                    _ = _suiviPostesBudgetViewModel.ChargerToutAsync();
+                    NavigateTo(_suiviPostesBudgetViewModel);
+                },
+                canExecute: () => true);
+
+            NavigateToEntretiensCommand = new RelayCommand(
+                execute: () =>
+                {
+                    _ = _entretiensEvaluationsViewModel.ChargerToutAsync();
+                    NavigateTo(_entretiensEvaluationsViewModel);
+                },
+                canExecute: () => true);
+
+            NavigateToFormationCommand = new RelayCommand(
+                execute: () =>
+                {
+                    _ = _formationViewModel.ChargerToutAsync();
+                    NavigateTo(_formationViewModel);
+                },
+                canExecute: () => true);
+
+            NavigateToRecrutementCommand = new RelayCommand(
+                execute: () =>
+                {
+                    _ = _recrutementViewModel.ChargerToutesDonneesAsync();
+                    NavigateTo(_recrutementViewModel);
+                },
+                canExecute: () => true);
+
+            NavigateToGestionTempsCommand = new RelayCommand(
+                execute: () => NavigateTo(_gestionTempsViewModel),
+                canExecute: () => true);
+
+            NavigateToDisciplineCommand = new RelayCommand(
+                execute: () => NavigateTo(_disciplineViewModel),
+                canExecute: () => true);
+
+            NavigateToSanteSecuriteCommand = new RelayCommand(
+                execute: () => NavigateTo(_santeSecuriteViewModel),
+                canExecute: () => true);
+
             ToggleNavRailCommand = new RelayCommand(
                 execute: () => IsNavRailVisible = !IsNavRailVisible);
 
@@ -811,6 +976,19 @@ namespace IUTSCalculator.ViewModels
         {
             if (viewModel == null)
                 throw new ArgumentNullException(nameof(viewModel));
+
+            // Verrouillage par licence : un écran dont le module n'est pas couvert reste
+            // inaccessible. En période d'évaluation, tous les modules sont ouverts.
+            if (!Licensing.LicenceService.Instance.EstModuleAutorise(viewModel.GetType().Name))
+            {
+                Licensing.GardeIntegrite.Sonder();
+                StatusMessage = "Module non inclus dans votre licence.";
+                System.Windows.MessageBox.Show(
+                    "Le module « " + viewModel.Title + " » n'est pas inclus dans votre licence.\n\n" +
+                    "Contactez l'éditeur pour l'activer.",
+                    "Sigma Paie & RH", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                return;
+            }
 
             if (CurrentViewModel != null)
                 CurrentViewModel.IsActive = false;
@@ -900,6 +1078,13 @@ namespace IUTSCalculator.ViewModels
 
         private void NavigateToEmployeeManagement()
         {
+            if (!Licensing.LicenceService.Instance.EstModuleAutorise("EmployeeManagementViewModel"))
+            {
+                Licensing.GardeIntegrite.Sonder();
+                StatusMessage = "Module non inclus dans votre licence.";
+                return;
+            }
+
             // Contrairement aux autres écrans, celui-ci est reconstruit à chaque visite (et
             // non réutilisé comme les VM singletons) : voir le commentaire du constructeur.
             // Mais comme NavigateTo(), il doit d'abord désactiver l'écran quitté — sans quoi
@@ -971,6 +1156,20 @@ namespace IUTSCalculator.ViewModels
             // ───── RESSOURCES HUMAINES ─────
             _navMenuItems.Add(new NavMenuItemDefinition("Organigramme", "RH", "Organigramme",
                 "organigramme directions services postes fonctions rattachements hierarchiques n+1 structure organisation ressources humaines rh", NavigateToOrganigrammeCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("SuiviPostes", "RH", "Suivi budgétaire des postes",
+                "suivi budgetaire des postes budget pourvu effectifs vacants sureffectif gpec fiches de poste competences referentiel ressources humaines rh", NavigateToSuiviPostesCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("Entretiens", "RH", "Entretiens & évaluations",
+                "entretiens evaluations evaluation performance notation objectifs n-1 n+1 grilles competences campagnes annuelles rh ressources humaines", NavigateToEntretiensCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("Formation", "RH", "Formation & TPA",
+                "formation tpa fafpa sessions participants plan de formation budget competences acquis attestation rh ressources humaines apprentissage", NavigateToFormationCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("Recrutement", "RH", "Recrutement & vivier",
+                "recrutement candidatures vivier talents cv entretiens embauche offre poste sal-01 rh ressources humaines", NavigateToRecrutementCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("Discipline", "RH", "Discipline & procédures",
+                "discipline disciplinaire procedure sanction sanctions avertissement blame mise a pied conservatoire licenciement faute lourde grave demande d explication entretien prealable notification registre rh-06 rh ressources humaines", NavigateToDisciplineCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("SanteSecurite", "RH", "Santé & sécurité au travail",
+                "sante securite sst hygiene accident accidents du travail at trajet maladie professionnelle declaration cnss inspection 48 heures arret indemnite journaliere ij visite medicale medecin aptitude embauche reprise epi equipement protection individuelle casque chaussures gants dotation rh-07 rh ressources humaines", NavigateToSanteSecuriteCommand));
+            _navMenuItems.Add(new NavMenuItemDefinition("GestionTemps", "RH", "Gestion des temps & rotations",
+                "gestion des temps rotations rotation planning equipes equipe poste quart jour nuit roulement pointage badgeuse heures supplementaires paniers panier cycle 7j 7n rh-08 rh ressources humaines", NavigateToGestionTempsCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("EcriturePaie", "DECLARATIONS", "Écritures de paie",
                 "ecritures de paie comptabilite compta syscohada od pieces debits credits 66 42 43 44 journal comptable", NavigateToEcriturePaieCommand));
             _navMenuItems.Add(new NavMenuItemDefinition("OrdreVirement", "DECLARATIONS", "Ordres de virement",

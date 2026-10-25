@@ -15,11 +15,12 @@ namespace IUTSCalculator.Tests.ViewModels
         {
             // MainViewModel nécessite désormais qu'un dossier (entreprise) soit ouvert
             // (voir Services/DossierSession.cs) avant de pouvoir être instancié.
+            string tempDb = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"mvm_tests_{System.Guid.NewGuid():N}.db");
             DossierSession.Instance.Open(new Dossier
             {
                 DossierId = "test-dossier",
                 RaisonSociale = "Dossier de test",
-                DbFileName = "iuts_data_tests.db"
+                DbFileName = tempDb
             });
         }
 

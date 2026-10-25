@@ -488,9 +488,9 @@
                     </Grid.Style>
 
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*"/>
-                        <ColumnDefinition Width="14"/>
-                        <ColumnDefinition Width="1.2*"/>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="1.6*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Tableau des postes -->
@@ -504,7 +504,9 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="RÉPERTOIRE DES POSTES" Style="{StaticResource SectionLabelStyle}" Margin="0,0,12,0"/>
                                 <ComboBox Width="110" Style="{StaticResource FormComboBoxStyle}"
-                                          SelectedItem="{Binding FiltreStatutPoste}">
+                                          SelectedValuePath="Content"
+                                          SelectedValue="{Binding FiltreStatutPoste}"
+                                          ToolTip="Pourvus : au moins un titulaire actif. Vacants : aucun titulaire actif.">
                                     <ComboBoxItem Content="Tous"/>
                                     <ComboBoxItem Content="Pourvus"/>
                                     <ComboBoxItem Content="Vacants"/>
@@ -521,73 +523,276 @@
                                   Style="{StaticResource FormDataGridStyle}"
                                   IsReadOnly="True" AutoGenerateColumns="False">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Code" Binding="{Binding Code, Mode=OneWay}" Width="85"/>
+                                <DataGridTextColumn Header="Code" Binding="{Binding Code, Mode=OneWay}" Width="75"/>
                                 <DataGridTextColumn Header="Intitulé du Poste" Binding="{Binding Intitule, Mode=OneWay}" Width="*"/>
-                                <DataGridTextColumn Header="Direction / Service" Binding="{Binding UniteLibelle, Mode=OneWay}" Width="130"/>
-                                <DataGridTextColumn Header="N+1 Direct" Binding="{Binding SuperieurPosteIntitule, Mode=OneWay}" Width="130"/>
-                                <DataGridTextColumn Header="Titulaire" Binding="{Binding TitulaireNom, Mode=OneWay}" Width="130"/>
-                                <DataGridTextColumn Header="Classification" Binding="{Binding Classification, Mode=OneWay}" Width="100"/>
-                                <DataGridTextColumn Header="Requis" Binding="{Binding EffectifRequis, Mode=OneWay}" Width="60"/>
-                                <DataGridTextColumn Header="Statut" Binding="{Binding StatutOccupation, Mode=OneWay}" Width="80"/>
+                                <DataGridTextColumn Header="Service" Binding="{Binding UniteLibelle, Mode=OneWay}" Width="110"/>
+                                <DataGridTextColumn Header="Effectif GPEC" Binding="{Binding BadgeEffectifGpec, Mode=OneWay}" Width="90"/>
+                                <DataGridTextColumn Header="Statut" Binding="{Binding StatutOccupationGpec, Mode=OneWay}" Width="75"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
 
-                    <!-- Formulaire latéral droit Poste -->
+                    <!-- Formulaire latéral droit : Fiche de poste complète -->
                     <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="16" Background="{StaticResource SurfaceAltBrush}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="FICHE DU POSTE" Style="{StaticResource SectionLabelStyle}" Margin="0,0,0,12"/>
+                                <DockPanel Margin="0,0,0,12">
+                                    <TextBlock Text="FICHE DE POSTE DÉTAILLÉE" Style="{StaticResource SectionLabelStyle}" VerticalAlignment="Center"/>
+                                    <Button Content="Exporter Fiche PDF" Tag="{StaticResource IconPdf}"
+                                            Style="{StaticResource MenuButtonStyle}" HorizontalAlignment="Right" Padding="10,4"
+                                            Command="{Binding ExporterFichePostePdfCommand}"/>
+                                </DockPanel>
 
-                                <TextBlock Text="Code Poste :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <TextBox Text="{Binding PosteEnEdition.Code, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,8"/>
+                                <!-- 1. Identification du poste -->
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="1. IDENTIFICATION &amp; RATTACHEMENT" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,0,0,8"/>
 
-                                <TextBlock Text="Intitulé du poste :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <TextBox Text="{Binding PosteEnEdition.Intitule, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,8"/>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <TextBlock Text="Code :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.Code, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                                <TextBlock Text="Intitulé du poste :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.Intitule, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Effectif budgété :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.EffectifRequis, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
 
-                                <TextBlock Text="Unité de rattachement (Service/Direction) :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <ComboBox ItemsSource="{Binding UnitesRattachementDisponibles}"
-                                          SelectedValue="{Binding PosteEnEdition.UniteId}"
-                                          SelectedValuePath="Id"
-                                          DisplayMemberPath="DisplayName"
-                                          Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,8"/>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <TextBlock Text="Unité / Direction :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <ComboBox ItemsSource="{Binding UnitesRattachementDisponibles}"
+                                                          SelectedValue="{Binding PosteEnEdition.UniteId}"
+                                                          SelectedValuePath="Id"
+                                                          DisplayMemberPath="DisplayName"
+                                                          Style="{StaticResource FormComboBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Supérieur direct N+1 :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <ComboBox ItemsSource="{Binding SuperieursDisponibles}"
+                                                          SelectedValue="{Binding PosteEnEdition.SuperieurPosteId}"
+                                                          SelectedValuePath="Id"
+                                                          DisplayMemberPath="DisplayName"
+                                                          Style="{StaticResource FormComboBoxStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
 
-                                <TextBlock Text="Supérieur hiérarchique N+1 :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <ComboBox ItemsSource="{Binding SuperieursDisponibles}"
-                                          SelectedValue="{Binding PosteEnEdition.SuperieurPosteId}"
-                                          SelectedValuePath="Id"
-                                          DisplayMemberPath="DisplayName"
-                                          Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,8"/>
+                                <!-- 2. Missions & Activités clés -->
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="2. MISSIONS &amp; ACTIVITÉS CLÉS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,0,0,8"/>
 
-                                <TextBlock Text="Salarié titulaire du poste :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <ComboBox ItemsSource="{Binding TitulairesDisponibles}"
-                                          SelectedValue="{Binding PosteEnEdition.TitulaireMatricule}"
-                                          SelectedValuePath="EmployeeId"
-                                          DisplayMemberPath="FullNameWithId"
-                                          Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Finalité principale du poste :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                        <TextBox Text="{Binding PosteEnEdition.FinalitePrincipale, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="45" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,6"/>
 
-                                <TextBlock Text="Classification conventionnelle (Catégorie/Échelon) :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <TextBox Text="{Binding PosteEnEdition.Classification, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,8"/>
+                                        <TextBlock Text="Activités clés &amp; Tâches régulières :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                        <TextBox Text="{Binding PosteEnEdition.ActivitesCles, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 Style="{StaticResource FormTextBoxStyle}"/>
+                                    </StackPanel>
+                                </Border>
 
-                                <TextBlock Text="Missions principales :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <TextBox Text="{Binding PosteEnEdition.Missions, UpdateSourceTrigger=PropertyChanged}"
-                                         Height="60" TextWrapping="Wrap" AcceptsReturn="True"
-                                         Style="{StaticResource FormTextBoxStyle}" Margin="0,0,0,8"/>
+                                <!-- 3. Profil requis & Conditions -->
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="3. PROFIL REQUIS &amp; CONDITIONS DE TRAVAIL" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,0,0,8"/>
 
-                                <TextBlock Text="Effectif requis (budgété) :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <TextBox Text="{Binding PosteEnEdition.EffectifRequis, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource FormTextBoxStyle}" Width="60" HorizontalAlignment="Left" Margin="0,0,0,16"/>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <TextBlock Text="Niveau d'étude :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.NiveauEtudeRequis, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                                <TextBlock Text="Diplôme exigé :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.DiplomeRequis, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Expérience (ans) :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.ExperienceMinimaleAnnees, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
 
-                                <!-- Boutons d'action -->
+                                        <TextBlock Text="Conditions particulières de travail (déplacements, horaires, etc.) :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                        <TextBox Text="{Binding PosteEnEdition.ConditionsTravail, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="40" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 Style="{StaticResource FormTextBoxStyle}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 4. Classification & Rémunération indicative -->
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="4. CLASSIFICATION CONVENTIONNELLE &amp; CADRE SALARIAL" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,0,0,8"/>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <TextBlock Text="Convention collective :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <!-- Référence à une convention du dossier (écran « Conventions & grilles ») : enregistrée dans Postes.ConventionId -->
+                                                <ComboBox ItemsSource="{Binding ConventionsDisponibles}"
+                                                          SelectedValue="{Binding PosteEnEdition.ConventionId}"
+                                                          SelectedValuePath="Id"
+                                                          DisplayMemberPath="Libelle"
+                                                          Style="{StaticResource FormComboBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                                <TextBlock Text="Catégorie conventionnelle :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.CategorieConventionnelle, UpdateSourceTrigger=LostFocus}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Échelon indicatif :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.EchelonConventionnel, UpdateSourceTrigger=LostFocus}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Ligne de la grille de la convention :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                        <ComboBox ItemsSource="{Binding GrilleConventionEnEdition}"
+                                                  SelectedItem="{Binding LigneGrilleSelectionnee}"
+                                                  Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,6"
+                                                  ToolTip="Choisir une ligne reporte la catégorie, l'échelon et le minimum de la grille sur la fiche"/>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                <TextBlock Text="Min. Convention (FCFA) :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <DockPanel LastChildFill="True">
+                                                    <Button DockPanel.Dock="Right" Content="Grille" Style="{StaticResource SecondaryButtonStyle}"
+                                                            Padding="6,2" Margin="4,0,0,0"
+                                                            Command="{Binding ActualiserSalaireConventionnelCommand}"
+                                                            ToolTip="Reprendre le minimum de la grille (convention, catégorie et échelon choisis)"/>
+                                                    <TextBox Text="{Binding PosteEnEdition.SalaireMinimumConventionnel, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:N0}'}" Style="{StaticResource FormTextBoxStyle}"/>
+                                                </DockPanel>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                                <TextBlock Text="Salaire Min Budgété :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.SalaireMinBudgete, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:N0}'}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Salaire Max Budgété :" Style="{StaticResource FormTextBlockLabelStyle}"/>
+                                                <TextBox Text="{Binding PosteEnEdition.SalaireMaxBudgete, UpdateSourceTrigger=PropertyChanged, StringFormat='{}{0:N0}'}" Style="{StaticResource FormTextBoxStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding InfoSalaireConventionnel, Mode=OneWay}" FontSize="10.5" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource InkSubtleBrush}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 5. Compétences requises -->
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="5. COMPÉTENCES REQUISES (CATALOGUE D'ENTREPRISE)" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,0,0,8"/>
+
+                                        <DataGrid ItemsSource="{Binding CompetencesPosteEnEdition}"
+                                                  SelectedItem="{Binding CompetencePosteSelectionnee}"
+                                                  Style="{StaticResource FormDataGridStyle}"
+                                                  MaxHeight="140" IsReadOnly="True" AutoGenerateColumns="False" Margin="0,0,0,8">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Code" Binding="{Binding CompetenceCode, Mode=OneWay}" Width="70"/>
+                                                <DataGridTextColumn Header="Compétence" Binding="{Binding CompetenceLibelle, Mode=OneWay}" Width="*"/>
+                                                <DataGridTextColumn Header="Domaine" Binding="{Binding DomaineLibelle, Mode=OneWay}" Width="100"/>
+                                                <DataGridTextColumn Header="Niveau" Binding="{Binding NiveauEtoilesAvecControle, Mode=OneWay}" Width="75"/>
+                                                <DataGridCheckBoxColumn Header="Requis" Binding="{Binding EstObligatoire, Mode=OneWay}" Width="55"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+
+                                        <!-- Barre d'ajout rapide de compétence -->
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="85"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox Grid.Column="0" ItemsSource="{Binding CompetencesDisponibles}"
+                                                      SelectedItem="{Binding CompetenceSelectionneePourAjout}"
+                                                      DisplayMemberPath="Libelle"
+                                                      Style="{StaticResource FormComboBoxStyle}" Margin="0,0,6,0"/>
+
+                                            <!-- La valeur choisie EST le niveau enregistré (1 à 4) -->
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding NiveauxMaitriseDisponibles}"
+                                                      SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                      SelectedValue="{Binding NiveauMaitrisePourAjout, Mode=TwoWay}"
+                                                      Style="{StaticResource FormComboBoxStyle}" Margin="0,0,6,0"/>
+
+                                            <CheckBox Grid.Column="2" Content="Requis" IsChecked="{Binding EstObligatoirePourAjout}"
+                                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                                            <Button Grid.Column="3" Content="Ajouter" Tag="{StaticResource IconAdd}"
+                                                    Style="{StaticResource MenuButtonStyle}" Margin="0,0,6,0" Padding="8,4"
+                                                    Command="{Binding AjouterCompetencePosteCommand}"
+                                                    ToolTip="Ajoute la compétence au poste, ou met à jour son niveau si elle y figure déjà"/>
+
+                                            <Button Grid.Column="4" Content="Retirer" Tag="{StaticResource IconDelete}"
+                                                    Style="{StaticResource SecondaryButtonStyle}" Padding="8,4"
+                                                    Command="{Binding SupprimerCompetencePosteCommand}"/>
+                                        </Grid>
+
+                                        <TextBlock Text="⚠ Niveau enregistré avant la correction du sélecteur (version 1.4.38) : à vérifier. Sélectionnez la ligne, choisissez le bon niveau puis « Ajouter » pour le confirmer."
+                                                   FontSize="10.5" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}" Margin="0,2,0,2"
+                                                   Visibility="{Binding AUnNiveauAVerifier, Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="{Binding InfoCompetences, Mode=OneWay}" FontSize="10.5" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource InkSubtleBrush}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 6. Titulaires actuels du poste -->
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <TextBlock Text="6. TITULAIRES ACTUELS DU POSTE (OCCUPATION RÉELLE)" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,0,0,8"/>
+
+                                        <DataGrid ItemsSource="{Binding TitulairesPosteEnEdition}"
+                                                  Style="{StaticResource FormDataGridStyle}"
+                                                  MaxHeight="120" IsReadOnly="True" AutoGenerateColumns="False">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Matricule" Binding="{Binding Matricule, Mode=OneWay}" Width="75"/>
+                                                <DataGridTextColumn Header="Nom &amp; Prénoms" Binding="{Binding NomComplet, Mode=OneWay}" Width="*"/>
+                                                <DataGridTextColumn Header="Embauche" Binding="{Binding DateEmbaucheTexte, Mode=OneWay}" Width="85"/>
+                                                <DataGridTextColumn Header="Contrat" Binding="{Binding TypeContrat, Mode=OneWay}" Width="70"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Boutons d'action enregistrement / suppression -->
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button Content="Supprimer" Tag="{StaticResource IconDelete}"
                                             Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"
                                             Command="{Binding SupprimerPosteCommand}"
                                             Visibility="{Binding EstEnEditionPoste, Converter={StaticResource BoolToVis}}"/>
-                                    <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                    <Button Content="Enregistrer le poste" Tag="{StaticResource IconSave}"
                                             Style="{StaticResource MenuButtonStyle}" Margin="0"
                                             Command="{Binding EnregistrerPosteCommand}"/>
                                 </StackPanel>
@@ -664,7 +869,7 @@
                                           Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,10"/>
 
                                 <TextBlock Text="Poste de travail occupé :" Style="{StaticResource FormTextBlockLabelStyle}"/>
-                                <ComboBox ItemsSource="{Binding Postes}"
+                                <ComboBox ItemsSource="{Binding PostesAffectationDisponibles}"
                                           SelectedItem="{Binding PosteAffectationChoisi}"
                                           DisplayMemberPath="DisplayName"
                                           Style="{StaticResource FormComboBoxStyle}" Margin="0,0,0,10"/>

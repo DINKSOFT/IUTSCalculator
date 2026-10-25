@@ -38,6 +38,11 @@
                 <Button Content="Actualiser" Tag="{StaticResource IconRefresh}"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Command="{Binding ActualiserCommand}" Margin="0,0,8,0"/>
+                <ComboBox Width="150" Height="30" Margin="0,0,6,0" VerticalAlignment="Center"
+                          Style="{StaticResource FormComboBoxStyle}"
+                          ItemsSource="{Binding MoisBordereauOptions}" DisplayMemberPath="Libelle"
+                          SelectedItem="{Binding MoisBordereau}"
+                          ToolTip="Mois de paie du bordereau de reversement"/>
                 <Button Content="Bordereau mensuel" Tag="{StaticResource IconExport}"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Command="{Binding ExporterBordereauCommand}" Margin="0,0,8,0"

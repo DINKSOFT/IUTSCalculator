@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\NUnit.4.3.2\build\NUnit.props" Condition="Exists('..\packages\NUnit.4.3.2\build\NUnit.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -72,8 +72,8 @@
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=9.0.0.6, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.9.0.6\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Bcl.Cryptography, Version=9.0.0.6, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Bcl.Cryptography.9.0.6\lib\net462\Microsoft.Bcl.Cryptography.dll</HintPath>
+    <Reference Include="Microsoft.Bcl.Cryptography, Version=9.0.0.20, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.Cryptography.9.0.20\lib\net462\Microsoft.Bcl.Cryptography.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Bcl.HashCode, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.HashCode.6.0.0\lib\net462\Microsoft.Bcl.HashCode.dll</HintPath>
@@ -106,10 +106,11 @@
     <Reference Include="System.Data.SQLite, Version=1.0.119.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
       <HintPath>..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.119.0\lib\net46\System.Data.SQLite.dll</HintPath>
     </Reference>
-    <Reference Include="System.Formats.Asn1, Version=9.0.0.6, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Formats.Asn1.9.0.6\lib\net462\System.Formats.Asn1.dll</HintPath>
+    <Reference Include="System.Formats.Asn1, Version=9.0.0.20, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Formats.Asn1.9.0.20\lib\net462\System.Formats.Asn1.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="System.Memory, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Memory.4.6.3\lib\net462\System.Memory.dll</HintPath>
     </Reference>
@@ -121,11 +122,12 @@
       <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.1.2\lib\net462\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
     <Reference Include="System.Security" />
+    <Reference Include="System.Management" />
     <Reference Include="System.Security.AccessControl, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Security.AccessControl.6.0.0\lib\net461\System.Security.AccessControl.dll</HintPath>
     </Reference>
-    <Reference Include="System.Security.Cryptography.Xml, Version=9.0.0.6, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Security.Cryptography.Xml.9.0.6\lib\net462\System.Security.Cryptography.Xml.dll</HintPath>
+    <Reference Include="System.Security.Cryptography.Xml, Version=9.0.0.20, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.Xml.9.0.20\lib\net462\System.Security.Cryptography.Xml.dll</HintPath>
     </Reference>
     <Reference Include="System.Security.Principal.Windows, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Security.Principal.Windows.5.0.0\lib\net461\System.Security.Principal.Windows.dll</HintPath>
@@ -171,6 +173,8 @@
     <Compile Include="Converters\DecimalToStringConverter.cs" />
     <Compile Include="Converters\StringEqualsConverter.cs" />
     <Compile Include="Helpers\Constants.cs" />
+    <Compile Include="Helpers\SauvegardeInteractive.cs" />
+    <Compile Include="Helpers\VersionApplication.cs" />
     <Compile Include="Helpers\EditionTranches.cs" />
     <Compile Include="Helpers\RelayCommand.cs" />
     <Compile Include="Models\AppSettings.cs" />
@@ -204,6 +208,14 @@
     <Compile Include="Models\ApportRappels.cs" />
     <Compile Include="Models\AvantageNature.cs" />
     <Compile Include="Models\Organigramme.cs" />
+    <Compile Include="Models\FichePoste.cs" />
+    <Compile Include="Models\Evaluation.cs" />
+    <Compile Include="Models\Formation.cs" />
+    <Compile Include="Models\Recrutement.cs" />
+    <Compile Include="Models\BaremeHeuresSup.cs" />
+    <Compile Include="Models\GestionTemps.cs" />
+    <Compile Include="Models\Discipline.cs" />
+    <Compile Include="Models\SanteSecurite.cs" />
     <Compile Include="Models\Dossier.cs" />
     <Compile Include="Models\PayslipMonthly.cs" />
     <Compile Include="Models\UserAccount.cs" />
@@ -214,6 +226,7 @@
     <Compile Include="Services\ExcelExportHelper.cs" />
     <Compile Include="Services\PDFExportService.cs" />
     <Compile Include="Services\BulletinService.cs" />
+    <Compile Include="Services\ChaineBulletinService.cs" />
     <Compile Include="Services\BulletinExportService.cs" />
     <Compile Include="Services\QrCodeService.cs" />
     <Compile Include="Services\DbValue.cs" />
@@ -258,6 +271,26 @@
     <Compile Include="Services\AvantageNatureExportService.cs" />
     <Compile Include="Services\OrganigrammeService.cs" />
     <Compile Include="Services\OrganigrammeExportService.cs" />
+    <Compile Include="Services\FichePosteService.cs" />
+    <Compile Include="Services\FichePosteExportService.cs" />
+    <Compile Include="Services\EvaluationService.cs" />
+    <Compile Include="Services\EvaluationExportService.cs" />
+    <Compile Include="Services\FormationService.cs" />
+    <Compile Include="Services\FormationExportService.cs" />
+    <Compile Include="Services\RecrutementService.cs" />
+    <Compile Include="Services\RecrutementExportService.cs" />
+    <Compile Include="Services\BaremeHeuresSupService.cs" />
+    <Compile Include="Services\CalculTemps.cs" />
+    <Compile Include="Services\GestionTempsService.cs" />
+    <Compile Include="Services\GestionTempsExcelService.cs" />
+    <Compile Include="Services\ControleDiscipline.cs" />
+    <Compile Include="Services\DisciplineService.cs" />
+    <Compile Include="Services\DisciplineExportService.cs" />
+    <Compile Include="Services\ControleSanteSecurite.cs" />
+    <Compile Include="Services\SanteSecuriteService.cs" />
+    <Compile Include="Services\GardeLectureSeule.cs" />
+    <Compile Include="Services\SauvegardeService.cs" />
+    <Compile Include="Services\SanteSecuriteExportService.cs" />
     <Compile Include="Services\RattrapageCnssService.cs" />
     <Compile Include="Services\SQLiteService.cs" />
     <Compile Include="Services\TaxCalculatorService.cs" />
@@ -304,6 +337,13 @@
     <Compile Include="ViewModels\RappelPaieViewModel.cs" />
     <Compile Include="ViewModels\AvantageNatureViewModel.cs" />
     <Compile Include="ViewModels\OrganigrammeViewModel.cs" />
+    <Compile Include="ViewModels\SuiviPostesBudgetViewModel.cs" />
+    <Compile Include="ViewModels\EntretiensEvaluationsViewModel.cs" />
+    <Compile Include="ViewModels\FormationViewModel.cs" />
+    <Compile Include="ViewModels\RecrutementViewModel.cs" />
+    <Compile Include="ViewModels\GestionTempsViewModel.cs" />
+    <Compile Include="ViewModels\DisciplineViewModel.cs" />
+    <Compile Include="ViewModels\SanteSecuriteViewModel.cs" />
     <Compile Include="ViewModels\SettingsViewModel.cs" />
     <Compile Include="Views\BaseSalaryEstimatorView.xaml.cs">
       <DependentUpon>BaseSalaryEstimatorView.xaml</DependentUpon>
@@ -317,8 +357,24 @@
     <Compile Include="Views\CalculationView.xaml.cs">
       <DependentUpon>CalculationView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Licensing\LicenceFormat.cs" />
+    <Compile Include="Licensing\LicenceModules.cs" />
+    <Compile Include="Licensing\LicenceClesPubliques.cs" />
+    <Compile Include="Licensing\EmpreinteMachine.cs" />
+    <Compile Include="Licensing\EtatLicence.cs" />
+    <Compile Include="Licensing\LicenceService.cs" />
+    <Compile Include="Licensing\GardeIntegrite.cs" />
     <Compile Include="Views\DossierSelectionWindow.xaml.cs">
       <DependentUpon>DossierSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\CreerAdminWindow.xaml.cs">
+      <DependentUpon>CreerAdminWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\UserManagementWindow.xaml.cs">
+      <DependentUpon>UserManagementWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ActivationWindow.xaml.cs">
+      <DependentUpon>ActivationWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\HistoryView.xaml.cs">
       <DependentUpon>HistoryView.xaml</DependentUpon>
@@ -410,6 +466,27 @@
     <Compile Include="Views\OrganigrammeView.xaml.cs">
       <DependentUpon>OrganigrammeView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\SuiviPostesBudgetView.xaml.cs">
+      <DependentUpon>SuiviPostesBudgetView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\EntretiensEvaluationsView.xaml.cs">
+      <DependentUpon>EntretiensEvaluationsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\FormationView.xaml.cs">
+      <DependentUpon>FormationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RecrutementView.xaml.cs">
+      <DependentUpon>RecrutementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\GestionTempsView.xaml.cs">
+      <DependentUpon>GestionTempsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DisciplineView.xaml.cs">
+      <DependentUpon>DisciplineView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SanteSecuriteView.xaml.cs">
+      <DependentUpon>SanteSecuriteView.xaml</DependentUpon>
+    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -443,6 +520,18 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\DossierSelectionWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\CreerAdminWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\UserManagementWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ActivationWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -563,6 +652,34 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\OrganigrammeView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SuiviPostesBudgetView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\EntretiensEvaluationsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\FormationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RecrutementView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\GestionTempsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DisciplineView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SanteSecuriteView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

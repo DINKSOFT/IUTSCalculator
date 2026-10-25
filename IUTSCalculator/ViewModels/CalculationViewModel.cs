@@ -23,6 +23,10 @@ namespace IUTSCalculator.ViewModels
         public bool IsAdmin => UserSession.Instance.IsAdmin;
         public bool IsReadOnly => UserSession.Instance.IsReadOnly;
         private readonly TaxCalculatorService _taxCalculatorService;
+        private readonly ChaineBulletinService _chaine;
+
+        /// <summary>Apport du dernier calcul mensuel, réutilisé à l'enregistrement.</summary>
+        private ApportVariables _dernierApport;
         public ObservableCollection<string> EmployeeCategories => _dataService.EmployeeCategories;
         private readonly DataService _dataService;
 
@@ -277,7 +281,8 @@ namespace IUTSCalculator.ViewModels
             ConventionCollectiveService conventionCollectiveService = null,
             RappelPaieService rappelPaieService = null,
             AvantageNatureService avantageNatureService = null,
-            PeriodePaieService periodePaieService = null)
+            PeriodePaieService periodePaieService = null,
+            SaisieOppositionService saisieOppositionService = null)
         {
             _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
@@ -292,6 +297,14 @@ namespace IUTSCalculator.ViewModels
             _rappelPaieService = rappelPaieService;
             _avantageNatureService = avantageNatureService;
             _periodePaieService = periodePaieService;
+
+            // Chaîne commune avec « Bulletin de paie » (défaut n° 4 du guide) : saisies sur
+            // salaire comprises, et un enregistrement mensuel qui archive un vrai bulletin.
+            _chaine = new ChaineBulletinService(
+                _dataService, new BulletinService(_taxCalculatorService), _baremeService, _rubriqueService,
+                _variablePaieService, _absenceService, _pretService, _profilPaieService,
+                _heureSupplementaireService, _conventionCollectiveService, _rappelPaieService,
+                _avantageNatureService, saisieOppositionService);
 
             Title = "Calcul d'IUTS";
 
@@ -484,13 +497,16 @@ namespace IUTSCalculator.ViewModels
                 // Recharger les catégories d'employés et autres paramètres depuis le service de données
                 var settings = await _dataService.LoadSettingsAsync();
 
-                // Mettre à jour les catégories si nécessaire
-                if (settings != null && settings.EmployeeCategories != null && settings.EmployeeCategories.Count > 0)
+                // Catégories : valeurs historiques + grilles du dossier + fiches existantes.
+                // La liste est partagée avec la fiche salarié : on ne la vide plus (la vider
+                // faisait perdre la catégorie affichée), on la complète.
+                await _dataService.RafraichirCategoriesAsync();
+                if (settings != null && settings.EmployeeCategories != null)
                 {
-                    EmployeeCategories.Clear();
                     foreach (var category in settings.EmployeeCategories)
                     {
-                        EmployeeCategories.Add(category);
+                        if (!string.IsNullOrWhiteSpace(category) && !EmployeeCategories.Contains(category))
+                            EmployeeCategories.Add(category);
                     }
                 }
 
@@ -630,8 +646,50 @@ namespace IUTSCalculator.ViewModels
                 {
                     // Paie du mois : elle remplace celle du même salarié pour le même mois.
                     // Sans ce remplacement, enregistrer deux fois déclarerait deux salaires.
-                    await _dataService.EnregistrerBulletinDuMoisAsync(CurrentCalculation, PeriodeDate);
-                    ResultMessage = $"Paie de {PeriodeLibelle} enregistrée pour ce salarié.";
+                    //
+                    // Défaut n° 4 du guide : l'enregistrement d'ici écrasait le bulletin
+                    // archivé du mois par un simple calcul, sans document ni saisies. Il
+                    // produit désormais le bulletin complet (archive, saisies, rappels), et
+                    // demande confirmation avant de remplacer un bulletin déjà enregistré.
+                    var employe = CurrentCalculation.Employee ?? CurrentEmployee;
+                    if (employe == null || string.IsNullOrWhiteSpace(employe.EmployeeId))
+                    {
+                        ResultMessage = "Chargez un salarié de la base avant d'enregistrer la paie d'un mois.";
+                        return;
+                    }
+
+                    var periode = new DateTime(Annee, Mois, 1);
+                    if (await _dataService.BulletinEnregistreAsync(employe.EmployeeId, periode))
+                    {
+                        var reponse = MessageBox.Show(
+                            string.Format(
+                                "Un bulletin est déjà enregistré pour {0} {1} en {2}.\n\n" +
+                                "L'enregistrer d'ici le remplace par un bulletin régénéré avec les valeurs de cet écran.\n\nContinuer ?",
+                                employe.FirstName, employe.LastName, PeriodeLibelle),
+                            "Calcul d'IUTS", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                        if (reponse != MessageBoxResult.Yes)
+                        {
+                            ResultMessage = "Enregistrement annulé : le bulletin du mois est conservé.";
+                            return;
+                        }
+                    }
+
+                    // Apport relu au moment d'enregistrer : la période ou le salarié ont pu
+                    // changer depuis le dernier « Calculer l'impôt ».
+                    var apport = await ChargerApportDuMoisAsync(employe);
+                    var resultat = await _chaine.PreparerAsync(
+                        employe, periode, 0m, ModesReglementPaie.ModeDeLaFiche, null, apport);
+                    await _chaine.EnregistrerAsync(resultat, employe, periode);
+
+                    if (resultat.Calcul != null)
+                    {
+                        resultat.Calcul.IsAnnual = false;
+                        resultat.Calcul.IsRegularization = false;
+                        CurrentCalculation = resultat.Calcul;
+                    }
+                    ResultMessage = $"Paie de {PeriodeLibelle} enregistrée pour ce salarié (bulletin archivé).";
+                    foreach (var avertissement in resultat.Avertissements)
+                        ResultMessage += " Attention : " + avertissement + ".";
                 }
             }
             catch (Exception ex)
@@ -674,150 +732,16 @@ namespace IUTSCalculator.ViewModels
         /// </summary>
         private async Task<ApportVariables> ChargerApportDuMoisAsync(Employee salarie)
         {
-            // Barème daté applicable à la période (module DEC-02 sur le socle SOC-02) :
-            // les taux CNSS et TPA du moteur suivent désormais la période calculée, plutôt
-            // que de rester figés aux valeurs historiques. Un dossier qui n'a jamais créé
-            // de barème personnalisé n'y voit aucun changement.
-            if (_baremeService != null)
-            {
-                try
-                {
-                    var bareme = await _baremeService.BaremeApplicableAsync(new DateTime(Annee, Mois, 1));
-                    _taxCalculatorService.AppliquerBareme(bareme);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Barème illisible, calcul avec les valeurs historiques : " + ex.Message;
-                    _taxCalculatorService.AppliquerBareme(null);
-                }
-            }
-
-            var apport = ApportVariables.Aucun();
-
+            // Même assemblage que le bulletin (ChaineBulletinService), saisies comprises :
+            // cet écran et le bulletin donnent le même résultat pour le même salarié.
             if (salarie == null || string.IsNullOrWhiteSpace(salarie.EmployeeId))
-                return apport;
-
-            if (_variablePaieService != null && _rubriqueService != null)
             {
-                try
-                {
-                    var plan = await _rubriqueService.ChargerAsync();
-                    apport = await _variablePaieService.ApportAsync(Annee, Mois, salarie.EmployeeId, plan);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Variables du mois illisibles, calcul sans elles : " + ex.Message;
-                }
+                await _chaine.AppliquerBaremeAsync(new DateTime(Annee, Mois, 1), m => ResultMessage = m);
+                return ApportVariables.Aucun();
             }
 
-            if (_absenceService != null)
-            {
-                try
-                {
-                    var reglages = await _dataService.LoadSettingsAsync();
-                    var baseRetenue = reglages != null
-                        ? reglages.BaseRetenueAbsence
-                        : BaseRetenueAbsence.TrentiemeMensuel;
-
-                    var absences = await _absenceService.ApportAsync(salarie, Annee, Mois, baseRetenue);
-                    apport = apport.AvecAbsences(absences);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Absences illisibles, calcul sans elles : " + ex.Message;
-                }
-            }
-
-            // Prêts, avances et acomptes (PAI-05) : retenue sur le net, comme sur le
-            // bulletin. Les quatre écrans qui produisent la paie prennent les mêmes
-            // entrées — sans quoi deux d'entre eux donneraient deux nets pour le même
-            // salarié et le même mois.
-            if (_pretService != null)
-            {
-                try
-                {
-                    var prets = await _pretService.ApportAsync(salarie.EmployeeId, Annee, Mois);
-                    apport = apport.AvecPrets(prets);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Prêts illisibles, calcul sans retenue de remboursement : " + ex.Message;
-                }
-            }
-
-            // Profil de paie (SOC-03), appliqué en dernier : une rubrique déjà saisie dans
-            // les variables du mois écarte celle du profil.
-            if (_profilPaieService != null && _rubriqueService != null)
-            {
-                try
-                {
-                    var plan = await _rubriqueService.ChargerAsync();
-                    var profil = await _profilPaieService.ApportAsync(salarie, Annee, Mois, plan);
-                    apport = apport.AvecProfil(profil);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Profil de paie illisible, calcul sans lui : " + ex.Message;
-                }
-            }
-
-            // Heures supplémentaires (PAI-03) : valorisation des heures majorées (115%, 130%, 150%, 200%).
-            if (_heureSupplementaireService != null)
-            {
-                try
-                {
-                    var heuresSup = await _heureSupplementaireService.ApportAsync(salarie, Annee, Mois);
-                    apport = apport.AvecHeuresSupplementaires(heuresSup);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Heures supplémentaires illisibles, calcul sans elles : " + ex.Message;
-                }
-            }
-
-            // Conventions collectives et prime d'ancienneté (SOC-05) : valorisation légale conventionnelle.
-            if (_conventionCollectiveService != null)
-            {
-                try
-                {
-                    var apportConv = await _conventionCollectiveService.ApportAsync(salarie, new DateTime(Annee, Mois, 1));
-                    apport = apport.AvecConventionCollective(apportConv);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Convention collective illisible, calcul sans prime d'ancienneté : " + ex.Message;
-                }
-            }
-
-            // Rappels & régularisations (PAI-07) : salaires rétroactifs, primes, trop-perçus, régul IUTS.
-            if (_rappelPaieService != null)
-            {
-                try
-                {
-                    var rappels = await _rappelPaieService.ApportAsync(Annee, Mois, salarie.EmployeeId);
-                    apport = apport.AvecRappels(rappels);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Rappels et régularisations illisibles, calcul sans eux : " + ex.Message;
-                }
-            }
-
-            // Avantages en nature (PAI-08) : réintégration fiscale et reprise en retenue.
-            if (_avantageNatureService != null)
-            {
-                try
-                {
-                    var avantages = await _avantageNatureService.ObtenirApportMoisAsync(salarie.EmployeeId, Annee, Mois);
-                    apport = apport.AvecAvantagesNature(avantages);
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = "Avantages en nature illisibles, calcul sans eux : " + ex.Message;
-                }
-            }
-
-            return apport;
+            _dernierApport = await _chaine.ChargerApportAsync(salarie, new DateTime(Annee, Mois, 1), m => ResultMessage = m);
+            return _dernierApport;
         }
 
         /// <summary>

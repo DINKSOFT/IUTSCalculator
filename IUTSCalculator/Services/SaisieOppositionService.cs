@@ -394,7 +394,8 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
-        /// Variante de <see cref="ChargerActivesParEmployeAsync(string)"/> qui lit DANS la
+        /// Toutes les saisies du salarié (le tri par mois se fait ensuite avec
+        /// <see cref="ActivesPourMois"/>), lues DANS la
         /// transaction en cours plutôt que sur une connexion séparée — nécessaire pour voir
         /// un TotalAmorti déjà corrigé par cette même transaction avant qu'elle ne soit
         /// validée (voir <see cref="AppliquerEtEnregistrerRetenuesMoisAsync"/>).
@@ -423,7 +424,7 @@ namespace IUTSCalculator.Services
                 }
             }
 
-            return liste.Where(s => s.EstActive).ToList();
+            return liste;
         }
 
         public async Task<SaisieOpposition> ChargerParIdAsync(int id)
@@ -657,7 +658,7 @@ namespace IUTSCalculator.Services
                     // remis à l'état d'avant ce mois (étape 1 ci-dessus), le solde restant
                     // dû que RepartirSaisies() calcule est le bon, que ce soit le premier
                     // passage du mois ou une correction.
-                    var saisies = await ChargerActivesParEmployeAsync(employeeId, conn, trans);
+                    var saisies = ActivesPourMois(await ChargerActivesParEmployeAsync(employeeId, conn, trans), null, annee, mois);
                     repartition = RepartirSaisies(salaireNetReference, saisies);
 
                     // 3. Insérer les nouvelles retenues
@@ -723,6 +724,21 @@ namespace IUTSCalculator.Services
             }
 
             return repartition;
+        }
+
+        /// <summary>Dernier mois (1er du mois) pour lequel une retenue a été enregistrée, ou null.</summary>
+        public async Task<DateTime?> DernierMoisAvecRetenuesAsync()
+        {
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT MAX(Annee * 100 + Mois) FROM RetenuesSaisiesMensuelles;";
+                object o = await cmd.ExecuteScalarAsync();
+                if (o == null || o == DBNull.Value) return null;
+                int am = Convert.ToInt32(o);
+                if (am <= 0) return null;
+                return new DateTime(am / 100, am % 100, 1);
+            }
         }
 
         public async Task<List<RetenueSaisieMensuelle>> ChargerRetenuesMoisAsync(int annee, int mois)
@@ -822,7 +838,12 @@ namespace IUTSCalculator.Services
             if (string.IsNullOrWhiteSpace(employeeId) || salaireNetReference <= 0m)
                 return apport;
 
-            var saisies = await ChargerActivesParEmployeAsync(employeeId);
+            // Aperçu du mois tel que l'enregistrement le calculera : les retenues déjà
+            // enregistrées pour CE mois et CE salarié sont neutralisées (l'enregistrement
+            // les annule avant de répartir), sinon un recalcul du mois lisait un TotalAmorti
+            // qui les contenait déjà — bulletin à 0 alors que le suivi reprenait la retenue.
+            var dejaRetenu = await RetenuesDuMoisParSaisieAsync(annee, mois, employeeId);
+            var saisies = ActivesPourMois(await ChargerParEmployeAsync(employeeId), dejaRetenu, annee, mois);
             if (saisies.Count == 0) return apport;
 
             var repartition = RepartirSaisies(salaireNetReference, saisies);
@@ -832,11 +853,7 @@ namespace IUTSCalculator.Services
                 if (rep.MontantRetenu <= 0m) continue;
 
                 string codeRubrique = rep.TypeSaisie == TypeSaisieOpposition.PensionAlimentaire ? "PENALIM" : "SAISIE";
-                string libelle = string.Format("{0} ({1})", rep.TypeSaisie.ToString(), rep.Creancier);
-                if (!string.IsNullOrWhiteSpace(rep.NumeroDossier))
-                    libelle += " - Dossier " + rep.NumeroDossier;
-
-                apport.Ajouter(new LigneSaisie(rep.SaisieOppositionId, codeRubrique, libelle, rep.MontantRetenu));
+                apport.Ajouter(new LigneSaisie(rep.SaisieOppositionId, codeRubrique, LibelleBulletin(rep), rep.MontantRetenu));
             }
 
             return apport;
@@ -855,8 +872,8 @@ namespace IUTSCalculator.Services
                 return resultat;
 
             var toutesSaisies = await ChargerToutAsync();
-            var saisiesParEmp = toutesSaisies
-                .Where(s => s.EstActive)
+            var dejaRetenu = await RetenuesDuMoisParSaisieAsync(annee, mois, null);
+            var saisiesParEmp = ActivesPourMois(toutesSaisies, dejaRetenu, annee, mois)
                 .GroupBy(s => s.EmployeeId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
@@ -867,15 +884,15 @@ namespace IUTSCalculator.Services
                 var apport = ApportSaisies.Aucun();
 
                 List<SaisieOpposition> saisies;
-                if (saisiesParEmp.TryGetValue(empId, out saisies) && saisies.Count > 0 && net > 0m)
+                saisiesParEmp.TryGetValue(empId, out saisies);
+                if (saisies != null && saisies.Count > 0 && net > 0m)
                 {
                     var rep = RepartirSaisies(net, saisies);
                     foreach (var r in rep.Repartitions)
                     {
                         if (r.MontantRetenu <= 0m) continue;
                         string code = r.TypeSaisie == TypeSaisieOpposition.PensionAlimentaire ? "PENALIM" : "SAISIE";
-                        string lib = string.Format("{0} ({1})", r.TypeSaisie.ToString(), r.Creancier);
-                        apport.Ajouter(new LigneSaisie(r.SaisieOppositionId, code, lib, r.MontantRetenu));
+                        apport.Ajouter(new LigneSaisie(r.SaisieOppositionId, code, LibelleBulletin(r), r.MontantRetenu));
                     }
                 }
 
@@ -883,6 +900,102 @@ namespace IUTSCalculator.Services
             }
 
             return resultat;
+        }
+
+        /// <summary>
+        /// Saisies qui jouent sur le mois de paie : date d'effet (DateDebut) au plus tard
+        /// le dernier jour du mois, et pas de date de fin antérieure au 1er du mois.
+        ///
+        /// La date d'effet était ignorée : un dossier créé en mars pour une saisie qui ne
+        /// joue qu'à partir de mai était retenu dès la paie de mars, et un dossier saisi
+        /// avec un effet antérieur était bien retenu — mais seulement à partir du mois
+        /// calculé, jamais rétroactivement (c'est voulu : une paie clôturée ne bouge pas).
+        /// </summary>
+        public static List<SaisieOpposition> EffectivesPourMois(IEnumerable<SaisieOpposition> saisies, int annee, int mois)
+        {
+            var resultat = new List<SaisieOpposition>();
+            if (saisies == null || mois < 1 || mois > 12) return resultat;
+
+            var debutMois = new DateTime(annee, mois, 1);
+            var finMois = debutMois.AddMonths(1).AddDays(-1);
+            foreach (var s in saisies)
+            {
+                if (s == null) continue;
+                if (s.DateDebut != default(DateTime) && s.DateDebut.Date > finMois) continue;
+                if (s.DateFin.HasValue && s.DateFin.Value.Date < debutMois) continue;
+                resultat.Add(s);
+            }
+            return resultat;
+        }
+
+        /// <summary>
+        /// Saisies recevables pour un mois de paie : statut en cours, créance non soldée
+        /// (ou illimitée), date d'effet et date de fin compatibles avec le MOIS (et non avec
+        /// la date du jour, comme EstActive — un recalcul de mars ignorait une saisie
+        /// terminée fin mars).
+        ///
+        /// <paramref name="dejaRetenu"/> : retenues déjà enregistrées pour ce mois, par
+        /// saisie. Elles sont retirées du TotalAmorti, et une saisie soldée par ce mois-là
+        /// redevient recevable — exactement l'état que l'enregistrement reconstitue avant de
+        /// répartir (AppliquerEtEnregistrerRetenuesMoisAsync).
+        /// </summary>
+        public static List<SaisieOpposition> ActivesPourMois(
+            IEnumerable<SaisieOpposition> saisies, IDictionary<int, decimal> dejaRetenu, int annee, int mois)
+        {
+            var recevables = new List<SaisieOpposition>();
+            foreach (var s in saisies ?? Enumerable.Empty<SaisieOpposition>())
+            {
+                if (s == null) continue;
+                decimal retenu;
+                if (dejaRetenu != null && dejaRetenu.TryGetValue(s.Id, out retenu) && retenu > 0m)
+                {
+                    s.TotalAmorti = Math.Max(0m, s.TotalAmorti - retenu);
+                    if (s.Statut == StatutSaisieOpposition.Soldee)
+                        s.Statut = StatutSaisieOpposition.EnCours;
+                }
+                if (s.Statut != StatutSaisieOpposition.EnCours) continue;
+                if (s.EstSolde && !s.EstIllimitee) continue;
+                recevables.Add(s);
+            }
+            return EffectivesPourMois(recevables, annee, mois);
+        }
+
+        /// <summary>Retenues déjà enregistrées pour un mois (et un salarié, si précisé), par saisie.</summary>
+        private async Task<Dictionary<int, decimal>> RetenuesDuMoisParSaisieAsync(int annee, int mois, string employeeId)
+        {
+            var map = new Dictionary<int, decimal>();
+            using (var conn = _sqliteService.CreateConnection())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT SaisieOppositionId, SUM(MontantRetenu) AS M FROM RetenuesSaisiesMensuelles " +
+                                  "WHERE Annee = @a AND Mois = @m" + (string.IsNullOrWhiteSpace(employeeId) ? "" : " AND EmployeeId = @e") +
+                                  " GROUP BY SaisieOppositionId;";
+                cmd.Parameters.AddWithValue("@a", annee);
+                cmd.Parameters.AddWithValue("@m", mois);
+                if (!string.IsNullOrWhiteSpace(employeeId)) cmd.Parameters.AddWithValue("@e", employeeId);
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                        map[DbValue.IntFromDb(reader["SaisieOppositionId"])] = DbValue.MoneyFromDb(reader["M"]);
+                }
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// Libellé de la ligne de retenue sur le bulletin : nature lisible, créancier et
+        /// numéro de dossier — « Saisie-arrêt judiciaire (CAISSE POPULAIRE) — dossier
+        /// SA-2026-014 » au lieu du nom technique « SaisieArretJudiciaire (…) ».
+        /// </summary>
+        public static string LibelleBulletin(LigneRepartitionSaisie ligne)
+        {
+            if (ligne == null) return "";
+            string libelle = SaisieOpposition.LibelleCourtType(ligne.TypeSaisie);
+            if (!string.IsNullOrWhiteSpace(ligne.Creancier))
+                libelle += " (" + ligne.Creancier.Trim() + ")";
+            if (!string.IsNullOrWhiteSpace(ligne.NumeroDossier))
+                libelle += " — dossier " + ligne.NumeroDossier.Trim();
+            return libelle;
         }
 
         /// <summary>

@@ -477,6 +477,10 @@ namespace IUTSCalculator.ViewModels
                     Employees.Add(emp);
                 RafraichirTotaux();
 
+                // Catégories des grilles et des fiches existantes, en plus des deux valeurs
+                // historiques (défaut n° 3 du guide de formation).
+                await _dataService.RafraichirCategoriesAsync();
+
                 CategoriesFiltreOptions.Clear();
                 CategoriesFiltreOptions.Add("Toutes les catégories");
                 foreach (var cat in EmployeeCategories)

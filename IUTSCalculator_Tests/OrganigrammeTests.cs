@@ -284,5 +284,73 @@ namespace IUTSCalculator.Tests
                 try { if (File.Exists(tempPdf)) File.Delete(tempPdf); } catch { }
             }
         }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void CodeUnique_AjouteUnSuffixeNumerique()
+        {
+            var pris = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase) { "DG" };
+
+            // « Direction générale » et « Direction d'usine » donnent la même racine.
+            Assert.That(OrganigrammeService.GenererCodeCourt("Direction générale"), Is.EqualTo("SRV-DIR"));
+            Assert.That(OrganigrammeService.GenererCodeCourt("Direction d'usine"), Is.EqualTo("SRV-DIR"));
+
+            Assert.That(OrganigrammeService.CodeUnique("SRV-DIR", pris), Is.EqualTo("SRV-DIR"));
+            Assert.That(OrganigrammeService.CodeUnique("SRV-DIR", pris), Is.EqualTo("SRV-DIR-2"));
+            Assert.That(OrganigrammeService.CodeUnique("srv-dir", pris), Is.EqualTo("SRV-DIR-3"));
+            Assert.That(OrganigrammeService.CodeUnique("DG", pris), Is.EqualTo("DG-2"));
+
+            // La longueur de 12 caractères des codes générés est respectée.
+            Assert.That(OrganigrammeService.CodeUnique("SRV-COMPTABI", pris), Is.EqualTo("SRV-COMPTABI"));
+            Assert.That(OrganigrammeService.CodeUnique("SRV-COMPTABI", pris), Is.EqualTo("SRV-COMPTA-2"));
+            Assert.That(pris.Count, Is.EqualTo(7));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public async Task InitialiserStructureDefautAsync_LibellesProches_CodesUniquesEtComplement()
+        {
+            string tempDb = Path.Combine(Path.GetTempPath(), $"test_org_init_srv_{Guid.NewGuid():N}.db");
+            try
+            {
+                var sqlite = new SQLiteService(tempDb);
+                var service = new OrganigrammeService(sqlite);
+                var dataService = new DataService(tempDb);
+
+                // Deux services qui commencent pareil (même code court SRV-DIR), et un service
+                // libellé exactement comme la Direction Générale créée d'office.
+                await dataService.AddEmployeeAsync(new Employee { EmployeeId = "E1", FirstName = "Awa", LastName = "KABORE", Service = "Direction générale", StatutSalarie = 0 });
+                await dataService.AddEmployeeAsync(new Employee { EmployeeId = "E2", FirstName = "Issa", LastName = "SANOU", Service = "Direction d'usine", StatutSalarie = 0 });
+                await dataService.AddEmployeeAsync(new Employee { EmployeeId = "E3", FirstName = "Ali", LastName = "BARRY", Service = "Direction Générale", StatutSalarie = 0 });
+
+                int creees = await service.InitialiserStructureDefautAsync();
+                var unites = await service.ChargerUnitesAsync();
+
+                // DG + 2 services (le service « Direction Générale » est la DG elle-même).
+                Assert.That(creees, Is.EqualTo(3));
+                Assert.That(unites.Count, Is.EqualTo(3));
+                Assert.That(unites.Select(u => u.Code).Distinct(StringComparer.OrdinalIgnoreCase).Count(), Is.EqualTo(3));
+                Assert.That(unites.Count(u => u.Libelle == "Direction Générale"), Is.EqualTo(1));
+                var dg = unites.Single(u => u.Code == "DG");
+                Assert.That(unites.Where(u => u.Id != dg.Id).All(u => u.ParentId == dg.Id), Is.True);
+                Assert.That(unites.Single(u => u.Libelle == "Direction d'usine").Code, Is.EqualTo("SRV-DIR"));
+                Assert.That(unites.Single(u => u.Libelle == "Direction générale").Code, Is.EqualTo("SRV-DIR-2"));
+                Assert.That(dg.NombreSalariesDirects, Is.EqualTo(1));
+
+                // Relancer ne crée rien ; un nouveau service est ajouté (complément), sans doublon.
+                Assert.That(await service.InitialiserStructureDefautAsync(), Is.EqualTo(0));
+                await dataService.AddEmployeeAsync(new Employee { EmployeeId = "E4", FirstName = "Léa", LastName = "SOME", Service = "Direction des achats", StatutSalarie = 0 });
+                Assert.That(await service.InitialiserStructureDefautAsync(), Is.EqualTo(1));
+                unites = await service.ChargerUnitesAsync();
+                Assert.That(unites.Count, Is.EqualTo(4));
+                var achats = unites.Single(u => u.Libelle == "Direction des achats");
+                Assert.That(achats.Code, Is.EqualTo("SRV-DDA"));
+                Assert.That(achats.ParentId, Is.EqualTo(dg.Id));
+            }
+            finally
+            {
+                try { if (File.Exists(tempDb)) File.Delete(tempDb); } catch { }
+            }
+        }
     }
 }

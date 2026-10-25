@@ -449,12 +449,31 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
+        /// Date à laquelle l'ancienneté est arrêtée pour la paie d'un mois : le 1er du mois
+        /// de paie, quel que soit l'écran (Bulletin, Bulletins en masse, Calcul en lot,
+        /// Calcul d'IUTS, simulateur des conventions, rappels).
+        ///
+        /// Jusqu'ici chaque écran passait sa propre date — le 1er du mois, la date choisie
+        /// dans le calendrier, ou le dernier jour du mois — si bien qu'un salarié dont
+        /// l'anniversaire d'entrée tombait dans le mois touchait une prime différente selon
+        /// l'écran utilisé. Règle retenue : le nouveau taux s'applique le mois qui suit
+        /// l'anniversaire d'entrée (ou le mois même pour une entrée un 1er).
+        /// </summary>
+        public static DateTime DateCalculAnciennete(DateTime datePaie)
+        {
+            return new DateTime(datePaie.Year, datePaie.Month, 1);
+        }
+
+        /// <summary>
         /// Calcule l'ancienneté et valorise la prime d'ancienneté d'un employé pour une période donnée.
+        /// La date passée est ramenée au 1er de son mois (<see cref="DateCalculAnciennete"/>).
         /// </summary>
         public CalculAncienneteResultat CalculerAnciennete(Employee employe, DateTime datePaie, ConventionCollective convention)
         {
             if (employe == null || convention == null)
                 return CalculAncienneteResultat.Vide;
+
+            datePaie = DateCalculAnciennete(datePaie);
 
             if (employe.DateEntree == default(DateTime) || employe.DateEntree > datePaie)
                 return CalculAncienneteResultat.Vide;

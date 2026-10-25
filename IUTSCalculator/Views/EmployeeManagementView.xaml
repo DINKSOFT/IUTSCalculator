@@ -385,6 +385,8 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Nom" Style="{StaticResource FieldLabel}"/>
@@ -406,8 +408,10 @@
 
                                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Catégorie" Style="{StaticResource FieldLabel}"/>
                                 <ComboBox  Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
+                                           IsEditable="True"
+                                           ToolTip="Catégorie du salarié. « Cadre Supérieur » ou « Cadres Supérieurs » : abattement de 20 % ; toute autre catégorie : 25 %. Choisissez le libellé de la grille pour la prime d'ancienneté et le contrôle du minimum."
                                            ItemsSource="{Binding DataContext.EmployeeCategories, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                           SelectedItem="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
+                                           Text="{Binding Category, UpdateSourceTrigger=LostFocus}"/>
 
                                 <TextBlock Grid.Row="5" Grid.Column="0" Text="Échelon" Style="{StaticResource FieldLabel}"/>
                                 <ComboBox  Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldCombo}"
@@ -450,6 +454,17 @@
                                 <TextBlock Grid.Row="12" Grid.Column="0" Text="Motif départ" Style="{StaticResource FieldLabel}"/>
                                 <TextBox   Grid.Row="12" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
                                            Text="{Binding MotifDepart, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Grid.Row="13" Grid.Column="0" Text="Congés repris (j)" Style="{StaticResource FieldLabel}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox   Grid.Row="13" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldBox}"
+                                           ToolTip="Solde de congés restant dû à la date de reprise, pour un salarié déjà en poste avant le logiciel. Le compteur devient : solde repris + 2,5 j par mois depuis la date de reprise − congés pris depuis."
+                                           Text="{Binding SoldeCongesReprise, StringFormat=N2, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Grid.Row="14" Grid.Column="0" Text="Reprise au" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Grid.Row="14" Grid.Column="1" Margin="0,0,0,8" Style="{StaticResource FieldDate}"
+                                            ToolTip="Date d'arrêté du solde repris. Vide : le compteur part de la date d'entrée."
+                                            SelectedDate="{Binding DateRepriseConges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                             </Grid>
 
                             <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,8,0,14"/>

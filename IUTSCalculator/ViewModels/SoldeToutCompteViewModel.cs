@@ -52,6 +52,19 @@ namespace IUTSCalculator.ViewModels
 
         private decimal _joursPresence = Math.Min(DateTime.Today.Day, 30);
         private decimal? _joursCongesManuel;
+        private int? _dureePreavisManuelle;
+
+        // Bulletin de sortie (défaut n° 1 du guide) : préparé au calcul, enregistré à la validation.
+        private readonly ChaineBulletinService _chaine;
+        private readonly RubriqueService _rubriqueService;
+        private ResultatBulletinMois _bulletinSortie;
+
+        // Chaque frappe relance le calcul : seul le DERNIER lancé est retenu (les calculs
+        // plus anciens qui finissent après lui sont ignorés).
+        private int _versionCalcul;
+
+        // Pour annuler les retenues de saisies si le décompte échoue après le bulletin.
+        private readonly SaisieOppositionService _saisiesService;
         private decimal? _salaireRefManuel;
         private decimal _gratification = 0m;
         private decimal _indemnitesDiverses = 0m;
@@ -96,7 +109,9 @@ namespace IUTSCalculator.ViewModels
             DataService dataService = null,
             SoldeToutCompteService stcService = null,
             SoldeToutCompteExportService exportService = null,
-            Dossier dossier = null)
+            Dossier dossier = null,
+            ChaineBulletinService chaine = null,
+            RubriqueService rubriqueService = null)
         {
             Title = "Solde de Tout Compte & Départs";
             _dossier = dossier ?? DossierSession.Instance.CurrentDossier;
@@ -104,6 +119,9 @@ namespace IUTSCalculator.ViewModels
             _dataService = dataService ?? new DataService("iuts_data.db");
             _stcService = stcService ?? new SoldeToutCompteService(_sqliteService);
             _exportService = exportService ?? new SoldeToutCompteExportService();
+            _chaine = chaine;
+            _rubriqueService = rubriqueService ?? new RubriqueService(_sqliteService);
+            _saisiesService = new SaisieOppositionService(_sqliteService);
 
             _selectedMotifOption = Motifs.FirstOrDefault();
             _selectedPreavisOption = StatutsPreavis.FirstOrDefault();
@@ -157,6 +175,22 @@ namespace IUTSCalculator.ViewModels
             set
             {
                 if (SetProperty(ref _selectedPreavisOption, value))
+                {
+                    _ = CalculerSoldeAutomatiqueAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Durée du préavis en mois saisie à la main (vide : durée de la catégorie — 3 mois
+        /// pour les cadres, agents de maîtrise et techniciens, 1 mois sinon).
+        /// </summary>
+        public int? DureePreavisManuelle
+        {
+            get => _dureePreavisManuelle;
+            set
+            {
+                if (SetProperty(ref _dureePreavisManuelle, value))
                 {
                     _ = CalculerSoldeAutomatiqueAsync();
                 }
@@ -356,11 +390,67 @@ namespace IUTSCalculator.ViewModels
 
         // ── Logique métier ───────────────────────────────────────────────────
 
+        private string _infoDiscipline;
+
+        /// <summary>
+        /// Rappel du licenciement disciplinaire notifié (module RH-06) qui a servi à
+        /// proposer le motif et la date de sortie ; vide s'il n'y en a pas.
+        /// </summary>
+        public string InfoDiscipline
+        {
+            get => _infoDiscipline;
+            private set
+            {
+                if (SetProperty(ref _infoDiscipline, value))
+                    OnPropertyChanged(nameof(AInfoDiscipline));
+            }
+        }
+
+        public bool AInfoDiscipline => !string.IsNullOrEmpty(_infoDiscipline);
+
+        /// <summary>
+        /// Passerelle RH-06 : si le salarié a reçu notification d'un licenciement
+        /// disciplinaire, son motif (faute lourde ou motif personnel) et sa date d'effet
+        /// sont proposés. Le gestionnaire garde la main : tout reste modifiable.
+        /// </summary>
+        private async Task ProposerDepuisDisciplineAsync(Employee salarie)
+        {
+            InfoDiscipline = null;
+            if (salarie == null || _sqliteService == null) return;
+
+            try
+            {
+                var procedure = await new DisciplineService(_sqliteService).DernierLicenciementNotifieAsync(salarie.EmployeeId);
+                if (procedure == null || procedure.TypeSanction == null || !ReferenceEquals(SelectedEmployee, salarie)) return;
+
+                var motif = procedure.TypeSanction.MotifDepartAssocie;
+                if (motif.HasValue)
+                {
+                    var option = Motifs.FirstOrDefault(m => m.Valeur == motif.Value);
+                    if (option != null) SelectedMotifOption = option;
+                }
+                if (procedure.DateEffetLicenciement.HasValue && !salarie.DateSortie.HasValue)
+                    DateSortie = procedure.DateEffetLicenciement.Value;
+
+                InfoDiscipline = string.Format(LibellesDiscipline.Fr,
+                    "Procédure disciplinaire {0} : {1} notifié le {2:dd/MM/yyyy}{3}. Motif et date de sortie proposés en conséquence.",
+                    procedure.Reference, procedure.TypeSanction.Libelle.ToLower(LibellesDiscipline.Fr), procedure.DateNotification,
+                    procedure.DateEffetLicenciement.HasValue
+                        ? string.Format(LibellesDiscipline.Fr, ", effet le {0:dd/MM/yyyy}", procedure.DateEffetLicenciement.Value)
+                        : "");
+            }
+            catch
+            {
+                // Dossier sans module Discipline (schéma antérieur) : rien à proposer.
+            }
+        }
+
         private void OnSelectedEmployeeChanged()
         {
             if (SelectedEmployee == null)
             {
                 SoldeCourant = null;
+                InfoDiscipline = null;
                 return;
             }
 
@@ -381,6 +471,7 @@ namespace IUTSCalculator.ViewModels
 
             AjusterPreavisSelonMotif();
             _ = CalculerSoldeAutomatiqueAsync();
+            _ = ProposerDepuisDisciplineAsync(SelectedEmployee);
         }
 
         private void AjusterPreavisSelonMotif()
@@ -399,6 +490,7 @@ namespace IUTSCalculator.ViewModels
         public async Task CalculerSoldeAutomatiqueAsync()
         {
             if (SelectedEmployee == null) return;
+            int version = ++_versionCalcul;
 
             try
             {
@@ -420,20 +512,41 @@ namespace IUTSCalculator.ViewModels
                     IndemnitesDiverses,
                     LibelleIndemnitesDiverses,
                     AutresDeductions,
-                    LibelleAutresDeductions);
+                    LibelleAutresDeductions,
+                    DureePreavisManuelle);
 
+                // Bulletin de sortie calculé par le moteur de paie : le décompte s'aligne sur
+                // lui (IUTS au barème, CNSS plafonnée, net = net du bulletin).
+                string mention = string.Empty;
+                ResultatBulletinMois bulletin = null;
+                if (_chaine != null)
+                {
+                    var salarie = await _dataService.GetEmployeeByIdAsync(stc.EmployeeId) ?? SelectedEmployee;
+                    var plan = await _rubriqueService.ChargerAsync();
+                    bulletin = await _stcService.PreparerBulletinSortieAsync(stc, salarie, _chaine, plan);
+                    mention = " Calculé sur le bulletin de sortie de " + stc.DateSortie.ToString("MM/yyyy") + ".";
+                    foreach (var avertissement in bulletin.Avertissements)
+                        mention += " Attention : " + avertissement + ".";
+                }
+
+                // Un calcul plus récent a été lancé pendant celui-ci : on l'ignore.
+                if (version != _versionCalcul) return;
+
+                _bulletinSortie = bulletin;
                 stc.Commentaire = Commentaire;
                 SoldeCourant = stc;
 
-                StatusMessage = $"Décompte prêt pour {stc.NomSalarie} : Net à percevoir {stc.TotalNet:N0} FCFA (Brut: {stc.TotalBrut:N0} FCFA).";
+                StatusMessage = $"Décompte prêt pour {stc.NomSalarie} : Net à percevoir {stc.TotalNet:N0} FCFA (Brut: {stc.TotalBrut:N0} FCFA)." + mention;
             }
             catch (Exception ex)
             {
-                StatusMessage = "Erreur lors du calcul du solde : " + ex.Message;
+                if (version == _versionCalcul)
+                    StatusMessage = "Erreur lors du calcul du solde : " + ex.Message;
             }
             finally
             {
-                IsBusy = false;
+                if (version == _versionCalcul)
+                    IsBusy = false;
             }
         }
 
@@ -457,13 +570,105 @@ namespace IUTSCalculator.ViewModels
                 IsBusy = true;
                 StatusMessage = "Enregistrement du solde et mise à jour du salarié...";
 
-                SoldeCourant.Commentaire = Commentaire;
-                int id = await _stcService.EnregistrerSoldeAsync(SoldeCourant, marquerEmployeSorti: true);
+                // Le bulletin de sortie entre dans la paie du mois de sortie : ce mois doit
+                // être ouvert, sinon rien n'est enregistré (ni décompte ni sortie).
+                var periodeSortie = new DateTime(SoldeCourant.DateSortie.Year, SoldeCourant.DateSortie.Month, 1);
+                if (_chaine != null && await new PeriodePaieService(_sqliteService).EstClotureeAsync(periodeSortie))
+                {
+                    StatusMessage = $"Validation refusée : la période {periodeSortie:MM/yyyy} est clôturée. Rouvrez-la (écran « Périodes de paie ») " +
+                                    "pour y enregistrer le bulletin de sortie, ou choisissez une date de sortie dans une période ouverte.";
+                    MessageBox.Show(StatusMessage, "Solde de tout compte", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
-                StatusMessage = $"Solde de tout compte #{id} validé et archivé avec succès. Salarié marqué comme sorti.";
+                // Décompte et bulletin recalculés au moment de valider, à partir des saisies
+                // de l'écran et de la fiche relue (un décompte déjà aligné ne se réaligne pas).
+                ResultatBulletinMois bulletinSortie = null;
+                if (_chaine != null)
+                {
+                    await CalculerSoldeAutomatiqueAsync();
+                    IsBusy = true;
+                    bulletinSortie = _bulletinSortie;
+                    if (bulletinSortie == null || SoldeCourant == null)
+                    {
+                        StatusMessage = "Validation interrompue : le bulletin de sortie n'a pas pu être calculé. " + StatusMessage;
+                        return;
+                    }
+                }
+
+                // Un bulletin ordinaire déjà enregistré pour le mois de sortie sera remplacé
+                // par le bulletin de sortie : on le dit avant de le faire.
+                if (bulletinSortie != null && await _dataService.BulletinEnregistreAsync(SoldeCourant.EmployeeId, periodeSortie))
+                {
+                    var remplacer = MessageBox.Show(
+                        $"Un bulletin est déjà enregistré pour {SoldeCourant.NomSalarie} en {periodeSortie:MM/yyyy}.\n\n" +
+                        "La validation le remplace par le bulletin de sortie (paie du mois au prorata et indemnités de rupture).\n\nContinuer ?",
+                        "Solde de tout compte", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                    if (remplacer != MessageBoxResult.Yes)
+                    {
+                        StatusMessage = "Validation annulée : le bulletin du mois de sortie est conservé, rien n'a été enregistré.";
+                        return;
+                    }
+                }
+
+                SoldeCourant.Commentaire = Commentaire;
+
+                // Ordre d'enregistrement : le bulletin de sortie d'abord, le décompte ensuite.
+                // Un échec du bulletin n'enregistre rien (pas de salarié « Sorti » sans bulletin) ;
+                // un échec du décompte supprime le bulletin qu'on vient d'écrire.
+                string mentionBulletin = string.Empty;
+                if (bulletinSortie != null)
+                {
+                    var salarie = await _dataService.GetEmployeeByIdAsync(SoldeCourant.EmployeeId) ?? SelectedEmployee;
+                    try
+                    {
+                        await _chaine.EnregistrerAsync(bulletinSortie, salarie, periodeSortie);
+                    }
+                    catch (Exception exBulletin)
+                    {
+                        StatusMessage = "Validation interrompue : le bulletin de sortie n'a pas pu être enregistré (" + exBulletin.Message +
+                                        "). Rien n'a été enregistré : le salarié reste actif. Corrigez la cause puis validez à nouveau.";
+                        MessageBox.Show(StatusMessage, "Solde de tout compte", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    mentionBulletin = $"\nLe bulletin de sortie de {periodeSortie:MM/yyyy} est enregistré dans la paie du mois " +
+                                      $"(net à payer {bulletinSortie.Bulletin.SalaireNetAPayer:N0} FCFA) : il entre dans les déclarations, " +
+                                      "le livre de paie, les virements et les écritures.";
+                }
+
+                int id;
+                try
+                {
+                    id = await _stcService.EnregistrerSoldeAsync(SoldeCourant, marquerEmployeSorti: true);
+                }
+                catch (Exception exSolde)
+                {
+                    string annulation = string.Empty;
+                    if (bulletinSortie != null && bulletinSortie.Calcul != null)
+                    {
+                        try
+                        {
+                            await _dataService.DeleteCalculationFromHistoryAsync(bulletinSortie.Calcul.Id);
+                            if (_saisiesService != null)
+                                await _saisiesService.AppliquerEtEnregistrerRetenuesMoisAsync(
+                                    periodeSortie.Year, periodeSortie.Month, SoldeCourant.EmployeeId, 0m, DateTime.Today);
+                            annulation = " Le bulletin de sortie qui venait d'être enregistré a été supprimé : régénérez le bulletin du mois si besoin.";
+                        }
+                        catch (Exception exAnnulation)
+                        {
+                            annulation = " ATTENTION : le bulletin de sortie déjà enregistré n'a pas pu être supprimé (" + exAnnulation.Message + ").";
+                        }
+                    }
+                    StatusMessage = "Erreur lors de l'enregistrement du décompte : " + exSolde.Message + "." + annulation;
+                    MessageBox.Show(StatusMessage, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                StatusMessage = $"Solde de tout compte #{id} validé et archivé avec succès. Salarié marqué comme sorti." +
+                                mentionBulletin.Replace("\n", " ");
                 MessageBox.Show(
                     $"Le solde de tout compte a été enregistré avec succès (N° {id}).\n" +
-                    "La fiche du salarié a été mise à jour avec le statut 'Sorti'.",
+                    "La fiche du salarié a été mise à jour avec le statut 'Sorti'." + mentionBulletin,
                     "Enregistrement réussi",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);

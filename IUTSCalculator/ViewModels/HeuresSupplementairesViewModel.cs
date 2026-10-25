@@ -33,6 +33,7 @@ namespace IUTSCalculator.ViewModels
         private decimal _totalMontantMois;
         private int _nombreSalariesConcernes;
         private decimal _tauxHoraireMoyen;
+        private string _tauxApplicables;
 
         public ObservableCollection<HeureSupplementaire> Lignes { get; } = new ObservableCollection<HeureSupplementaire>();
 
@@ -123,6 +124,16 @@ namespace IUTSCalculator.ViewModels
             set => SetProperty(ref _tauxHoraireMoyen, value);
         }
 
+        /// <summary>
+        /// Majorations du barème daté applicable au mois affiché (RH-08), par exemple
+        /// « 15 % · 35 % · 50 % · 60 % · 120 % — barème du 01/10/2026 ».
+        /// </summary>
+        public string TauxApplicables
+        {
+            get => _tauxApplicables;
+            set => SetProperty(ref _tauxApplicables, value);
+        }
+
         public ICommand ChargerCommand { get; }
         public ICommand EnregistrerCommand { get; }
         public ICommand ExporterExcelCommand { get; }
@@ -187,6 +198,12 @@ namespace IUTSCalculator.ViewModels
                 }
 
                 var donnees = await _service.ChargerSaisieMoisAsync(Annee, MoisSelectionne.Numero);
+                var bareme = await _service.BaremeApplicableAsync(Annee, MoisSelectionne.Numero);
+                TauxApplicables = string.Format(
+                    "Majorations appliquées : 41e-48e h {0} · au-delà {1} · nuit {2} · dimanche/férié jour {3} · dimanche/férié nuit {4} — barème du {5:dd/MM/yyyy}",
+                    BaremeHeuresSup.Pourcent(bareme.TauxTranche1), BaremeHeuresSup.Pourcent(bareme.TauxTranche2),
+                    BaremeHeuresSup.Pourcent(bareme.TauxNuit), BaremeHeuresSup.Pourcent(bareme.TauxFerieJour),
+                    BaremeHeuresSup.Pourcent(bareme.TauxFerieNuit), bareme.DateEffet);
 
                 // Détacher les anciens abonnements
                 foreach (var l in Lignes)
@@ -224,6 +241,7 @@ namespace IUTSCalculator.ViewModels
                 e.PropertyName == nameof(HeureSupplementaire.Heures15) ||
                 e.PropertyName == nameof(HeureSupplementaire.Heures30) ||
                 e.PropertyName == nameof(HeureSupplementaire.Heures50) ||
+                e.PropertyName == nameof(HeureSupplementaire.Heures60) ||
                 e.PropertyName == nameof(HeureSupplementaire.Heures100))
             {
                 RecalculerTotaux();
@@ -289,6 +307,7 @@ namespace IUTSCalculator.ViewModels
                 l.Heures15 = 0m;
                 l.Heures30 = 0m;
                 l.Heures50 = 0m;
+                l.Heures60 = 0m;
                 l.Heures100 = 0m;
                 l.Commentaire = string.Empty;
             }

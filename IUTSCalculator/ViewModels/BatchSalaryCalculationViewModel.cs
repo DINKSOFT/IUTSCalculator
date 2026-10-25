@@ -20,6 +20,7 @@ namespace IUTSCalculator.ViewModels
     {
         private readonly DataService _dataService;
         private readonly TaxCalculatorService _taxCalculatorService;
+        private readonly ChaineBulletinService _chaine;
 
         // Variables du mois (PAI-02), absences (PAI-04) et prêts (PAI-05). Facultatifs :
         // sans eux, le calcul est celui d'avant ces modules.
@@ -129,7 +130,9 @@ namespace IUTSCalculator.ViewModels
             ConventionCollectiveService conventionCollectiveService = null,
             RappelPaieService rappelPaieService = null,
             AvantageNatureService avantageNatureService = null,
-            PeriodePaieService periodePaieService = null)
+            PeriodePaieService periodePaieService = null,
+            SaisieOppositionService saisieOppositionService = null,
+            BulletinService bulletinService = null)
         {
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
             _taxCalculatorService = taxCalculatorService ?? throw new ArgumentNullException(nameof(taxCalculatorService));
@@ -144,6 +147,14 @@ namespace IUTSCalculator.ViewModels
             _rappelPaieService = rappelPaieService;
             _avantageNatureService = avantageNatureService;
             _periodePaieService = periodePaieService;
+
+            // Chaîne commune avec l'écran « Bulletin de paie » (défaut n° 4 du guide) : le
+            // calcul en lot produit désormais de vrais bulletins archivés, saisies comprises.
+            _chaine = new ChaineBulletinService(
+                _dataService, bulletinService ?? new BulletinService(_taxCalculatorService),
+                _baremeService, _rubriqueService, _variablePaieService, _absenceService, _pretService,
+                _profilPaieService, _heureSupplementaireService, _conventionCollectiveService,
+                _rappelPaieService, _avantageNatureService, saisieOppositionService);
 
             // Le titre alimente le message de la barre d'état et signale l'écran
             // actif dans le rail de navigation : sans lui, ni l'un ni l'autre.
@@ -200,110 +211,106 @@ namespace IUTSCalculator.ViewModels
             {
                 IsBusy = true;
                 StatusMessage = "Calcul en cours...";
-                Calculations.Clear();
 
-                // Le calcul porte sur une PÉRIODE : variables du mois et absences du mois
-                // y entrent, exactement comme sur un bulletin. Lues une seule fois pour
-                // tout l'effectif.
-                var apports = await ChargerApportsAsync();
-                var absences = await ChargerAbsencesAsync();
-                var prets = await ChargerPretsAsync();
-                var baseRetenue = await BaseRetenueAsync();
                 var periode = PeriodeDate;
 
                 // Toujours relire les fiches depuis la base ici plutôt que d'utiliser Employees
-                // tel qu'affiché à l'écran : cette liste ne se met à jour qu'au clic sur
-                // « Charger les employés », et lancer un calcul sans recliquer après une
-                // modification faite ailleurs (fiche salarié, import CSV) réenregistrerait
-                // sinon l'ancienne fiche par-dessus la nouvelle, silencieusement (signalé le
-                // 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 19).
-                // Seuls les employés actifs entrent dans un calcul en lot (signalé le
-                // 16 septembre 2026, voir ETAT-DEVELOPPEMENT.md item 20) : un employé sorti
-                // ou suspendu n'a plus vocation à recevoir un bulletin mensuel ordinaire.
+                // tel qu'affiché à l'écran (ETAT-DEVELOPPEMENT.md item 19). Seuls les employés
+                // actifs entrent dans un calcul en lot (item 20).
                 var salaries = (await _dataService.LoadEmployeesAsync()).Where(e => e.EstActif).ToList();
-                var profils = await ChargerProfilsAsync(salaries);
-                var heuresSup = await ChargerHeuresSupAsync(periode, salaries);
-                var conventions = await ChargerConventionsAsync(periode, salaries);
-                var rappels = await ChargerRappelsAsync(periode);
-                var avantages = await ChargerAvantagesNatureAsync(periode);
 
-                // Barème daté applicable à la période (module DEC-02) : appliqué une seule
-                // fois pour tout le lot, qui partage la même période.
-                if (_baremeService != null)
+                // Défaut n° 4 du guide : ce calcul ENREGISTRE la paie du mois. Il remplaçait
+                // en silence les bulletins archivés par de simples calculs, sans document ni
+                // saisies. Il passe désormais par la même chaîne que « Bulletin de paie »
+                // (bulletin archivé, saisies, rappels) et prévient avant de remplacer.
+                bool clos = _periodePaieService != null && await _periodePaieService.EstClotureeAsync(periode);
+                if (!clos)
                 {
-                    try
+                    int dejaEnregistres = 0;
+                    foreach (var emp in salaries)
                     {
-                        var bareme = await _baremeService.BaremeApplicableAsync(periode);
-                        _taxCalculatorService.AppliquerBareme(bareme);
+                        if (await _dataService.BulletinEnregistreAsync(emp.EmployeeId, periode))
+                            dejaEnregistres++;
                     }
-                    catch (Exception ex)
+
+                    if (dejaEnregistres > 0)
                     {
-                        StatusMessage = "Barème illisible, calcul avec les valeurs historiques : " + ex.Message;
-                        _taxCalculatorService.AppliquerBareme(null);
+                        var reponse = MessageBox.Show(
+                            string.Format(
+                                "{0} salarié(s) ont déjà un bulletin enregistré pour {1}.\n\n" +
+                                "« Calculer pour tous » va les régénérer à partir des fiches et des éléments du mois " +
+                                "actuels : leurs bulletins archivés seront remplacés par les nouveaux.\n\nContinuer ?",
+                                dejaEnregistres, Periode),
+                            "Calcul en lot", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                        if (reponse != MessageBoxResult.Yes)
+                        {
+                            StatusMessage = "Calcul annulé : aucun bulletin n'a été remplacé.";
+                            return;
+                        }
                     }
                 }
 
-                int doublonsPossibles = 0;
+                Calculations.Clear();
+                await _chaine.AppliquerBaremeAsync(periode, m => StatusMessage = m);
 
-                var results = await Task.Run(() => salaries
-                    .Select(emp =>
-                    {
-                        var apport = ApportDe(apports, emp.EmployeeId)
-                            .AvecAbsences(AbsenceService.Apport(
-                                emp, absences, periode.Year, periode.Month, baseRetenue))
-                            .AvecPrets(PretService.ApportDe(prets, emp.EmployeeId))
-                            .AvecProfil(ProfilPaieService.ApportDe(profils, emp.EmployeeId))
-                            .AvecHeuresSupplementaires(HeuresSupDe(heuresSup, emp.EmployeeId))
-                            .AvecConventionCollective(ConventionDe(conventions, emp.EmployeeId))
-                            .AvecRappels(RappelPaieService.ApportDe(rappels, emp.EmployeeId))
-                            .AvecAvantagesNature(AvantageNatureService.ApportDe(avantages, emp.EmployeeId, periode.Year, periode.Month));
-
-                        // Doublon possible entre une retenue saisie à la main et une retenue
-                        // automatique d'un module (dette connue n°9) : compté, sans bloquer.
-                        doublonsPossibles += apport.Avertissements.Count;
-
-                        var calcul = _taxCalculatorService.CalculateMonthlyTax(emp, apport);
-
-                        // Le moteur date du jour ; une paie se date de son mois.
-                        calcul.CalculationDate = periode;
-                        return calcul;
-                    })
-                    .ToList());
-
-                foreach (var calc in results)
-                    Calculations.Add(calc);
-
-                // La paie calculée est ENREGISTRÉE sous sa période, en remplaçant celle
-                // qui s'y trouverait déjà : c'est cet historique que lisent la déclaration
-                // CNSS, la déclaration IUTS et le livre de paie. Un calcul qui n'y entre
-                // pas n'existe que le temps de l'écran.
                 int enregistres = 0;
-                var refus = new List<string>();
+                int doublonsPossibles = 0;
+                string refus = null;
+                var erreurs = new List<string>();
 
-                foreach (var calcul in results)
+                foreach (var emp in salaries)
                 {
                     try
                     {
-                        await _dataService.EnregistrerBulletinDuMoisAsync(calcul, periode);
-                        enregistres++;
+                        var apport = await _chaine.ChargerApportAsync(emp, periode, m => erreurs.Add(emp.EmployeeId + " : " + m), avecBareme: false);
+                        doublonsPossibles += apport.Avertissements.Count;
+
+                        var resultat = await _chaine.PreparerAsync(
+                            emp, periode, 0m, ModesReglementPaie.ModeDeLaFiche, null, apport);
+
+                        if (resultat.Calcul == null) continue;
+                        resultat.Calcul.CalculationDate = periode;
+
+                        if (refus == null)
+                        {
+                            try
+                            {
+                                await _chaine.EnregistrerAsync(resultat, emp, periode);
+                                enregistres++;
+                            }
+                            catch (BulletinDeSortieProtegeException ex)
+                            {
+                                // Bulletin de sortie d'un solde de tout compte : on passe au suivant.
+                                erreurs.Add(emp.EmployeeId + " : " + ex.Message);
+                            }
+                            catch (InvalidOperationException ex)
+                            {
+                                // Période clôturée : inutile d'insister salarié par salarié.
+                                refus = ex.Message;
+                            }
+                        }
+
+                        Calculations.Add(resultat.Calcul);
                     }
-                    catch (InvalidOperationException ex)
+                    catch (Exception ex)
                     {
-                        refus.Add(ex.Message);
-                        break;   // période clôturée : inutile d'insister salarié par salarié
+                        erreurs.Add(emp.EmployeeId + " : " + ex.Message);
                     }
                 }
 
                 string mentionDoublons = doublonsPossibles > 0
-                    ? $" {doublonsPossibles} doublon(s) possible(s) retenue/prêt — vérifiez les variables du mois des salariés concernés."
+                    ? $" {doublonsPossibles} doublon(s) possible(s) — vérifiez les variables du mois des salariés concernés."
+                    : string.Empty;
+                string mentionErreurs = erreurs.Count > 0
+                    ? $" {erreurs.Count} incident(s) : {erreurs[0]}"
                     : string.Empty;
 
-                StatusMessage = (refus.Count > 0
-                    ? $"{Calculations.Count} calcul(s) affiché(s), aucun enregistré — {refus[0]}"
+                StatusMessage = (refus != null
+                    ? $"{Calculations.Count} calcul(s) affiché(s), aucun enregistré — {refus}"
                     : $"Calcul terminé pour {Calculations.Count} employé(s) sur {Periode} — " +
-                      $"{enregistres} enregistré(s) dans la paie du mois.")
+                      $"{enregistres} bulletin(s) enregistré(s) et archivé(s) dans la paie du mois.")
                     + await AvertissementPeriodeAsync(Annee, Mois)
-                    + mentionDoublons;
+                    + mentionDoublons + mentionErreurs;
             }
             catch (Exception ex)
             {
@@ -465,7 +472,7 @@ namespace IUTSCalculator.ViewModels
 
             try
             {
-                return await _rappelPaieService.ObtenirRappelsAsync(periode.Year, periode.Month, null, StatutRappelPaie.EnAttente);
+                return await _rappelPaieService.ObtenirRappelsDuMoisAsync(periode.Year, periode.Month);
             }
             catch (Exception ex)
             {

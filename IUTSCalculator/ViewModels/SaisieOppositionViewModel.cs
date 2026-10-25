@@ -383,6 +383,49 @@ namespace IUTSCalculator.ViewModels
 
         #endregion
 
+        #region Mois du bordereau
+
+        /// <summary>
+        /// Mois proposés pour le bordereau de reversement : les 24 derniers mois. Le
+        /// bordereau sortait toujours sur le mois de l'horloge du poste, si bien qu'un
+        /// bordereau préparé début mai pour la paie d'avril était vide.
+        /// </summary>
+        public ObservableCollection<MoisSelectionnable> MoisBordereauOptions { get; } = new ObservableCollection<MoisSelectionnable>();
+
+        private MoisSelectionnable _moisBordereau;
+        public MoisSelectionnable MoisBordereau
+        {
+            get => _moisBordereau;
+            set => SetProperty(ref _moisBordereau, value);
+        }
+
+        private async Task InitialiserMoisBordereauAsync()
+        {
+            MoisBordereauOptions.Clear();
+            var courant = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            for (int i = 0; i < 24; i++)
+                MoisBordereauOptions.Add(new MoisSelectionnable(courant.AddMonths(-i)));
+
+            // Par défaut : le dernier mois pour lequel des retenues ont été enregistrées.
+            DateTime? dernier = null;
+            try { dernier = await _saisieService.DernierMoisAvecRetenuesAsync(); }
+            catch (Exception) { dernier = null; }
+
+            MoisSelectionnable choix = null;
+            if (dernier.HasValue)
+            {
+                choix = MoisBordereauOptions.FirstOrDefault(m => m.Mois == dernier.Value);
+                if (choix == null)
+                {
+                    choix = new MoisSelectionnable(dernier.Value);
+                    MoisBordereauOptions.Insert(0, choix);
+                }
+            }
+            MoisBordereau = choix ?? MoisBordereauOptions[0];
+        }
+
+        #endregion
+
         public SaisieOppositionViewModel(
             SaisieOppositionService saisieService,
             SaisieOppositionExportService exportService,
@@ -417,6 +460,7 @@ namespace IUTSCalculator.ViewModels
 
         private async Task InitialiserAsync()
         {
+            await InitialiserMoisBordereauAsync();
             await ChargerSalariesAsync();
             await ChargerDonneesAsync();
             RecalculerSimulateur();
@@ -812,19 +856,27 @@ namespace IUTSCalculator.ViewModels
         {
             try
             {
+                DateTime mois = MoisBordereau != null ? MoisBordereau.Mois : new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                var retenues = await _saisieService.ChargerRetenuesMoisAsync(mois.Year, mois.Month);
+                if (retenues.Count == 0)
+                {
+                    StatusMessage = "Aucune retenue enregistrée pour " + (MoisBordereau != null ? MoisBordereau.Libelle : mois.ToString("MM/yyyy")) +
+                                    " : générez d'abord les bulletins de ce mois.";
+                    return;
+                }
+
                 var dialog = new SaveFileDialog
                 {
                     Filter = "Fichier Excel (*.xlsx)|*.xlsx",
-                    FileName = string.Format("Bordereau_Retenues_Saisies_{0:yyyyMM}.xlsx", DateTime.Today),
+                    FileName = string.Format("Bordereau_Retenues_Saisies_{0:yyyyMM}.xlsx", mois),
                     Title = "Exporter le bordereau mensuel des reversements"
                 };
 
                 if (dialog.ShowDialog() != true) return;
 
-                var retenues = await _saisieService.ChargerRetenuesMoisAsync(DateTime.Today.Year, DateTime.Today.Month);
                 var dossier = DossierSession.Instance.CurrentDossier;
                 await _exportService.ExporterRecapitulatifMensuelExcelAsync(
-                    retenues, dossier, DateTime.Today.Year, DateTime.Today.Month, dialog.FileName);
+                    retenues, dossier, mois.Year, mois.Month, dialog.FileName);
                 StatusMessage = "Bordereau mensuel exporté avec succès : " + dialog.FileName;
             }
             catch (Exception ex)

@@ -1,0 +1,818 @@
+<UserControl x:Class="IUTSCalculator.Views.DisciplineView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             d:DataContext="{d:DesignInstance Type=viewmodels:DisciplineViewModel}"
+             mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormTextBlockLabelStyle}">
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style x:Key="Section" TargetType="TextBlock" BasedOn="{StaticResource SectionLabelStyle}">
+            <Setter Property="Margin" Value="0,14,0,6"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush2}"/>
+        </Style>
+        <Style x:Key="Field" TargetType="StackPanel">
+            <Setter Property="Margin" Value="0,0,10,6"/>
+        </Style>
+        <Style x:Key="Saisie" TargetType="TextBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4,0"/>
+        </Style>
+        <Style x:Key="SaisieLongue" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="56"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Padding" Value="4,2"/>
+        </Style>
+        <Style x:Key="Date" TargetType="DatePicker" BasedOn="{StaticResource FormDatePickerStyle}">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style x:Key="KpiLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{StaticResource InkMutedBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+        <Style x:Key="KpiValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+        </Style>
+        <Style x:Key="KpiCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+        <Style x:Key="Toolbar" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource GroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="0,0,0,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="200"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ En-tête ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Discipline &amp; procédures" Style="{StaticResource ScreenTitleStyle}"/>
+                <TextBlock Text="Demande d'explication, entretien préalable, sanction et notification — délais et pièces contrôlés (RH-06)"
+                           FontSize="12" Foreground="{StaticResource InkSubtleBrush}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Actualiser" Tag="{StaticResource IconRefresh}"
+                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ChargerCommand}"/>
+                <Button Content="Exporter le registre" Tag="{StaticResource IconExcel}"
+                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ExporterExcelCommand}"/>
+                <Button Content="Nouvelle procédure" Tag="{StaticResource IconAdd}" Margin="0"
+                        Style="{StaticResource MenuButtonStyle}" Command="{Binding NouvelleProcedureCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ Indicateurs ═══════════ -->
+        <WrapPanel Grid.Row="1" Margin="0,0,0,8">
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="PROCÉDURES EN COURS" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreEnCours, Mode=OneWay}" Style="{StaticResource KpiValue}" Foreground="{StaticResource AccentBrush2}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="DÉCISIONS À NOTIFIER" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreANotifier, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="ÉCHÉANCES DÉPASSÉES" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreEcheancesDepassees, Mode=OneWay}" Style="{StaticResource KpiValue}" Foreground="{StaticResource DangerBrush}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="SANCTIONS NOTIFIÉES CETTE ANNÉE" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreSanctionsAnnee, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiCard}">
+                <StackPanel>
+                    <TextBlock Text="DONT MISES À PIED" Style="{StaticResource KpiLabel}"/>
+                    <TextBlock Text="{Binding NombreMisesAPiedAnnee, Mode=OneWay}" Style="{StaticResource KpiValue}"/>
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+
+        <!-- ═══════════ Onglets ═══════════ -->
+        <TabControl Grid.Row="2" SelectedIndex="{Binding OngletActif, Mode=TwoWay}">
+
+            <!-- ───────── 1. Procédures ───────── -->
+            <TabItem Header="Procédures">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4*" MinWidth="300"/>
+                        <ColumnDefinition Width="6*" MinWidth="460"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Liste -->
+                    <Grid Grid.Column="0" Margin="0,0,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*" MinHeight="100"/>
+                        </Grid.RowDefinitions>
+                        <Border Style="{StaticResource Toolbar}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Width="165" Height="28" ItemsSource="{Binding FiltresStatut}" SelectedItem="{Binding FiltreStatut}"/>
+                                <TextBox Grid.Column="2" Style="{StaticResource Saisie}"
+                                         Text="{Binding Recherche, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Filtrer : référence, matricule, nom, nature des faits, sanction"/>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                            <DataGrid ItemsSource="{Binding VueProcedures}" SelectedItem="{Binding ProcedureSelectionnee}"
+                                      Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                      AutoGenerateColumns="False" BorderThickness="0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Référence" Binding="{Binding Reference, Mode=OneWay}" Width="105"/>
+                                    <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="120"/>
+                                    <DataGridTextColumn Header="Faits" Binding="{Binding DateFaitsLibelle, Mode=OneWay}" Width="78"/>
+                                    <DataGridTextColumn Header="Étape" Binding="{Binding StatutLibelle, Mode=OneWay}" Width="125"/>
+                                    <DataGridTextColumn Header="Sanction" Binding="{Binding SanctionLibelle, Mode=OneWay}" Width="150"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Fiche -->
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="12,10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*" MinHeight="120"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Titre et actions -->
+                            <Grid Grid.Row="0" Margin="0,0,0,6">
+                                <TextBlock Text="{Binding TitreFiche, Mode=OneWay}" FontSize="14" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,330,0"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                            Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerCommand}"/>
+                                    <Button Content="Annuler" Tag="{StaticResource IconCancel}"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding AnnulerCommand}"/>
+                                    <Button Content="Supprimer" Tag="{StaticResource IconDelete}" Margin="0"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerCommand}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Contrôles de procédure -->
+                            <Border Grid.Row="1" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}"
+                                    BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,6"
+                                    Visibility="{Binding ProcedureOuverte, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding EtapeSuivante, Mode=OneWay}" FontWeight="SemiBold" TextWrapping="Wrap"
+                                               Foreground="{StaticResource AccentBrush2}" Margin="0,0,0,4"/>
+                                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Alertes}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="80"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border CornerRadius="3" Padding="4,0" Margin="0,1,6,1" VerticalAlignment="Top"
+                                                                Background="{Binding Couleur, Mode=OneWay}">
+                                                            <TextBlock Text="{Binding NiveauLibelle, Mode=OneWay}" Foreground="White" FontSize="10"
+                                                                       FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Message, Mode=OneWay}" TextWrapping="Wrap" FontSize="11.5"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Formulaire -->
+                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                          Visibility="{Binding ProcedureOuverte, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel Margin="0,0,8,0" IsEnabled="{Binding PeutModifier, Mode=OneWay}">
+
+                                    <!-- Sanction notifiée : éléments figés -->
+                                    <Border Background="#FFF8E1" BorderBrush="#E65100" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,4,10,4"
+                                            Visibility="{Binding EstFigee, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{Binding MessageVerrouillage, Mode=OneWay}" TextWrapping="Wrap" FontSize="11.5" Foreground="#8A3B00"/>
+                                    </Border>
+
+                                    <!-- Sections 1 à 7 : ce qui fonde la sanction, figé une fois la sanction notifiée -->
+                                    <StackPanel IsEnabled="{Binding ChampsFondateursModifiables, Mode=OneWay}">
+
+                                    <!-- 1. Salarié et faits -->
+                                    <TextBlock Text="1. SALARIÉ ET FAITS REPROCHÉS" Style="{StaticResource Section}" Margin="0,4,0,6"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Salarié *" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding SalariesProposes}" SelectedItem="{Binding SalarieChoisi}"
+                                                      DisplayMemberPath="FullNameWithId" Height="28" IsEditable="False"
+                                                      IsEnabled="{Binding SalarieModifiable, Mode=OneWay}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Nature des faits" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding Categories}" Text="{Binding ProcedureEnCours.CategorieFaits, UpdateSourceTrigger=LostFocus}"
+                                                      IsEditable="True" Height="28"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Date des faits *" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateFaits}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Connus de l'employeur le *" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateConnaissance}"
+                                                        ToolTip="Point de départ du délai d'engagement de la procédure."/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Lieu" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.LieuFaits, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Qualification de la faute" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding Gravites}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                      SelectedValue="{Binding ProcedureEnCours.Gravite}" Height="28"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Description précise des faits (date, heure, circonstances) *" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding ProcedureEnCours.DescriptionFaits, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+                                    <TextBlock Text="Témoins" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.Temoins, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <CheckBox Content="Salarié protégé (délégué du personnel, délégué syndical…)" Style="{StaticResource FormCheckBoxStyle}" ToolTip="Coché automatiquement si le salarié figure à l'onglet « Salariés protégés » ; un oubli est signalé, et bloque un licenciement."
+                                                  IsChecked="{Binding ProcedureEnCours.SalarieProtege}" Margin="0,4,12,4"/>
+                                        <TextBox Style="{StaticResource Saisie}" Width="200" Text="{Binding ProcedureEnCours.MandatProtege, UpdateSourceTrigger=LostFocus}"
+                                                 ToolTip="Mandat exercé" Visibility="{Binding ProcedureEnCours.SalarieProtege, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    </StackPanel>
+
+                                    <!-- 2. Sanction envisagée -->
+                                    <TextBlock Text="2. SANCTION ENVISAGÉE" Style="{StaticResource Section}"/>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <ComboBox ItemsSource="{Binding TypesProposes}" SelectedItem="{Binding TypeSanctionChoisi}"
+                                                  DisplayMemberPath="Designation" Height="28"/>
+                                        <TextBlock Text="{Binding ExigencesSanction, Mode=OneWay}" Style="{StaticResource Hint}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- 3. Demande d'explication -->
+                                    <TextBlock Text="3. DEMANDE D'EXPLICATION ÉCRITE" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Remise au salarié le" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateDemandeExplication}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Réponse reçue le" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateReponse}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="{Binding DateLimiteReponseLibelle, Mode=OneWay}" Style="{StaticResource Hint}"/>
+                                    <TextBlock Text="Résumé de la réponse du salarié" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding ProcedureEnCours.ResumeReponse, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+
+                                    <!-- 4. Mise à pied conservatoire -->
+                                    <TextBlock Text="4. MISE À PIED CONSERVATOIRE (FACULTATIVE)" Style="{StaticResource Section}"/>
+                                    <TextBlock Style="{StaticResource Hint}"
+                                               Text="Mesure d'attente, pas une sanction : les jours restent payés, sauf si la procédure aboutit à un licenciement pour faute lourde."/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="À compter du" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.ConservatoireDebut}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Jusqu'au (vide : jusqu'à la décision)" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.ConservatoireFin}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+
+                                    <!-- 5. Entretien préalable -->
+                                    <TextBlock Text="5. ENTRETIEN PRÉALABLE" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Convocation remise le" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateConvocation}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Entretien le" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateEntretien}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Heure et lieu (repris dans la convocation)" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.HeureLieuEntretien, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Salarié assisté par" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.AssistantEntretien, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="{Binding PremiereDateEntretienLibelle, Mode=OneWay}" Style="{StaticResource Hint}"/>
+                                    <TextBlock Text="Compte rendu de l'entretien" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding ProcedureEnCours.CompteRenduEntretien, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+
+                                    <!-- 6. Inspection du travail -->
+                                    <StackPanel Visibility="{Binding AfficherInspection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="6. AUTORISATION DE L'INSPECTEUR DU TRAVAIL (SALARIÉ PROTÉGÉ)" Style="{StaticResource Section}"/>
+                                        <UniformGrid Columns="2">
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Décision de l'inspecteur" Style="{StaticResource FieldLabel}"/>
+                                                <ComboBox ItemsSource="{Binding DecisionsInspection}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                          SelectedValue="{Binding ProcedureEnCours.DecisionInspection}" Height="28"/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Référence de la décision" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.ReferenceInspection, UpdateSourceTrigger=LostFocus}"/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Demande déposée le" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateDemandeInspection}"/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Décision rendue le" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateDecisionInspection}"/>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                    </StackPanel>
+
+                                    <!-- 7. Décision -->
+                                    <TextBlock Text="7. DÉCISION" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Décision prise le (sanction choisie en 2.)" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateDecision}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}" VerticalAlignment="Bottom">
+                                            <CheckBox Content="Classer sans suite" Style="{StaticResource FormCheckBoxStyle}"
+                                                      IsChecked="{Binding ProcedureEnCours.ClasseeSansSuite}" Margin="0,4,0,4"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <StackPanel Visibility="{Binding AfficherClassement, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="Motif du classement sans suite *" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.MotifClassement, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+                                    </StackPanel>
+                                    <TextBlock Text="Motifs de la décision (repris dans la lettre — obligatoires pour un licenciement)" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource SaisieLongue}" Text="{Binding ProcedureEnCours.MotifsDecision, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+
+                                    <StackPanel Visibility="{Binding EstMiseAPied, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <UniformGrid Columns="3">
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Mise à pied du" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.MiseAPiedDebut}"/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="au (inclus)" Style="{StaticResource FieldLabel}"/>
+                                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.MiseAPiedFin}"/>
+                                            </StackPanel>
+                                            <StackPanel Style="{StaticResource Field}">
+                                                <TextBlock Text="Jours retenus" Style="{StaticResource FieldLabel}"/>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBox Style="{StaticResource Saisie}" Width="60"
+                                                             Text="{Binding ProcedureEnCours.MiseAPiedJours, UpdateSourceTrigger=LostFocus, StringFormat={}{0:0.##}}"/>
+                                                    <Button Content="Proposer" Style="{StaticResource SecondaryButtonStyle}" Margin="6,0,0,0"
+                                                            Command="{Binding ProposerJoursCommand}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </UniformGrid>
+                                        <TextBlock Text="{Binding JoursMiseAPiedProposesLibelle, Mode=OneWay}" Style="{StaticResource Hint}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Visibility="{Binding EstLicenciement, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <StackPanel Style="{StaticResource Field}" HorizontalAlignment="Left" Width="260">
+                                            <TextBlock Text="Date d'effet du licenciement (fin du contrat)" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateEffetLicenciement}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    </StackPanel>
+
+                                    <!-- 8. Notification -->
+                                    <TextBlock Text="8. NOTIFICATION AU SALARIÉ" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="3">
+                                        <StackPanel Style="{StaticResource Field}" IsEnabled="{Binding ChampsFondateursModifiables, Mode=OneWay}">
+                                            <TextBlock Text="Notifiée le" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateNotification}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}" IsEnabled="{Binding ChampsFondateursModifiables, Mode=OneWay}">
+                                            <TextBlock Text="Mode" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding ModesNotification}" Text="{Binding ProcedureEnCours.ModeNotification, UpdateSourceTrigger=LostFocus}"
+                                                      IsEditable="True" Height="28"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}" IsEnabled="{Binding AccuseReceptionModifiable, Mode=OneWay}">
+                                            <TextBlock Text="Décharge / AR du" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateAccuseReception}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+
+                                    <!-- 9. Recours -->
+                                    <TextBlock Text="9. RECOURS DU SALARIÉ" Style="{StaticResource Section}"/>
+                                    <UniformGrid Columns="3">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Recours formé le" Style="{StaticResource FieldLabel}"/>
+                                            <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding ProcedureEnCours.DateRecours}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Devant" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding InstancesRecours}" Text="{Binding ProcedureEnCours.InstanceRecours, UpdateSourceTrigger=LostFocus}"
+                                                      IsEditable="True" Height="28"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Issue" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.IssueRecours, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Commentaire interne" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Text="{Binding ProcedureEnCours.Commentaire, UpdateSourceTrigger=LostFocus}" Margin="0,0,10,6"/>
+
+                                    <!-- 10. Lettres -->
+                                    <TextBlock Text="10. LETTRES (PRODUITES EN PDF ET VERSÉES AU DOSSIER)" Style="{StaticResource Section}"/>
+                                    <WrapPanel>
+                                        <Button Content="Demande d'explication" Tag="{StaticResource IconPdf}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding LettreExplicationCommand}" Margin="0,0,6,6"/>
+                                        <Button Content="Convocation à entretien" Tag="{StaticResource IconPdf}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding LettreConvocationCommand}" Margin="0,0,6,6"/>
+                                        <Button Content="Mise à pied conservatoire" Tag="{StaticResource IconPdf}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding LettreConservatoireCommand}" Margin="0,0,6,6"/>
+                                        <Button Content="Notification de sanction" Tag="{StaticResource IconPdf}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding LettreNotificationCommand}" Margin="0,0,6,6"/>
+                                        <Button Content="Lettre de licenciement" Tag="{StaticResource IconPdf}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding LettreLicenciementCommand}" Margin="0,0,6,6"/>
+                                    </WrapPanel>
+
+                                    <!-- 11. Pièces -->
+                                    <TextBlock Text="11. PIÈCES DU DOSSIER" Style="{StaticResource Section}"/>
+                                    <ItemsControl ItemsSource="{Binding PiecesExigees}" Margin="0,0,0,6">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="0,1" ToolTip="{Binding Motif, Mode=OneWay}">
+                                                    <TextBlock Text="{Binding Etat, Mode=OneWay}" Width="78" FontWeight="SemiBold" FontSize="11">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Fournie}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding Libelle, Mode=OneWay}" FontSize="11.5"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Grid Margin="0,0,10,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox ItemsSource="{Binding TypesPiece}" SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                  SelectedValue="{Binding TypeNouvellePiece}" Height="28"/>
+                                        <Button Grid.Column="1" Content="Verser une pièce…" Tag="{StaticResource IconImport}"
+                                                Style="{StaticResource SecondaryButtonStyle}" Command="{Binding AjouterPieceCommand}" Margin="6,0,0,0"/>
+                                    </Grid>
+                                    <DataGrid ItemsSource="{Binding Pieces}" SelectedItem="{Binding PieceSelectionnee}" IsReadOnly="True"
+                                              AutoGenerateColumns="False" HeadersVisibility="Column" RowHeaderWidth="0" MinHeight="70" MaxHeight="180"
+                                              GridLinesVisibility="Horizontal" BorderThickness="1" BorderBrush="{StaticResource RuleBrush}" Margin="0,0,10,6">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Nature" Binding="{Binding TypeLibelle, Mode=OneWay}" Width="190"/>
+                                            <DataGridTextColumn Header="Fichier" Binding="{Binding NomOriginal, Mode=OneWay}" Width="*"/>
+                                            <DataGridTextColumn Header="Versée le" Binding="{Binding DateAjoutLibelle, Mode=OneWay}" Width="110"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <Button Content="Ouvrir" Tag="{StaticResource IconView}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding OuvrirPieceCommand}" Margin="0,0,6,0"/>
+                                        <Button Content="Retirer" Tag="{StaticResource IconDelete}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding SupprimerPieceCommand}" Margin="0,0,6,0"/>
+                                        <Button Content="Ouvrir le répertoire" Tag="{StaticResource IconFile}" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding OuvrirRepertoireCommand}" Margin="0"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 2. Échéancier ───────── -->
+            <TabItem Header="Échéancier">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource Hint}" Margin="2,0,0,8"
+                               Text="Délais de réponse, entretiens, décisions à prendre ou à notifier, mises à pied à venir. Cliquez une ligne pour ouvrir la procédure."/>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                        <DataGrid ItemsSource="{Binding Echeances}" SelectedItem="{Binding EcheanceSelectionnee}"
+                                  Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                  AutoGenerateColumns="False" BorderThickness="0">
+                            <DataGrid.CellStyle>
+                                <Style TargetType="DataGridCell" BasedOn="{StaticResource GridCellStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding EstDepassee}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.CellStyle>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Date" Binding="{Binding DateLibelle, Mode=OneWay}" Width="120"/>
+                                <DataGridTextColumn Header="Délai" Binding="{Binding DelaiLibelle, Mode=OneWay}" Width="120"/>
+                                <DataGridTextColumn Header="Échéance" Binding="{Binding Libelle, Mode=OneWay}" Width="*" MinWidth="220"/>
+                                <DataGridTextColumn Header="Référence" Binding="{Binding Reference, Mode=OneWay}" Width="115"/>
+                                <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}" Width="90"/>
+                                <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="200"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 3. Registre ───────── -->
+            <TabItem Header="Registre des sanctions">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                    </Grid.RowDefinitions>
+                    <Border Style="{StaticResource Toolbar}">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox Content="Afficher les sanctions effacées" Style="{StaticResource FormCheckBoxStyle}"
+                                      IsChecked="{Binding AfficherEffacees}" Margin="0,0,16,0"/>
+                            <Button Content="Exporter vers Excel" Tag="{StaticResource IconExcel}"
+                                    Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ExporterExcelCommand}" Margin="0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="0">
+                        <DataGrid ItemsSource="{Binding VueRegistre}" SelectedItem="{Binding LigneRegistreSelectionnee}"
+                                  Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                  AutoGenerateColumns="False" BorderThickness="0">
+                            <DataGrid.CellStyle>
+                                <Style TargetType="DataGridCell" BasedOn="{StaticResource GridCellStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding EstEffacee}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource InkSubtleBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.CellStyle>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Référence" Binding="{Binding Reference, Mode=OneWay}" Width="115"/>
+                                <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}" Width="85"/>
+                                <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="180"/>
+                                <DataGridTextColumn Header="Faits du" Binding="{Binding DateFaitsLibelle, Mode=OneWay}" Width="80"/>
+                                <DataGridTextColumn Header="Nature des faits" Binding="{Binding CategorieFaits, Mode=OneWay}" Width="*" MinWidth="150"/>
+                                <DataGridTextColumn Header="Sanction" Binding="{Binding Sanction, Mode=OneWay}" Width="200"/>
+                                <DataGridTextColumn Header="Notifiée le" Binding="{Binding DateNotificationLibelle, Mode=OneWay}" Width="85"/>
+                                <DataGridTextColumn Header="J. MAP" Binding="{Binding JoursMiseAPied, Mode=OneWay, StringFormat={}{0:0.##}}" Width="55"
+                                                    HeaderStyle="{StaticResource GridColumnHeaderRightStyle}" ElementStyle="{StaticResource RightTextStyle}"/>
+                                <DataGridTextColumn Header="Effacement" Binding="{Binding EffacementLibelle, Mode=OneWay}" Width="135"/>
+                                <DataGridCheckBoxColumn Header="Recours" Binding="{Binding Recours, Mode=OneWay}" Width="60"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 4. Salariés protégés ───────── -->
+            <TabItem Header="Salariés protégés">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="6*" MinWidth="380"/>
+                        <ColumnDefinition Width="4*" MinWidth="320"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="100"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.ColumnSpan="2" Style="{StaticResource Hint}" Margin="2,0,0,8"
+                               Text="Délégués du personnel, délégués syndicaux… Un salarié inscrit ici est automatiquement « protégé » dans ses procédures : son licenciement est bloqué tant que l'autorisation de l'inspecteur du travail n'est pas saisie. Gardez les mandats terminés (avec leur date de fin) : la protection s'apprécie à la date des faits et de la décision."/>
+
+                    <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="0" Margin="0,0,8,0">
+                        <DataGrid ItemsSource="{Binding Mandats}" SelectedItem="{Binding MandatSelectionne}"
+                                  Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                  AutoGenerateColumns="False" BorderThickness="0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Matricule" Binding="{Binding EmployeeId, Mode=OneWay}" Width="85"/>
+                                <DataGridTextColumn Header="Salarié" Binding="{Binding NomSalarie, Mode=OneWay}" Width="*" MinWidth="140"/>
+                                <DataGridTextColumn Header="Mandat" Binding="{Binding Mandat, Mode=OneWay}" Width="190"/>
+                                <DataGridTextColumn Header="Mandat exercé" Binding="{Binding PeriodeLibelle, Mode=OneWay}" Width="170"/>
+                                <DataGridTextColumn Header="Protection" Binding="{Binding ProtectionLibelle, Mode=OneWay}" Width="115"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="14,10" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="MANDAT" Style="{StaticResource SectionLabelStyle}"/>
+                            <TextBlock Text="Sélectionnez un mandat ou cliquez sur « Nouveau mandat ».">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding MandatOuvert}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <StackPanel Visibility="{Binding MandatOuvert, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        IsEnabled="{Binding PeutModifier, Mode=OneWay}">
+                                <TextBlock Text="Salarié *" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding SalariesRegistre}" SelectedItem="{Binding SalarieMandatChoisi}"
+                                          DisplayMemberPath="FullNameWithId" Height="28" Margin="0,0,0,8"/>
+                                <TextBlock Text="Mandat exercé *" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox ItemsSource="{Binding MandatsProposes}" IsEditable="True" Height="28" Margin="0,0,0,8"
+                                          Text="{Binding MandatEnCours.Mandat, UpdateSourceTrigger=LostFocus}"/>
+                                <UniformGrid Columns="2">
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Début du mandat *" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding MandatEnCours.DateDebut}"/>
+                                    </StackPanel>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Fin du mandat (vide : en cours)" Style="{StaticResource FieldLabel}"/>
+                                        <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding MandatEnCours.DateFin}"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="Protection jusqu'au (si elle se prolonge après le mandat)" Style="{StaticResource FieldLabel}"/>
+                                <DatePicker Style="{StaticResource Date}" SelectedDate="{Binding MandatEnCours.FinProtection}" HorizontalAlignment="Left" Width="160" Margin="0,0,0,4"/>
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="Vide : la protection s'arrête avec le mandat. À renseigner si la loi, la convention ou un accord la prolonge."/>
+                                <TextBlock Text="Commentaire (procès-verbal d'élection, désignation…)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Text="{Binding MandatEnCours.Commentaire, UpdateSourceTrigger=LostFocus}" Margin="0,0,0,8"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="Nouveau mandat" Tag="{StaticResource IconAdd}"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding NouveauMandatCommand}"/>
+                                <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                        Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerMandatCommand}"/>
+                                <Button Content="Retirer" Tag="{StaticResource IconDelete}" Margin="0"
+                                        Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerMandatCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ───────── 5. Paramètres & catalogue ───────── -->
+            <TabItem Header="Délais &amp; catalogue des sanctions">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4*" MinWidth="300"/>
+                            <ColumnDefinition Width="6*" MinWidth="420"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Délais -->
+                        <Border Style="{StaticResource CardBorderStyle}" Padding="14,10" Margin="0,0,8,0" VerticalAlignment="Top">
+                            <StackPanel DataContext="{Binding ParametresEnCours}">
+                                <TextBlock Text="DÉLAIS DE PROCÉDURE DU DOSSIER" Style="{StaticResource SectionLabelStyle}"/>
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="Le Code du travail ne fixe pas ces délais : alignez-les sur votre règlement intérieur visé par l'inspection du travail et sur la convention collective. Les valeurs livrées sont indicatives."/>
+                                <TextBlock Text="Engager la procédure dans les (jours après connaissance des faits ; 0 = non contrôlé)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding DelaiEngagementJours, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Délai de réponse à la demande d'explication (jours ouvrables)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding DelaiReponseJoursOuvrables, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Jours ouvrables pleins entre convocation et entretien" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding DelaiConvocationJoursOuvrables, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Décider dans les (jours après réponse ou entretien ; 0 = non contrôlé)" Style="{StaticResource FieldLabel}" TextWrapping="Wrap"/>
+                                <TextBox Style="{StaticResource Saisie}" Width="80" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                         Text="{Binding DelaiDecisionJours, UpdateSourceTrigger=LostFocus}"/>
+
+                                <TextBlock Text="LETTRES" Style="{StaticResource SectionLabelStyle}" Margin="0,10,0,6"/>
+                                <TextBlock Text="Référence du règlement intérieur (visa de l'inspection)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Margin="0,0,0,8" Text="{Binding ReferenceReglementInterieur, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Signataire" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Margin="0,0,0,8" Text="{Binding Signataire, UpdateSourceTrigger=LostFocus}"/>
+                                <TextBlock Text="Qualité du signataire" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Style="{StaticResource Saisie}" Margin="0,0,0,10" Text="{Binding FonctionSignataire, UpdateSourceTrigger=LostFocus}"/>
+
+                                <Button Content="Enregistrer les délais" Tag="{StaticResource IconSave}" HorizontalAlignment="Left"
+                                        Style="{StaticResource MenuButtonStyle}"
+                                        Command="{Binding DataContext.EnregistrerParametresCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Catalogue -->
+                        <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Padding="14,10" VerticalAlignment="Top">
+                            <StackPanel>
+                                <TextBlock Text="CATALOGUE DES SANCTIONS (RÈGLEMENT INTÉRIEUR)" Style="{StaticResource SectionLabelStyle}"/>
+                                <DataGrid ItemsSource="{Binding Types}" SelectedItem="{Binding TypeCatalogueSelectionne}"
+                                          Style="{StaticResource FormDataGridStyle}" IsReadOnly="True" SelectionMode="Single"
+                                          AutoGenerateColumns="False" MinHeight="140" MaxHeight="260" Margin="0,0,0,10">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Rang" Binding="{Binding Ordre, Mode=OneWay}" Width="45"/>
+                                        <DataGridTextColumn Header="Code" Binding="{Binding Code, Mode=OneWay}" Width="55"/>
+                                        <DataGridTextColumn Header="Sanction" Binding="{Binding Libelle, Mode=OneWay}" Width="*"/>
+                                        <DataGridTextColumn Header="Nature" Binding="{Binding NatureLibelle, Mode=OneWay}" Width="105"/>
+                                        <DataGridCheckBoxColumn Header="Explic." Binding="{Binding ExigeExplication, Mode=OneWay}" Width="50"/>
+                                        <DataGridCheckBoxColumn Header="Entret." Binding="{Binding ExigeEntretien, Mode=OneWay}" Width="50"/>
+                                        <DataGridTextColumn Header="Max j" Binding="{Binding DureeMaxJours, Mode=OneWay}" Width="45"/>
+                                        <DataGridTextColumn Header="Effac. (mois)" Binding="{Binding EffacementMois, Mode=OneWay}" Width="80"/>
+                                        <DataGridCheckBoxColumn Header="Active" Binding="{Binding Actif, Mode=OneWay}" Width="50"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <StackPanel DataContext="{Binding TypeCatalogueEnCours}">
+                                    <UniformGrid Columns="3">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Code *" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" CharacterCasing="Upper" Text="{Binding Code, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Nature" Style="{StaticResource FieldLabel}"/>
+                                            <ComboBox ItemsSource="{Binding DataContext.Natures, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      SelectedValuePath="Key" DisplayMemberPath="Value" SelectedValue="{Binding Nature}" Height="28"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Rang dans l'échelle" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding Ordre, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock Text="Libellé *" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Style="{StaticResource Saisie}" Margin="0,0,10,6" Text="{Binding Libelle, UpdateSourceTrigger=LostFocus}"/>
+                                    <WrapPanel Margin="0,2,0,4">
+                                        <CheckBox Content="Exige une demande d'explication" Style="{StaticResource FormCheckBoxStyle}" IsChecked="{Binding ExigeExplication}" Margin="0,4,14,4"/>
+                                        <CheckBox Content="Exige un entretien préalable" Style="{StaticResource FormCheckBoxStyle}" IsChecked="{Binding ExigeEntretien}" Margin="0,4,14,4"/>
+                                        <CheckBox Content="Faute lourde (sans préavis ni indemnité)" Style="{StaticResource FormCheckBoxStyle}" IsChecked="{Binding FauteLourde}"
+                                                  IsEnabled="{Binding EstLicenciement, Mode=OneWay}" Margin="0,4,14,4"/>
+                                        <CheckBox Content="Active" Style="{StaticResource FormCheckBoxStyle}" IsChecked="{Binding Actif}" Margin="0,4,0,4"/>
+                                    </WrapPanel>
+                                    <UniformGrid Columns="2">
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Mise à pied : jours au plus (0 = libre)" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding DureeMaxJours, UpdateSourceTrigger=LostFocus}"
+                                                     IsEnabled="{Binding EstMiseAPied, Mode=OneWay}"/>
+                                        </StackPanel>
+                                        <StackPanel Style="{StaticResource Field}">
+                                            <TextBlock Text="Effacée après (mois ; 0 = jamais)" Style="{StaticResource FieldLabel}"/>
+                                            <TextBox Style="{StaticResource Saisie}" Text="{Binding EffacementMois, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button Content="Nouvelle sanction" Tag="{StaticResource IconAdd}"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding NouveauTypeCommand}"/>
+                                    <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                            Style="{StaticResource MenuButtonStyle}" Command="{Binding EnregistrerTypeCommand}"/>
+                                    <Button Content="Supprimer" Tag="{StaticResource IconDelete}" Margin="0"
+                                            Style="{StaticResource SecondaryButtonStyle}" Command="{Binding SupprimerTypeCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- ═══════════ Barre de statut ═══════════ -->
+        <Border Grid.Row="3" Margin="0,8,0,0" Padding="8,4" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource InkSubtleBrush}" TextWrapping="Wrap"/>
+        </Border>
+    </Grid>
+</UserControl>

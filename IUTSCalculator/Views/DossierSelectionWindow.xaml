@@ -5,8 +5,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Sélection du dossier"
-        Height="580" Width="860"
-        MinHeight="500" MinWidth="760"
+        Height="600" Width="980"
+        MinHeight="520" MinWidth="900"
         WindowStartupLocation="CenterScreen"
         WindowStyle="SingleBorderWindow"
         Background="{StaticResource GrayLightBrush}"
@@ -23,6 +23,8 @@
                        Foreground="{StaticResource PrimaryBlueDarkerBrush}"/>
             <TextBlock Text="Chaque dossier correspond à une entreprise : ses employés et calculs sont conservés séparément des autres dossiers."
                        Foreground="{StaticResource GrayDarkBrush}" FontSize="12" Margin="0,4,0,0"/>
+            <TextBlock Text="{Binding VersionProgramme, Mode=OneWay}"
+                       Foreground="{StaticResource GrayDarkBrush}" FontSize="11" Margin="0,2,0,0"/>
         </StackPanel>
 
         <Grid Grid.Row="1">
@@ -133,10 +135,20 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" VerticalAlignment="Center"
-                       Foreground="{StaticResource GrayDarkBrush}" FontSize="12"/>
-            <Button Grid.Column="1" Content="Ouvrir le dossier" Command="{Binding OpenDossierCommand}"
+            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Foreground="{StaticResource GrayDarkBrush}" FontSize="12" Margin="0,0,10,0"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,14,0">
+                <Button Content="Sauvegarder les données…" Command="{Binding SauvegarderCommand}"
+                        Style="{StaticResource MenuButtonStyle}" Tag="{StaticResource IconSave}"
+                        ToolTip="Copie de tous les dossiers, utilisateurs et réglages de ce poste dans un fichier .zip (à garder aussi hors de l'ordinateur)."/>
+                <Button Content="Restaurer…" Command="{Binding RestaurerCommand}" Margin="8,5,0,5"
+                        Style="{StaticResource MenuButtonStyle}" Tag="{StaticResource IconImport}"
+                        ToolTip="Remet toutes les données dans l'état d'une sauvegarde (l'état actuel est sauvegardé d'abord). Possible seulement au démarrage, avant d'ouvrir un dossier."
+                        ToolTipService.ShowOnDisabled="True"/>
+            </StackPanel>
+            <Button Grid.Column="2" Content="Ouvrir le dossier" Command="{Binding OpenDossierCommand}"
                     Style="{StaticResource MenuButtonStyle}" Tag="{StaticResource IconCheck}" MinWidth="170"/>
         </Grid>
     </Grid>

@@ -334,8 +334,172 @@ namespace IUTSCalculator.Models
         public int EffectifRequis
         {
             get => _effectifRequis;
-            set { if (_effectifRequis != value) { _effectifRequis = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_effectifRequis != value)
+                {
+                    _effectifRequis = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(EffectifBudgete));
+                    OnPropertyChanged(nameof(EcartEffectif));
+                    OnPropertyChanged(nameof(TauxOccupation));
+                    OnPropertyChanged(nameof(StatutOccupationGpec));
+                    OnPropertyChanged(nameof(BadgeEffectifGpec));
+                    OnPropertyChanged(nameof(CouleurStatutGpec));
+                }
+            }
         }
+
+        // ── Propriétés étendues RH-02 (Fiche de poste & GPEC) ──
+        private string _finalitePrincipale;
+        private string _activitesCles;
+        private string _niveauEtudeRequis;
+        private string _diplomeRequis;
+        private int _experienceMinimaleAnnees;
+        private string _conditionsTravail;
+        private int? _conventionId;
+        private string _conventionLibelle;
+        private string _categorieConventionnelle;
+        private string _echelonConventionnel;
+        private decimal _salaireMinimumConventionnel;
+        private decimal _salaireMinBudgete;
+        private decimal _salaireMaxBudgete;
+        private int _effectifPourvu;
+
+        public string FinalitePrincipale
+        {
+            get => _finalitePrincipale;
+            set { if (_finalitePrincipale != value) { _finalitePrincipale = value; OnPropertyChanged(); } }
+        }
+
+        public string ActivitesCles
+        {
+            get => _activitesCles;
+            set { if (_activitesCles != value) { _activitesCles = value; OnPropertyChanged(); } }
+        }
+
+        public string NiveauEtudeRequis
+        {
+            get => _niveauEtudeRequis;
+            set { if (_niveauEtudeRequis != value) { _niveauEtudeRequis = value; OnPropertyChanged(); } }
+        }
+
+        public string DiplomeRequis
+        {
+            get => _diplomeRequis;
+            set { if (_diplomeRequis != value) { _diplomeRequis = value; OnPropertyChanged(); } }
+        }
+
+        public int ExperienceMinimaleAnnees
+        {
+            get => _experienceMinimaleAnnees;
+            set { if (_experienceMinimaleAnnees != value) { _experienceMinimaleAnnees = value; OnPropertyChanged(); } }
+        }
+
+        public string ConditionsTravail
+        {
+            get => _conditionsTravail;
+            set { if (_conditionsTravail != value) { _conditionsTravail = value; OnPropertyChanged(); } }
+        }
+
+        public int? ConventionId
+        {
+            get => _conventionId;
+            set { if (_conventionId != value) { _conventionId = value; OnPropertyChanged(); } }
+        }
+
+        public string ConventionLibelle
+        {
+            get => _conventionLibelle;
+            set { if (_conventionLibelle != value) { _conventionLibelle = value; OnPropertyChanged(); } }
+        }
+
+        public string CategorieConventionnelle
+        {
+            get => _categorieConventionnelle;
+            set { if (_categorieConventionnelle != value) { _categorieConventionnelle = value; OnPropertyChanged(); } }
+        }
+
+        public string EchelonConventionnel
+        {
+            get => _echelonConventionnel;
+            set { if (_echelonConventionnel != value) { _echelonConventionnel = value; OnPropertyChanged(); } }
+        }
+
+        public decimal SalaireMinimumConventionnel
+        {
+            get => _salaireMinimumConventionnel;
+            set { if (_salaireMinimumConventionnel != value) { _salaireMinimumConventionnel = value; OnPropertyChanged(); } }
+        }
+
+        public decimal SalaireMinBudgete
+        {
+            get => _salaireMinBudgete;
+            set { if (_salaireMinBudgete != value) { _salaireMinBudgete = value; OnPropertyChanged(); } }
+        }
+
+        public decimal SalaireMaxBudgete
+        {
+            get => _salaireMaxBudgete;
+            set { if (_salaireMaxBudgete != value) { _salaireMaxBudgete = value; OnPropertyChanged(); } }
+        }
+
+        public int EffectifBudgete
+        {
+            get => _effectifRequis;
+            set => EffectifRequis = value;
+        }
+
+        public int EffectifPourvu
+        {
+            get => _effectifPourvu;
+            set
+            {
+                if (_effectifPourvu != value)
+                {
+                    _effectifPourvu = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(EcartEffectif));
+                    OnPropertyChanged(nameof(TauxOccupation));
+                    OnPropertyChanged(nameof(StatutOccupationGpec));
+                    OnPropertyChanged(nameof(BadgeEffectifGpec));
+                    OnPropertyChanged(nameof(CouleurStatutGpec));
+                    OnPropertyChanged(nameof(EstPourvu));
+                    OnPropertyChanged(nameof(StatutOccupation));
+                }
+            }
+        }
+
+        public int EcartEffectif => _effectifRequis - _effectifPourvu;
+
+        public double TauxOccupation => _effectifRequis > 0 ? Math.Round((double)_effectifPourvu / _effectifRequis * 100.0, 1) : 0;
+
+        public string StatutOccupationGpec
+        {
+            get
+            {
+                if (_effectifPourvu == 0) return "Vacant";
+                if (_effectifPourvu < _effectifRequis) return "Partiel";
+                if (_effectifPourvu == _effectifRequis) return "Pourvu";
+                return "Sureffectif";
+            }
+        }
+
+        public string BadgeEffectifGpec => $"{_effectifPourvu} / {_effectifRequis}";
+
+        public string CouleurStatutGpec
+        {
+            get
+            {
+                if (_effectifPourvu == 0) return "#C62828";
+                if (_effectifPourvu < _effectifRequis) return "#E65100";
+                if (_effectifPourvu == _effectifRequis) return "#1B5E20";
+                return "#6A1B9A";
+            }
+        }
+
+        public ObservableCollection<PosteCompetence> CompetencesRequises { get; set; } = new ObservableCollection<PosteCompetence>();
+        public ObservableCollection<TitulairePosteLigne> TitulairesActuels { get; set; } = new ObservableCollection<TitulairePosteLigne>();
 
         public bool Actif
         {
@@ -355,9 +519,9 @@ namespace IUTSCalculator.Models
             set { if (_dateCreation != value) { _dateCreation = value; OnPropertyChanged(); } }
         }
 
-        public bool EstPourvu => !string.IsNullOrWhiteSpace(TitulaireMatricule);
+        public bool EstPourvu => _effectifPourvu > 0;
 
-        public string StatutOccupation => EstPourvu ? "Pourvu" : "Vacant";
+        public string StatutOccupation => StatutOccupationGpec;
 
         public string DisplayName => string.IsNullOrWhiteSpace(Code) ? Intitule : $"{Code} — {Intitule}";
 
@@ -494,6 +658,53 @@ namespace IUTSCalculator.Models
         {
             get => _effectifTotal;
             set { if (_effectifTotal != value) { _effectifTotal = value; OnPropertyChanged(); } }
+        }
+
+        private int _effectifBudgete;
+        private int _effectifPourvu;
+
+        public int EffectifBudgete
+        {
+            get => _effectifBudgete;
+            set
+            {
+                if (_effectifBudgete != value)
+                {
+                    _effectifBudgete = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(BadgeEffectifGpec));
+                    OnPropertyChanged(nameof(CouleurStatutGpec));
+                }
+            }
+        }
+
+        public int EffectifPourvu
+        {
+            get => _effectifPourvu;
+            set
+            {
+                if (_effectifPourvu != value)
+                {
+                    _effectifPourvu = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(BadgeEffectifGpec));
+                    OnPropertyChanged(nameof(CouleurStatutGpec));
+                }
+            }
+        }
+
+        public string BadgeEffectifGpec => $"{_effectifPourvu} / {_effectifBudgete}";
+
+        public string CouleurStatutGpec
+        {
+            get
+            {
+                if (_effectifBudgete <= 0) return "#555555";
+                if (_effectifPourvu == 0) return "#C62828";
+                if (_effectifPourvu < _effectifBudgete) return "#E65100";
+                if (_effectifPourvu == _effectifBudgete) return "#1B5E20";
+                return "#6A1B9A";
+            }
         }
 
         public int NombrePostes

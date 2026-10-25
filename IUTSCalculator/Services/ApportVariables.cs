@@ -97,6 +97,27 @@ namespace IUTSCalculator.Services
         public decimal JoursCongesPris { get; private set; }
 
         /// <summary>
+        /// Part du mois couverte par le contrat quand le salarié entre ou sort en cours de
+        /// mois (prorata hors contrat, voir AbsenceService.ProrataHorsContrat), 1 sinon.
+        ///
+        /// Elle proratise ce qui est dû pour le mois ENTIER et non pour les jours
+        /// travaillés : l'abattement forfaitaire (calculé sur le salaire de base), la prime
+        /// d'ancienneté et les gains permanents du profil de paie. Les absences ordinaires
+        /// n'y entrent pas (comportement inchangé). À appliquer avant le profil et la
+        /// convention : AvecAbsences vient en premier dans tous les assemblages.
+        /// </summary>
+        public decimal FractionContrat { get; private set; } = 1m;
+
+        /// <summary>Gain permanent ramené à la part du mois couverte par le contrat.</summary>
+        private LigneApport Proratiser(LigneApport ligne)
+        {
+            if (ligne == null || FractionContrat >= 1m || ligne.Sens != SensRubrique.Gain) return ligne;
+            decimal montant = Math.Round(ligne.Montant * FractionContrat, 0, MidpointRounding.AwayFromZero);
+            return new LigneApport(ligne.Code, ligne.Libelle + " (prorata)", ligne.Sens, ligne.Quantite, montant,
+                                   ligne.SoumisIUTS, ligne.SoumisCNSS, ligne.SoumisTPA);
+        }
+
+        /// <summary>
         /// Désignation du profil de paie effectivement appliqué (module SOC-03), pour que
         /// l'écran et le bulletin puissent en faire mention. Reste vide tant qu'aucune
         /// ligne du profil n'a été retenue — un profil entièrement écarté parce que les
@@ -121,6 +142,7 @@ namespace IUTSCalculator.Services
             RetenueSurBrut = absences.RetenueSurBrut;
             LibelleRetenueSurBrut = absences.LibelleRetenue;
             JoursCongesPris = absences.JoursCongesPris;
+            FractionContrat = absences.FractionContrat > 0m && absences.FractionContrat < 1m ? absences.FractionContrat : 1m;
             return this;
         }
 
@@ -176,6 +198,21 @@ namespace IUTSCalculator.Services
         /// Elles portent sur le NET après impôts et cotisations, dans la limite de la quotité saisissable
         /// légale et avec sanctuarisation du minimum vital d'existence (SMIG).
         /// </summary>
+        /// <summary>
+        /// Net de référence sur lequel les saisies de cet apport ont été calculées. C'est
+        /// lui, et lui seul, qui doit servir à enregistrer les retenues du mois : un net
+        /// recalculé à l'enregistrement (après ajout des indemnités de sortie, par exemple)
+        /// faisait diverger le suivi des saisies de la retenue imprimée sur le bulletin.
+        /// </summary>
+        public decimal? NetReferenceSaisies { get; private set; }
+
+        /// <summary>Ajoute les saisies calculées sur <paramref name="netReference"/>, et retient ce net.</summary>
+        public ApportVariables AvecSaisies(ApportSaisies saisies, decimal netReference)
+        {
+            NetReferenceSaisies = netReference;
+            return AvecSaisies(saisies);
+        }
+
         public ApportVariables AvecSaisies(ApportSaisies saisies)
         {
             if (saisies == null || saisies.EstVide) return this;
@@ -257,6 +294,15 @@ namespace IUTSCalculator.Services
         {
             if (heuresSup == null || heuresSup.EstVide) return this;
 
+            // Doublon probable (défaut n° 23) : des heures saisies en variable HSUP en plus
+            // de celles du module. La saisie est désormais refusée des deux côtés ; ce
+            // contrôle couvre les données saisies avant cette correction.
+            if (_lignes.Any(l => string.Equals(l.Code, "HSUP", StringComparison.OrdinalIgnoreCase)))
+            {
+                _avertissements.Add("doublon possible : une variable HSUP s'ajoute aux heures du module " +
+                                    "« Heures supplémentaires » — les heures risquent d'être payées deux fois");
+            }
+
             foreach (var ligne in heuresSup.Lignes)
             {
                 if (ligne == null || ligne.Montant <= 0m) continue;
@@ -283,13 +329,17 @@ namespace IUTSCalculator.Services
             var codesExistants = new HashSet<string>(
                 _lignes.Select(l => (l.Code ?? string.Empty).ToUpperInvariant()));
 
-            foreach (var ligne in apport.Lignes)
+            foreach (var ligneConvention in apport.Lignes)
             {
-                if (ligne == null || ligne.Montant <= 0m) continue;
+                if (ligneConvention == null || ligneConvention.Montant <= 0m) continue;
 
-                string cle = (ligne.Code ?? string.Empty).ToUpperInvariant();
+                string cle = (ligneConvention.Code ?? string.Empty).ToUpperInvariant();
                 if (codesExistants.Contains(cle))
                     continue;
+
+                // Prime d'ancienneté : élément permanent, due au prorata du contrat un mois
+                // d'entrée ou de sortie (le salaire de base l'est déjà par la retenue de prorata).
+                var ligne = Proratiser(ligneConvention);
 
                 GainsImposablesEtCotisables += ligne.Montant;
                 _lignes.Add(ligne);
@@ -316,13 +366,16 @@ namespace IUTSCalculator.Services
 
             bool appliquee = false;
 
-            foreach (var ligne in profil.Lignes)
+            foreach (var ligneProfil in profil.Lignes)
             {
-                if (ligne == null || ligne.Montant == 0m) continue;
+                if (ligneProfil == null || ligneProfil.Montant == 0m) continue;
 
-                string cle = (ligne.Code ?? string.Empty).ToUpperInvariant();
+                string cle = (ligneProfil.Code ?? string.Empty).ToUpperInvariant();
                 if (codesExistants.Contains(cle))
                     continue;
+
+                // Rubrique permanente : due au prorata du contrat un mois d'entrée ou de sortie.
+                var ligne = Proratiser(ligneProfil);
 
                 switch (ligne.Sens)
                 {

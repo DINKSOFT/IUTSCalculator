@@ -122,16 +122,17 @@ namespace IUTSCalculator.Tests
 
         [Test]
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
-        public void CalculerDureePreavisMois_EmployeNonCadre_1MoisOu2MoisSelonAnciennete()
+        public void CalculerDureePreavisMois_EmployeNonCadre_1MoisSansPalier()
         {
-            // Non-cadres : 1 mois si < 5 ans, 2 mois si >= 5 ans (Art. 30 CCI-BF)
+            // Non-cadres payés au mois : 1 mois, quelle que soit l'ancienneté (CCI-BF art. 35 ;
+            // loi n° 013-2026/ALP, art. 76). L'ancien palier de 2 mois à 5 ans n'existe pas.
             decimal preavisMoins5 = SoldeToutCompteService.CalculerDureePreavisMois(isCadre: false, ancienneteAnnees: 3m);
             decimal preavisPlus5 = SoldeToutCompteService.CalculerDureePreavisMois(isCadre: false, ancienneteAnnees: 5m);
             decimal preavisPlus8 = SoldeToutCompteService.CalculerDureePreavisMois(isCadre: false, ancienneteAnnees: 8m);
 
             Assert.That(preavisMoins5, Is.EqualTo(1.0m));
-            Assert.That(preavisPlus5, Is.EqualTo(2.0m));
-            Assert.That(preavisPlus8, Is.EqualTo(2.0m));
+            Assert.That(preavisPlus5, Is.EqualTo(1.0m));
+            Assert.That(preavisPlus8, Is.EqualTo(1.0m));
         }
 
         [Test]

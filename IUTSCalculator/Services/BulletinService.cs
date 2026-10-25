@@ -5,6 +5,72 @@ using IUTSCalculator.Models;
 namespace IUTSCalculator.Services
 {
     /// <summary>
+    /// Modes de règlement proposés sur les écrans de bulletin.
+    ///
+    /// « Mobile money » manquait sur les écrans de bulletin alors que la fiche salarié et
+    /// les ordres de virement le connaissent : un salarié payé par mobile money finissait
+    /// en « Virement bancaire » ou en « Espèces » sur son bulletin, et c'est le mode du
+    /// bulletin archivé que lisent les ordres de virement. Le choix par défaut est
+    /// désormais « Mode de la fiche » : chaque salarié garde le mode de sa fiche, sauf
+    /// choix explicite d'un autre mode pour tout le lot.
+    /// </summary>
+    public static class ModesReglementPaie
+    {
+        public const string ModeDeLaFiche = "Mode de la fiche";
+        public const string Virement = "Virement bancaire";
+        public const string Cheque = "Chèque";
+        public const string Especes = "Espèces";
+        public const string MobileMoney = "Mobile money";
+
+        /// <summary>Liste des écrans de bulletin, « Mode de la fiche » en tête.</summary>
+        public static string[] Liste()
+        {
+            return new[] { ModeDeLaFiche, Virement, Cheque, Especes, MobileMoney };
+        }
+
+        /// <summary>Vrai si le choix revient à prendre le mode de la fiche.</summary>
+        public static bool EstModeDeLaFiche(string choix)
+        {
+            return string.IsNullOrWhiteSpace(choix)
+                || string.Equals(choix.Trim(), ModeDeLaFiche, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Forme normalisée d'un mode saisi librement sur une fiche.</summary>
+        public static string Normaliser(string mode)
+        {
+            if (string.IsNullOrWhiteSpace(mode)) return Virement;
+            string m = mode.Trim();
+            string bas = m.ToLowerInvariant();
+            if (bas.Contains("mobile") || bas.Contains("orange") || bas.Contains("moov")) return MobileMoney;
+            if (bas.Contains("espèce") || bas.Contains("espece") || bas.Contains("caisse")) return Especes;
+            if (bas.Contains("chèque") || bas.Contains("cheque")) return Cheque;
+            if (bas.Contains("virement") || bas.Contains("banque") || bas.Contains("bancaire")) return Virement;
+            return m;
+        }
+
+        /// <summary>Mode effectif du bulletin : le choix de l'écran, ou celui de la fiche.</summary>
+        public static string Resoudre(string choix, Employee employe)
+        {
+            if (EstModeDeLaFiche(choix))
+                return Normaliser(employe != null ? employe.ModeReglement : null);
+            return choix.Trim();
+        }
+
+        /// <summary>
+        /// Compte imprimé sur le bulletin : celui saisi à l'écran, sinon celui de la fiche
+        /// quand le mode retenu passe par un compte (virement, mobile money).
+        /// </summary>
+        public static string CompteDe(string choix, string compteSaisi, Employee employe)
+        {
+            if (!string.IsNullOrWhiteSpace(compteSaisi)) return compteSaisi;
+            string mode = Resoudre(choix, employe);
+            if (employe != null && (mode == Virement || mode == MobileMoney))
+                return employe.NumeroCompte;
+            return compteSaisi;
+        }
+    }
+
+    /// <summary>
     /// Service de génération du bulletin de paie mensuel d'un employé, conforme au
     /// modèle de référence (fichier "model_buletin.xlsx", onglet "Option 4") et au
     /// moteur de calcul IUTS (<see cref="TaxCalculatorService.CalculateMonthlyTax"/>).
@@ -70,6 +136,25 @@ namespace IUTSCalculator.Services
             string numeroCompte = null,
             ApportVariables apport = null)
         {
+            var resultat = GenererBulletinEtCalcul(employee, periode, congesPrisJours, modeReglement, numeroCompte, apport);
+            DernierCalcul = resultat.Calcul;
+            return resultat.Bulletin;
+        }
+
+        /// <summary>
+        /// Génère le bulletin ET renvoie le calcul qui l'a produit, sans passer par l'état
+        /// partagé <see cref="DernierCalcul"/> : deux générations concurrentes (calculs du
+        /// solde de tout compte relancés à chaque frappe, par exemple) ne peuvent plus
+        /// mélanger le bulletin de l'une et le calcul de l'autre.
+        /// </summary>
+        public (Bulletin Bulletin, TaxCalculation Calcul) GenererBulletinEtCalcul(
+            Employee employee,
+            DateTime periode,
+            decimal congesPrisJours = 0m,
+            string modeReglement = "Virement bancaire",
+            string numeroCompte = null,
+            ApportVariables apport = null)
+        {
             if (employee == null) throw new ArgumentNullException(nameof(employee));
 
             var apportEffectif = apport ?? ApportVariables.Aucun();
@@ -83,7 +168,6 @@ namespace IUTSCalculator.Services
             calcul.CalculationDate = new DateTime(periode.Year, periode.Month, 1)
                 .AddMonths(1).AddDays(-1);
 
-            DernierCalcul = calcul;
 
             // Congés pris : le compteur PAI-04 fait foi dès qu'une absence est enregistrée
             // pour ce mois. Le paramètre saisi à la main ne sert plus que de repli, pour
@@ -95,8 +179,19 @@ namespace IUTSCalculator.Services
             DateTime periodeFin = periodeDebut.AddMonths(1).AddDays(-1);
 
             DateTime? dateEmbauche = employee.DateEntree != default(DateTime) ? employee.DateEntree : (DateTime?)null;
-            int ancienneteMois = CalculerAncienneteMois(dateEmbauche, periodeFin);
-            decimal congesAcquis = ancienneteMois * 2.5m;
+
+            // Ancienneté affichée arrêtée au 1er du mois, comme celle de la prime
+            // d'ancienneté (défaut n° 2 : une seule date de calcul dans toute l'application).
+            int ancienneteMois = CalculerAncienneteMois(dateEmbauche, periodeDebut);
+
+            // Reprise du solde de congés (défaut n° 7) : les droits courent depuis la date
+            // de reprise, à partir du solde repris, au lieu de repartir de l'entrée.
+            decimal congesAcquis;
+            if (employee.DateRepriseConges.HasValue)
+                congesAcquis = employee.SoldeCongesReprise
+                             + CalculerAncienneteMois(employee.DateRepriseConges.Value, periodeFin) * 2.5m;
+            else
+                congesAcquis = CalculerAncienneteMois(dateEmbauche, periodeFin) * 2.5m;
             decimal congesCumules = congesAcquis - congesPrisJours;
 
             // IUTS brut (avant réduction pour charges familiales) : IUTSNet = IUTSBrut - AbattementChargesFamiliales
@@ -127,7 +222,7 @@ namespace IUTSCalculator.Services
             string numeroControle = QrCodeService.GenererNumeroControle(
                 $"{employee.EmployeeId}|{periodeFin:yyyyMM}|{calcul.SalaireNetaPayer}|{dateGeneration:yyyyMMddHHmmss}");
 
-            return new Bulletin
+            var bulletin = new Bulletin
             {
                 EntrepriseRaisonSociale = dossier?.RaisonSociale,
                 EntrepriseAdresse = dossier?.Adresse,
@@ -194,8 +289,8 @@ namespace IUTSCalculator.Services
 
                 SalaireNetAPayer = calcul.SalaireNetaPayer,
 
-                ModeReglement = modeReglement,
-                NumeroCompte = numeroCompte,
+                ModeReglement = ModesReglementPaie.Resoudre(modeReglement, employee),
+                NumeroCompte = ModesReglementPaie.CompteDe(modeReglement, numeroCompte, employee),
 
                 CumulBrutAnnuel = cumulBrutAnnuel,
                 CumulIUTSAnnuel = cumulIUTSAnnuel,
@@ -206,6 +301,8 @@ namespace IUTSCalculator.Services
                 NumeroControle = numeroControle,
                 DateGeneration = dateGeneration
             };
+
+            return (bulletin, calcul);
         }
 
         /// <summary>

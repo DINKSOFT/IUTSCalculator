@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -24,17 +25,26 @@ namespace IUTSCalculator.ViewModels
         private readonly OrganigrammeExportService _exportService;
         private readonly DataService _dataService;
         private readonly Dossier _dossier;
+        private readonly FichePosteService _fichePosteService;
+        private readonly FichePosteExportService _fichePosteExportService;
+        private ConventionCollectiveService _conventionService;
 
         public OrganigrammeViewModel(
             OrganigrammeService organigrammeService,
             OrganigrammeExportService exportService,
             DataService dataService,
-            Dossier dossier)
+            Dossier dossier,
+            FichePosteService fichePosteService = null,
+            FichePosteExportService fichePosteExportService = null,
+            ConventionCollectiveService conventionService = null)
         {
             _organigrammeService = organigrammeService ?? throw new ArgumentNullException(nameof(organigrammeService));
             _exportService = exportService ?? throw new ArgumentNullException(nameof(exportService));
             _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
             _dossier = dossier ?? throw new ArgumentNullException(nameof(dossier));
+            _fichePosteService = fichePosteService ?? new FichePosteService(new SQLiteService(_dossier.DbFileName));
+            _fichePosteExportService = fichePosteExportService ?? new FichePosteExportService();
+            _conventionService = conventionService;
 
             Title = "Organigramme";
 
@@ -62,6 +72,13 @@ namespace IUTSCalculator.ViewModels
             EnregistrerPosteCommand = new RelayCommand(async () => await EnregistrerPosteAsync(), () => PosteEnEdition != null && !IsBusy);
             SupprimerPosteCommand = new RelayCommand(async () => await SupprimerPosteAsync(), () => PosteSelectionne != null && !IsBusy);
             AnnulerEditionPosteCommand = new RelayCommand(() => EstEnEditionPoste = false);
+
+            // Commandes Fiche de poste (RH-02)
+            AjouterCompetencePosteCommand = new RelayCommand(async () => await AjouterCompetencePosteAsync(), () => PosteEnEdition != null && PosteEnEdition.Id > 0 && CompetenceSelectionneePourAjout != null && !IsBusy);
+            SupprimerCompetencePosteCommand = new RelayCommand(async () => await SupprimerCompetencePosteAsync(), () => CompetencePosteSelectionnee != null && !IsBusy);
+            ExporterFichePostePdfCommand = new RelayCommand(ExporterFichePostePdf, () => (PosteSelectionne != null || PosteEnEdition != null) && !IsBusy);
+            ActualiserSalaireConventionnelCommand = new RelayCommand(async () => await ActualiserSalaireConventionnelAsync(),
+                () => PosteEnEdition != null && PosteEnEdition.ConventionId.HasValue && PosteEnEdition.ConventionId.Value > 0 && !IsBusy);
 
             // Commandes Affectations
             EnregistrerAffectationCommand = new RelayCommand(async () => await EnregistrerAffectationAsync(), () => AffectationSelectionnee != null && !IsBusy);
@@ -249,7 +266,18 @@ namespace IUTSCalculator.ViewModels
         public Poste PosteEnEdition
         {
             get => _posteEnEdition;
-            set { _posteEnEdition = value; OnPropertyChanged(); }
+            set
+            {
+                if (_posteEnEdition != null) _posteEnEdition.PropertyChanged -= PosteEnEdition_PropertyChanged;
+                _posteEnEdition = value;
+                if (_posteEnEdition != null) _posteEnEdition.PropertyChanged += PosteEnEdition_PropertyChanged;
+                OnPropertyChanged();
+                InfoSalaireConventionnel = null;
+                InfoCompetences = null;
+                // Grille de la convention du poste ouvert, sans rien proposer : les valeurs
+                // enregistrées sont affichées telles quelles.
+                _ = ChargerGrilleConventionAsync(false);
+            }
         }
 
         private bool _estEnEditionPoste;
@@ -259,6 +287,12 @@ namespace IUTSCalculator.ViewModels
             set { _estEnEditionPoste = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// Filtre du répertoire des postes : « Tous », « Pourvus » (au moins un titulaire
+        /// actif) ou « Vacants » (aucun). La liste déroulante est liée par SelectedValue sur
+        /// le contenu des éléments : liée par SelectedItem, elle renvoyait un ComboBoxItem
+        /// (« System.Windows.Controls.ComboBoxItem: Pourvus ») et le filtre restait sans effet.
+        /// </summary>
         private string _filtreStatutPoste = "Tous";
         public string FiltreStatutPoste
         {
@@ -275,8 +309,132 @@ namespace IUTSCalculator.ViewModels
         }
 
         public ObservableCollection<Poste> SuperieursDisponibles { get; } = new ObservableCollection<Poste>();
+
+        /// <summary>
+        /// Tous les postes, pour le panneau d'affectation : il ne doit pas dépendre du filtre
+        /// ni de la recherche du répertoire, sinon le poste actuel d'un salarié pourrait
+        /// manquer à la liste et l'affectation être enregistrée sans poste.
+        /// </summary>
+        public ObservableCollection<Poste> PostesAffectationDisponibles { get; } = new ObservableCollection<Poste>();
         public ObservableCollection<Employee> TitulairesDisponibles { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<UniteOrganisationnelle> UnitesRattachementDisponibles { get; } = new ObservableCollection<UniteOrganisationnelle>();
+
+        // RH-02 : Compétences requises et Titulaires multiples du poste en cours d'édition
+        public ObservableCollection<PosteCompetence> CompetencesPosteEnEdition { get; } = new ObservableCollection<PosteCompetence>();
+        public ObservableCollection<TitulairePosteLigne> TitulairesPosteEnEdition { get; } = new ObservableCollection<TitulairePosteLigne>();
+        public ObservableCollection<Competence> CompetencesDisponibles { get; } = new ObservableCollection<Competence>();
+
+        private Competence _competenceSelectionneePourAjout;
+        public Competence CompetenceSelectionneePourAjout
+        {
+            get => _competenceSelectionneePourAjout;
+            set => SetProperty(ref _competenceSelectionneePourAjout, value);
+        }
+
+        /// <summary>
+        /// Niveaux proposés à l'ajout d'une compétence : la clé EST le niveau enregistré
+        /// (1 à 4). Le sélecteur était lié par SelectedIndex (0 à 3) puis converti par
+        /// Math.Max(1, …) : Niv 1 et Niv 2 étaient enregistrés 1, Niv 3 → 2, Niv 4 → 3, et le
+        /// niveau 4 restait inatteignable.
+        /// </summary>
+        public IEnumerable<KeyValuePair<int, string>> NiveauxMaitriseDisponibles { get; } = new List<KeyValuePair<int, string>>
+        {
+            new KeyValuePair<int, string>((int)NiveauMaitrise.Notions, "Niv 1 (★)"),
+            new KeyValuePair<int, string>((int)NiveauMaitrise.Pratique, "Niv 2 (★★)"),
+            new KeyValuePair<int, string>((int)NiveauMaitrise.Maitrise, "Niv 3 (★★★)"),
+            new KeyValuePair<int, string>((int)NiveauMaitrise.Expert, "Niv 4 (★★★★)")
+        };
+
+        /// <summary>Niveau requis (1 à 4) choisi pour l'ajout ; « Niv 3 » par défaut, comme l'écran l'affichait.</summary>
+        private int _niveauMaitrisePourAjout = (int)NiveauMaitrise.Maitrise;
+        public int NiveauMaitrisePourAjout
+        {
+            get => _niveauMaitrisePourAjout;
+            set => SetProperty(ref _niveauMaitrisePourAjout, value);
+        }
+
+        private bool _estObligatoirePourAjout = true;
+        public bool EstObligatoirePourAjout
+        {
+            get => _estObligatoirePourAjout;
+            set => SetProperty(ref _estObligatoirePourAjout, value);
+        }
+
+        private PosteCompetence _competencePosteSelectionnee;
+        public PosteCompetence CompetencePosteSelectionnee
+        {
+            get => _competencePosteSelectionnee;
+            set
+            {
+                if (SetProperty(ref _competencePosteSelectionnee, value) && value != null)
+                {
+                    // La ligne choisie est reportée dans la barre d'ajout avec SON niveau :
+                    // « Ajouter » la met alors à jour (et confirme un niveau à vérifier).
+                    var comp = CompetencesDisponibles.FirstOrDefault(c => c.Id == value.CompetenceId);
+                    if (comp != null) CompetenceSelectionneePourAjout = comp;
+                    NiveauMaitrisePourAjout = (int)value.NiveauRequis;
+                    EstObligatoirePourAjout = value.EstObligatoire;
+                }
+            }
+        }
+
+        /// <summary>Vrai si une compétence du poste ouvert porte un niveau à vérifier (enregistré avant la v38).</summary>
+        public bool AUnNiveauAVerifier => CompetencesPosteEnEdition.Any(c => c.NiveauAVerifier);
+
+        // RH-02 : Classification conventionnelle (bloc 4 de la fiche de poste)
+        public ObservableCollection<ConventionCollective> ConventionsDisponibles { get; } = new ObservableCollection<ConventionCollective>();
+        public ObservableCollection<GrilleSalaire> GrilleConventionEnEdition { get; } = new ObservableCollection<GrilleSalaire>();
+
+        private GrilleSalaire _ligneGrilleSelectionnee;
+        /// <summary>
+        /// Ligne de la grille choisie dans la liste : reporte catégorie, échelon et minimum
+        /// sur la fiche (le minimum reste modifiable).
+        /// </summary>
+        public GrilleSalaire LigneGrilleSelectionnee
+        {
+            get => _ligneGrilleSelectionnee;
+            set
+            {
+                if (SetProperty(ref _ligneGrilleSelectionnee, value) && value != null && PosteEnEdition != null && _synchroListes == 0)
+                {
+                    _synchroListes++;
+                    try
+                    {
+                        PosteEnEdition.CategorieConventionnelle = value.Categorie;
+                        PosteEnEdition.EchelonConventionnel = value.Echelon;
+                        PosteEnEdition.SalaireMinimumConventionnel = value.SalaireMinimum;
+                    }
+                    finally
+                    {
+                        _synchroListes--;
+                    }
+                    _sequenceMinimum++; // une proposition encore en cours ne doit pas écraser ce choix
+                    InfoSalaireConventionnel = MessageMinimumPropose(value.SalaireMinimum);
+                }
+            }
+        }
+
+        private string _infoSalaireConventionnel;
+        /// <summary>Information affichée sous le minimum conventionnel (proposé, introuvable…).</summary>
+        public string InfoSalaireConventionnel
+        {
+            get => _infoSalaireConventionnel;
+            set => SetProperty(ref _infoSalaireConventionnel, value);
+        }
+
+        private string _infoCompetences;
+        /// <summary>Retour de la dernière opération sur les compétences du poste (affiché sous la barre d'ajout).</summary>
+        public string InfoCompetences
+        {
+            get => _infoCompetences;
+            set => SetProperty(ref _infoCompetences, value);
+        }
+
+        // Pendant la reconstruction d'une liste liée, les listes déroulantes renvoient une
+        // sélection vide : elle ne doit être prise ni pour une saisie, ni pour un changement.
+        // Compteur (et non booléen) : plusieurs reconstructions peuvent se chevaucher.
+        private int _synchroListes;
+        private int _sequenceMinimum;
 
         #endregion
 
@@ -348,6 +506,12 @@ namespace IUTSCalculator.ViewModels
         public ICommand SupprimerPosteCommand { get; }
         public ICommand AnnulerEditionPosteCommand { get; }
 
+        // Commandes Fiche de poste (RH-02)
+        public ICommand AjouterCompetencePosteCommand { get; }
+        public ICommand SupprimerCompetencePosteCommand { get; }
+        public ICommand ExporterFichePostePdfCommand { get; }
+        public ICommand ActualiserSalaireConventionnelCommand { get; }
+
         public ICommand EnregistrerAffectationCommand { get; }
 
         public ICommand ExporterExcelCommand { get; }
@@ -368,9 +532,18 @@ namespace IUTSCalculator.ViewModels
 
         public async Task ChargerToutAsync()
         {
+            // Reconstruire une liste liée vide un instant la sélection des listes déroulantes
+            // de la fiche de poste ouverte, qui la recopieraient dans le poste (unité, N+1,
+            // convention). Ces valeurs sont donc mises de côté puis rétablies.
+            var posteOuvert = PosteEnEdition;
+            int? uniteOuverte = posteOuvert?.UniteId;
+            int? superieurOuvert = posteOuvert?.SuperieurPosteId;
+            int? conventionOuverte = posteOuvert?.ConventionId;
+
             try
             {
                 IsBusy = true;
+                _synchroListes++;
                 StatusMessage = "Chargement de l'organigramme...";
 
                 // 1. Charger salariés pour les listes déroulantes
@@ -402,10 +575,15 @@ namespace IUTSCalculator.ViewModels
                 // 3. Charger Postes
                 _tousPostes = await _organigrammeService.ChargerPostesAsync();
                 FiltrerPostes();
+                PostesAffectationDisponibles.Clear();
+                foreach (var p in _tousPostes) PostesAffectationDisponibles.Add(p);
 
                 TotalPostes = _tousPostes.Count;
                 TotalPostesPourvus = _tousPostes.Count(p => p.EstPourvu);
                 TotalPostesVacants = _tousPostes.Count(p => !p.EstPourvu);
+
+                // Conventions collectives du dossier (bloc 4 de la fiche de poste)
+                await ChargerConventionsAsync();
 
                 // 4. Charger Affectations
                 _toutesAffectations = await _organigrammeService.ChargerAffectationsSalariesAsync();
@@ -429,8 +607,183 @@ namespace IUTSCalculator.ViewModels
             }
             finally
             {
+                if (posteOuvert != null && ReferenceEquals(posteOuvert, PosteEnEdition))
+                {
+                    posteOuvert.UniteId = uniteOuverte;
+                    posteOuvert.SuperieurPosteId = superieurOuvert;
+                    posteOuvert.ConventionId = conventionOuverte;
+                }
+                _synchroListes--;
                 IsBusy = false;
             }
+        }
+
+        private ConventionCollectiveService ServiceConventions
+        {
+            get
+            {
+                // Lecture seule (liste des conventions et grilles SOC-05).
+                if (_conventionService == null)
+                    _conventionService = new ConventionCollectiveService(new SQLiteService(_dossier.DbFileName));
+                return _conventionService;
+            }
+        }
+
+        private async Task ChargerConventionsAsync()
+        {
+            List<ConventionCollective> liste;
+            try
+            {
+                liste = await ServiceConventions.ObtenirToutesConventionsAsync();
+            }
+            catch
+            {
+                liste = new List<ConventionCollective>();
+            }
+
+            ConventionsDisponibles.Clear();
+            ConventionsDisponibles.Add(new ConventionCollective { Id = 0, Code = "", Libelle = "— Aucune convention —" });
+            foreach (var c in liste) ConventionsDisponibles.Add(c);
+        }
+
+        // ── Classification conventionnelle de la fiche de poste (RH-02) ──
+
+        /// <summary>
+        /// Convention, catégorie ou échelon modifiés sur la fiche ouverte : le minimum de la
+        /// grille est proposé (il reste modifiable). Rien n'est proposé à l'ouverture d'un
+        /// poste : les valeurs enregistrées sont affichées telles quelles.
+        /// </summary>
+        private void PosteEnEdition_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (_synchroListes > 0 || !ReferenceEquals(sender, _posteEnEdition)) return;
+
+            switch (e.PropertyName)
+            {
+                case nameof(Poste.ConventionId):
+                    var conv = _posteEnEdition.ConventionId.HasValue && _posteEnEdition.ConventionId.Value > 0
+                        ? ConventionsDisponibles.FirstOrDefault(c => c.Id == _posteEnEdition.ConventionId.Value)
+                        : null;
+                    _posteEnEdition.ConventionLibelle = conv?.Libelle;
+                    _ = ChargerGrilleConventionAsync(true);
+                    break;
+
+                case nameof(Poste.CategorieConventionnelle):
+                case nameof(Poste.EchelonConventionnel):
+                    SelectionnerLigneGrille();
+                    _ = ProposerSalaireMinimumAsync(false);
+                    break;
+            }
+        }
+
+        /// <summary>Charge la grille de la convention du poste ouvert (liste « Ligne de la grille »).</summary>
+        private async Task ChargerGrilleConventionAsync(bool proposer)
+        {
+            var poste = PosteEnEdition;
+            var conventionId = poste?.ConventionId;
+            var lignes = new List<GrilleSalaire>();
+
+            if (conventionId.HasValue && conventionId.Value > 0)
+            {
+                try
+                {
+                    var conv = await ServiceConventions.ObtenirParIdAsync(conventionId.Value);
+                    if (conv != null && conv.Grilles != null) lignes = conv.Grilles;
+                }
+                catch (Exception ex)
+                {
+                    InfoSalaireConventionnel = "Grille salariale illisible : " + ex.Message;
+                }
+            }
+
+            // Un autre poste (ou une autre convention) a pu être choisi pendant la lecture.
+            if (!ReferenceEquals(poste, PosteEnEdition) || (poste != null && poste.ConventionId != conventionId)) return;
+
+            _synchroListes++;
+            try
+            {
+                GrilleConventionEnEdition.Clear();
+                foreach (var g in lignes) GrilleConventionEnEdition.Add(g);
+            }
+            finally
+            {
+                _synchroListes--;
+            }
+            SelectionnerLigneGrille();
+
+            if (proposer) await ProposerSalaireMinimumAsync(false);
+        }
+
+        /// <summary>Met en regard, dans la liste de la grille, la ligne correspondant à la catégorie et à l'échelon saisis.</summary>
+        private void SelectionnerLigneGrille()
+        {
+            var poste = PosteEnEdition;
+            var ligne = poste == null ? null : GrilleConventionEnEdition.FirstOrDefault(g =>
+                string.Equals((g.Categorie ?? "").Trim(), (poste.CategorieConventionnelle ?? "").Trim(), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals((g.Echelon ?? "").Trim(), (poste.EchelonConventionnel ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
+
+            _synchroListes++;
+            try
+            {
+                LigneGrilleSelectionnee = ligne;
+            }
+            finally
+            {
+                _synchroListes--;
+            }
+        }
+
+        /// <summary>
+        /// Propose le minimum de la grille (SOC-05) pour la convention, la catégorie et
+        /// l'échelon de la fiche ouverte. Seule la saisie la plus récente est appliquée.
+        /// </summary>
+        private async Task ProposerSalaireMinimumAsync(bool demandeExplicite)
+        {
+            var poste = PosteEnEdition;
+            int sequence = ++_sequenceMinimum;
+            if (poste == null) return;
+
+            bool aConvention = poste.ConventionId.HasValue && poste.ConventionId.Value > 0;
+            if (!aConvention || string.IsNullOrWhiteSpace(poste.CategorieConventionnelle) || string.IsNullOrWhiteSpace(poste.EchelonConventionnel))
+            {
+                InfoSalaireConventionnel = aConvention || demandeExplicite
+                    ? "Choisissez la convention, puis une ligne de la grille (ou saisissez catégorie et échelon) : le minimum conventionnel est alors repris de la grille."
+                    : null;
+                return;
+            }
+
+            try
+            {
+                var salMin = await _fichePosteService.ObtenirSalaireMinConventionnelAsync(
+                    poste.ConventionId.Value,
+                    poste.CategorieConventionnelle,
+                    poste.EchelonConventionnel);
+
+                // Une saisie plus récente (ou un autre poste) a pris le relais.
+                if (sequence != _sequenceMinimum || !ReferenceEquals(poste, PosteEnEdition)) return;
+
+                if (salMin > 0m)
+                {
+                    poste.SalaireMinimumConventionnel = salMin;
+                    InfoSalaireConventionnel = MessageMinimumPropose(salMin);
+                    StatusMessage = $"Salaire minimum conventionnel mis à jour : {salMin:N0} FCFA.";
+                }
+                else
+                {
+                    InfoSalaireConventionnel = string.Format(
+                        "Aucune ligne de la grille pour la catégorie « {0} », échelon « {1} » : saisissez le minimum à la main.",
+                        poste.CategorieConventionnelle.Trim(), poste.EchelonConventionnel.Trim());
+                }
+            }
+            catch (Exception ex)
+            {
+                if (sequence == _sequenceMinimum)
+                    InfoSalaireConventionnel = "Grille salariale illisible : " + ex.Message;
+            }
+        }
+
+        private static string MessageMinimumPropose(decimal minimum)
+        {
+            return $"Minimum de la grille : {minimum:N0} FCFA (repris automatiquement, modifiable).";
         }
 
         private async Task ChargerArbreAsync()
@@ -442,10 +795,15 @@ namespace IUTSCalculator.ViewModels
 
         private async Task InitialiserStructureDefautAsync()
         {
-            if (_toutesUnites.Count > 0)
+            bool complement = _toutesUnites.Count > 0;
+            if (complement)
             {
+                // L'organigramme existant n'est jamais effacé : l'initialisation se borne à
+                // ajouter les services des fiches salariés qui n'ont pas encore d'unité (ce
+                // qui complète aussi une structure restée inachevée).
                 var rep = MessageBox.Show(
-                    "L'organigramme contient déjà des unités. L'initialisation par défaut est réservée aux dossiers sans structure définie.\n\nSouhaitez-vous quand même réinitialiser ?",
+                    "L'organigramme contient déjà des unités : il ne sera ni effacé ni modifié.\n\n" +
+                    "Seuls les services saisis sur les fiches salariés qui n'ont pas encore d'unité seront ajoutés, rattachés à la Direction Générale.\n\nContinuer ?",
                     "Initialisation de l'organigramme",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
@@ -456,13 +814,25 @@ namespace IUTSCalculator.ViewModels
             {
                 IsBusy = true;
                 StatusMessage = "Initialisation de la structure d'entreprise...";
-                await _organigrammeService.InitialiserStructureDefautAsync();
+                int creees = await _organigrammeService.InitialiserStructureDefautAsync();
                 await ChargerToutAsync();
-                StatusMessage = "Structure d'organigramme initialisée avec succès.";
+                if (!complement)
+                    StatusMessage = $"Structure d'organigramme initialisée avec succès ({creees} unité(s) créée(s)).";
+                else if (creees > 0)
+                    StatusMessage = $"{creees} service(s) des fiches salariés ajouté(s) à l'organigramme.";
+                else
+                    StatusMessage = "Aucun service à ajouter : chaque service des fiches salariés a déjà son unité.";
+
+                // Le message d'état de cet écran n'est pas affiché par la fenêtre principale :
+                // le bilan est donc présenté dans une boîte de dialogue.
+                MessageBox.Show(StatusMessage, "Initialisation de l'organigramme", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                StatusMessage = "Erreur d'initialisation : " + ex.Message;
+                // Rien n'a été enregistré (création en une seule transaction).
+                StatusMessage = "Erreur d'initialisation (aucune unité créée) : " + ex.Message;
+                MessageBox.Show("L'initialisation de l'organigramme a échoué ; aucune unité n'a été créée.\n\n" + ex.Message,
+                    "Initialisation de l'organigramme", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             finally
             {
@@ -614,6 +984,10 @@ namespace IUTSCalculator.ViewModels
 
         private void NouveauPoste()
         {
+            // Une seule convention active dans le dossier : elle est proposée d'office.
+            var conventionsActives = ConventionsDisponibles.Where(c => c.Id > 0 && c.EstActive).ToList();
+            var conventionParDefaut = conventionsActives.Count == 1 ? conventionsActives[0] : null;
+
             PosteEnEdition = new Poste
             {
                 Id = 0,
@@ -622,8 +996,14 @@ namespace IUTSCalculator.ViewModels
                 UniteId = _toutesUnites.FirstOrDefault()?.Id,
                 EffectifRequis = 1,
                 Actif = true,
-                Ordre = _tousPostes.Count + 1
+                Ordre = _tousPostes.Count + 1,
+                ConventionId = conventionParDefaut?.Id,
+                ConventionLibelle = conventionParDefaut?.Libelle
             };
+            CompetencesPosteEnEdition.Clear();
+            OnPropertyChanged(nameof(AUnNiveauAVerifier));
+            TitulairesPosteEnEdition.Clear();
+            _ = ChargerCompetencesCatalogueAsync();
             MettreAJourSuperieursDisponibles(0);
             EstEnEditionPoste = true;
         }
@@ -644,11 +1024,170 @@ namespace IUTSCalculator.ViewModels
                 Missions = PosteSelectionne.Missions,
                 EffectifRequis = PosteSelectionne.EffectifRequis,
                 Actif = PosteSelectionne.Actif,
-                Ordre = PosteSelectionne.Ordre
+                Ordre = PosteSelectionne.Ordre,
+                // RH-02 : Attributs étendus de la fiche de poste
+                FinalitePrincipale = PosteSelectionne.FinalitePrincipale,
+                ActivitesCles = PosteSelectionne.ActivitesCles,
+                NiveauEtudeRequis = PosteSelectionne.NiveauEtudeRequis,
+                DiplomeRequis = PosteSelectionne.DiplomeRequis,
+                ExperienceMinimaleAnnees = PosteSelectionne.ExperienceMinimaleAnnees,
+                ConditionsTravail = PosteSelectionne.ConditionsTravail,
+                ConventionId = PosteSelectionne.ConventionId,
+                ConventionLibelle = PosteSelectionne.ConventionLibelle,
+                CategorieConventionnelle = PosteSelectionne.CategorieConventionnelle,
+                EchelonConventionnel = PosteSelectionne.EchelonConventionnel,
+                SalaireMinimumConventionnel = PosteSelectionne.SalaireMinimumConventionnel,
+                SalaireMinBudgete = PosteSelectionne.SalaireMinBudgete,
+                SalaireMaxBudgete = PosteSelectionne.SalaireMaxBudgete
             };
 
             MettreAJourSuperieursDisponibles(PosteSelectionne.Id);
             EstEnEditionPoste = true;
+            _ = ChargerDetailsPosteEnEditionAsync(PosteSelectionne.Id);
+        }
+
+        private async Task ChargerCompetencesCatalogueAsync()
+        {
+            try
+            {
+                var compList = await _fichePosteService.ChargerToutesCompetencesAsync();
+                CompetencesDisponibles.Clear();
+                foreach (var c in compList) CompetencesDisponibles.Add(c);
+                if (CompetenceSelectionneePourAjout == null && CompetencesDisponibles.Count > 0)
+                {
+                    CompetenceSelectionneePourAjout = CompetencesDisponibles[0];
+                }
+            }
+            catch { }
+        }
+
+        private async Task ChargerDetailsPosteEnEditionAsync(int posteId)
+        {
+            try
+            {
+                await ChargerCompetencesCatalogueAsync();
+
+                var compPoste = await _organigrammeService.ChargerCompetencesPosteAsync(posteId);
+                CompetencesPosteEnEdition.Clear();
+                foreach (var cp in compPoste) CompetencesPosteEnEdition.Add(cp);
+                OnPropertyChanged(nameof(AUnNiveauAVerifier));
+
+                var tituPoste = await _organigrammeService.ChargerTitulairesPosteAsync(posteId);
+                TitulairesPosteEnEdition.Clear();
+                foreach (var tp in tituPoste) TitulairesPosteEnEdition.Add(tp);
+            }
+            catch { }
+        }
+
+        private async Task AjouterCompetencePosteAsync()
+        {
+            if (PosteEnEdition == null || PosteEnEdition.Id <= 0 || CompetenceSelectionneePourAjout == null) return;
+
+            int niveau = NiveauMaitrisePourAjout;
+            if (niveau < (int)NiveauMaitrise.Notions || niveau > (int)NiveauMaitrise.Expert)
+            {
+                MessageBox.Show("Choisissez le niveau requis (Niv 1 à Niv 4).", "Compétences du poste", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                var competence = CompetenceSelectionneePourAjout;
+                // Une compétence ne figure qu'une fois sur un poste : la rajouter met à jour
+                // son niveau et sa criticité.
+                var existante = CompetencesPosteEnEdition.FirstOrDefault(c => c.CompetenceId == competence.Id);
+                var pc = new PosteCompetence
+                {
+                    Id = existante?.Id ?? 0,
+                    PosteId = PosteEnEdition.Id,
+                    CompetenceId = competence.Id,
+                    NiveauRequis = (NiveauMaitrise)niveau,
+                    EstObligatoire = EstObligatoirePourAjout,
+                    Commentaire = existante?.Commentaire
+                };
+
+                await _organigrammeService.EnregistrerCompetencePosteAsync(pc);
+                await ChargerDetailsPosteEnEditionAsync(PosteEnEdition.Id);
+
+                string etoiles = new string('★', niveau);
+                InfoCompetences = existante == null
+                    ? $"Compétence « {competence.Libelle} » ajoutée au poste (Niv {niveau} {etoiles})."
+                    : $"Compétence « {competence.Libelle} » mise à jour (Niv {niveau} {etoiles})" + (existante.NiveauAVerifier ? " : niveau confirmé." : ".");
+                StatusMessage = InfoCompetences;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur lors de l'ajout de la compétence : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private async Task SupprimerCompetencePosteAsync()
+        {
+            if (CompetencePosteSelectionnee == null || PosteEnEdition == null) return;
+
+            try
+            {
+                await _organigrammeService.SupprimerCompetencePosteAsync(CompetencePosteSelectionnee.Id);
+                await ChargerDetailsPosteEnEditionAsync(PosteEnEdition.Id);
+                StatusMessage = "Compétence retirée du poste.";
+                InfoCompetences = StatusMessage;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur lors du retrait de la compétence : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        /// <summary>Bouton « Grille » : reprend le minimum de la grille après une saisie manuelle.</summary>
+        private async Task ActualiserSalaireConventionnelAsync()
+        {
+            await ProposerSalaireMinimumAsync(true);
+        }
+
+        private void ExporterFichePostePdf()
+        {
+            var poste = PosteEnEdition ?? PosteSelectionne;
+            if (poste == null || poste.Id <= 0)
+            {
+                MessageBox.Show("Veuillez d'abord sélectionner ou enregistrer un poste pour exporter sa fiche.", "Export Fiche de poste", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                var sfd = new SaveFileDialog
+                {
+                    Title = "Exporter la fiche de poste officielle en PDF",
+                    Filter = "Document PDF (*.pdf)|*.pdf",
+                    FileName = string.Format("Fiche_Poste_{0}_{1:yyyyMMdd}.pdf",
+                        string.IsNullOrWhiteSpace(poste.Code) ? "PST" : poste.Code.Trim(),
+                        DateTime.Now)
+                };
+
+                if (sfd.ShowDialog() != true) return;
+
+                IsBusy = true;
+                StatusMessage = "Génération de la fiche de poste PDF...";
+
+                // Charger compétences et titulaires à jour
+                var comp = _organigrammeService.ChargerCompetencesPosteAsync(poste.Id).GetAwaiter().GetResult();
+                var titu = _organigrammeService.ChargerTitulairesPosteAsync(poste.Id).GetAwaiter().GetResult();
+                poste.CompetencesRequises = new ObservableCollection<PosteCompetence>(comp ?? new List<PosteCompetence>());
+                poste.TitulairesActuels = new ObservableCollection<TitulairePosteLigne>(titu ?? new List<TitulairePosteLigne>());
+
+                _fichePosteExportService.GenererFichePostePdf(poste, _dossier, sfd.FileName);
+
+                StatusMessage = "Fiche de poste exportée avec succès.";
+                try { Process.Start(new ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur lors de l'export PDF : " + ex.Message, "Export Fiche de poste", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
 
         private void MettreAJourSuperieursDisponibles(int idExclu)
@@ -668,9 +1207,23 @@ namespace IUTSCalculator.ViewModels
             try
             {
                 IsBusy = true;
-                if (PosteEnEdition.UniteId == 0) PosteEnEdition.UniteId = null;
-                if (PosteEnEdition.SuperieurPosteId == 0) PosteEnEdition.SuperieurPosteId = null;
-                if (string.IsNullOrWhiteSpace(PosteEnEdition.TitulaireMatricule)) PosteEnEdition.TitulaireMatricule = null;
+                _synchroListes++;
+                try
+                {
+                    if (PosteEnEdition.UniteId == 0) PosteEnEdition.UniteId = null;
+                    if (PosteEnEdition.SuperieurPosteId == 0) PosteEnEdition.SuperieurPosteId = null;
+                    // « — Aucune convention — » : pas de convention (et pas d'identifiant 0 en base).
+                    if (PosteEnEdition.ConventionId.HasValue && PosteEnEdition.ConventionId.Value <= 0)
+                    {
+                        PosteEnEdition.ConventionId = null;
+                        PosteEnEdition.ConventionLibelle = null;
+                    }
+                    if (string.IsNullOrWhiteSpace(PosteEnEdition.TitulaireMatricule)) PosteEnEdition.TitulaireMatricule = null;
+                }
+                finally
+                {
+                    _synchroListes--;
+                }
 
                 await _organigrammeService.EnregistrerPosteAsync(PosteEnEdition);
                 EstEnEditionPoste = false;

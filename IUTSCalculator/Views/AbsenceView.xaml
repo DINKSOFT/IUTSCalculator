@@ -384,7 +384,7 @@
                                         <TextBlock Text="Heures" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
                                         <TextBox Width="80" Margin="0,0,0,10" TextAlignment="Right"
                                                  Style="{StaticResource FormTextBoxStyle}"
-                                                 ToolTip="À renseigner seulement si le dossier retient au taux horaire, ou pour une absence de quelques heures."
+                                                 ToolTip="Pour une absence de quelques heures, ou si le dossier retient au taux horaire. Équivalence : 8 heures = 1 jour (une absence en heures seulement se compte en jours, et une absence en jours se compte à 8 h par jour au taux horaire)."
                                                  Text="{Binding AbsenceEnCours.NombreHeures, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"/>
                                     </StackPanel>
                                     <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,10">

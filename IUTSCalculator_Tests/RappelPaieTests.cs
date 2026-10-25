@@ -120,7 +120,9 @@ namespace IUTSCalculator.Tests
                     SoumisIUTS = true,
                     SoumisCNSS = true,
                     SoumisTPA = true,
-                    Statut = StatutRappelPaie.Impute // Déjà imputé, doit être ignoré
+                    // Annulé : jamais repris. (Un rappel « Imputé » est en revanche repris
+                    // quand on recalcule SON mois d'imputation — voir le test suivant.)
+                    Statut = StatutRappelPaie.Annule
                 },
                 new RappelPaie
                 {
@@ -157,6 +159,28 @@ namespace IUTSCalculator.Tests
             Assert.That(apport.RappelIds.Contains(3), Is.True);
             Assert.That(apport.RappelIds.Contains(1), Is.False);
             Assert.That(apport.RappelIds.Contains(2), Is.False);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void ApportDe_RappelImputeRepris_AuRecalculDeSonMois()
+        {
+            // L'enregistrement d'un bulletin marque ses rappels « Imputé » : recalculer ce
+            // mois ne doit pas les perdre (la liste fournie est celle du mois d'imputation).
+            var rappels = new List<RappelPaie>
+            {
+                new RappelPaie
+                {
+                    Id = 4, EmployeeId = "EMP001", TypeRappel = TypeRappelPaie.RappelSalaire, Libelle = "Rappel",
+                    MontantBrut = 50_000m, Sens = SensRappel.Gain, SoumisIUTS = true, SoumisCNSS = true, SoumisTPA = true,
+                    Statut = StatutRappelPaie.Impute
+                }
+            };
+
+            var apport = RappelPaieService.ApportDe(rappels, "EMP001");
+
+            Assert.That(apport.GainsImposablesEtCotisables, Is.EqualTo(50_000m));
+            Assert.That(apport.RappelIds.Contains(4), Is.True);
         }
 
         [Test]

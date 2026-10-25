@@ -390,6 +390,22 @@ namespace IUTSCalculator.ViewModels
             set => SetProperty(ref _simuTotalTpa, value);
         }
 
+        private decimal _simuTotalIuts;
+        /// <summary>Écart d'IUTS cumulé, mois par mois (comme si la hausse avait été payée à temps).</summary>
+        public decimal SimuTotalIuts
+        {
+            get => _simuTotalIuts;
+            set { _simuTotalIuts = value; OnPropertyChanged(); }
+        }
+
+        private decimal _simuIutsImputation;
+        /// <summary>IUTS supplémentaire estimé si tout le rappel est payé sur un seul bulletin.</summary>
+        public decimal SimuIutsImputation
+        {
+            get => _simuIutsImputation;
+            set { _simuIutsImputation = value; OnPropertyChanged(); }
+        }
+
         public decimal SimuTotalNet
         {
             get => _simuTotalNet;
@@ -582,6 +598,27 @@ namespace IUTSCalculator.ViewModels
             IsEditionMode = true;
         }
 
+        /// <summary>
+        /// Propose comme mois d'imputation la période de paie ouverte (défaut n° 9 du guide)
+        /// plutôt que le mois de l'horloge du poste.
+        /// </summary>
+        private async Task ProposerMoisImputationAsync()
+        {
+            try
+            {
+                var mois = await _rappelService.MoisImputationParDefautAsync();
+                if (!IsEditionMode)
+                {
+                    FormAnneeImputation = mois.Year;
+                    FormMoisImputation = mois.Month;
+                }
+            }
+            catch (Exception)
+            {
+                // Repli silencieux : le mois du poste reste proposé.
+            }
+        }
+
         private void ReinitialiserFormulaire()
         {
             _formId = 0;
@@ -593,6 +630,7 @@ namespace IUTSCalculator.ViewModels
             FormMoisOrigineFin = DateTime.Now.AddMonths(-1);
             FormAnneeImputation = DateTime.Now.Year;
             FormMoisImputation = DateTime.Now.Month;
+            _ = ProposerMoisImputationAsync();
             FormMontantBrut = 0m;
             FormSoumisIUTS = true;
             FormSoumisCNSS = true;
@@ -776,9 +814,12 @@ namespace IUTSCalculator.ViewModels
                 SimuTotalCnssPatronal = res.TotalCnssPatronal;
                 SimuTotalTpa = res.TotalTpa;
                 SimuTotalNet = res.TotalNet;
+                SimuTotalIuts = res.Details.Sum(d => d.DeltaIuts);
+                SimuIutsImputation = _rappelService.DeltaIutsPourGain(SimuEmploye, res.TotalBrut);
                 HasSimulationResults = true;
 
-                StatusMessage = $"Simulation calculée sur {_detailsSimulation.Count} mois : Total brut = {SimuTotalBrut:N0} FCFA";
+                StatusMessage = $"Simulation calculée sur {_detailsSimulation.Count} mois : Total brut = {SimuTotalBrut:N0} FCFA — " +
+                                $"écart d'IUTS {SimuTotalIuts:N0} FCFA mois par mois, {SimuIutsImputation:N0} FCFA si tout est payé en une fois.";
             }
             catch (Exception ex)
             {
@@ -793,6 +834,7 @@ namespace IUTSCalculator.ViewModels
             try
             {
                 IsBusy = true;
+                var moisImputation = await _rappelService.MoisImputationParDefautAsync();
                 var rappel = new RappelPaie
                 {
                     EmployeeId = SimuEmploye.EmployeeId,
@@ -803,13 +845,14 @@ namespace IUTSCalculator.ViewModels
                     Sens = SensRappel.Gain,
                     MoisOrigineDebut = SimuMoisDebut,
                     MoisOrigineFin = SimuMoisFin,
-                    AnneeImputation = DateTime.Now.Year,
-                    MoisImputation = DateTime.Now.Month,
+                    AnneeImputation = moisImputation.Year,
+                    MoisImputation = moisImputation.Month,
                     MontantBrut = SimuTotalBrut,
                     MontantCnssSalarial = SimuTotalCnssSalarial,
                     MontantCnssPatronal = SimuTotalCnssPatronal,
                     MontantTPA = SimuTotalTpa,
-                    MontantNet = SimuTotalNet,
+                    MontantIUTS = SimuIutsImputation,
+                    MontantNet = SimuTotalBrut - SimuTotalCnssSalarial - SimuIutsImputation,
                     SoumisIUTS = true,
                     SoumisCNSS = true,
                     SoumisTPA = true,
@@ -823,7 +866,7 @@ namespace IUTSCalculator.ViewModels
                 _rappels.Insert(0, rappel);
                 AppliquerFiltre();
 
-                StatusMessage = $"Rappel rétroactif n°{id} créé et placé en attente d'imputation.";
+                StatusMessage = $"Rappel rétroactif n°{id} créé et placé en attente d'imputation sur la paie de {moisImputation:MM/yyyy}.";
                 SelectedTabIndex = 0; // Revenir au premier onglet
             }
             catch (Exception ex)

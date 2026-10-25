@@ -185,7 +185,8 @@
                         <ComboBox Grid.Row="5" Grid.Column="1" Margin="0,0,0,10"
                                   Style="{StaticResource FormComboBoxStyle}"
                                   ItemsSource="{Binding ModesReglement}"
-                                  SelectedItem="{Binding ModeReglement, Mode=TwoWay}"/>
+                                  SelectedItem="{Binding ModeReglement, Mode=TwoWay}"
+                                  ToolTip="« Mode de la fiche » reprend le mode de règlement et le compte de la fiche du salarié. C'est ce mode que lisent les ordres de virement."/>
 
                         <TextBlock Grid.Row="6" Grid.Column="0" Text="N° de compte"
                                    Style="{StaticResource FormTextBlockLabelStyle}" Margin="0" VerticalAlignment="Center"/>

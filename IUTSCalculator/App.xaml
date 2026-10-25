@@ -116,6 +116,7 @@
             <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
 
             <!-- ═══════════ Icônes Segoe MDL2 Assets ═══════════ -->
+            <sys:String x:Key="IconPeople">&#xE716;</sys:String>
             <sys:String x:Key="IconCalculator">&#xE8CD;</sys:String>
             <sys:String x:Key="IconHistory">&#xF182;</sys:String>
             <sys:String x:Key="IconSettings">&#xE713;</sys:String>
@@ -152,6 +153,10 @@
             <sys:String x:Key="IconBuilding">&#xE825;</sys:String>
             <sys:String x:Key="IconMenu">&#xE700;</sys:String>
             <sys:String x:Key="IconCollapseLeft">&#xE76B;</sys:String>
+            <sys:String x:Key="IconEdit">&#xE70F;</sys:String>
+            <sys:String x:Key="IconLock">&#xE72E;</sys:String>
+            <sys:String x:Key="IconBack">&#xE72B;</sys:String>
+            <sys:String x:Key="IconHealth">&#xE95E;</sys:String>
 
             <!-- ═══════════════════════════════════════════════════════════════
                  TYPOGRAPHIE

@@ -441,11 +441,18 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
+        /// <summary>
+        /// Utilisateur de l'application qui clôture ou rouvre la période (« Clôturée par ») :
+        /// le compte connecté, et non plus le compte Windows du poste (défaut n° 10).
+        /// </summary>
         private static string UtilisateurCourant()
         {
             try
             {
-                string nom = Environment.UserName;
+                var u = UserSession.Instance.CurrentUser;
+                string nom = u != null
+                    ? (!string.IsNullOrWhiteSpace(u.DisplayName) ? u.DisplayName : u.Username)
+                    : Environment.UserName;
                 return string.IsNullOrWhiteSpace(nom) ? "—" : nom;
             }
             catch

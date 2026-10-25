@@ -60,7 +60,8 @@ namespace IUTSCalculator.Services
             decimal indemnitesDiverses = 0m,
             string libelleDivers = null,
             decimal autresDeductions = 0m,
-            string libelleDeductions = null)
+            string libelleDeductions = null,
+            int? dureePreavisManuelle = null)
         {
             if (salarie == null)
                 throw new ArgumentNullException(nameof(salarie));
@@ -128,7 +129,11 @@ namespace IUTSCalculator.Services
             }
 
             // 5. Durée et indemnité compensatrice de préavis (Art. 30 CCI-BF)
-            stc.DureePreavisMois = DeterminerDureePreavisMois(salarie, annees);
+            // Durée de la catégorie (CCI-BF art. 35), sauf durée saisie dans le formulaire
+            // (travailleur payé à l'heure ou à la journée, contrat plus favorable…).
+            stc.DureePreavisMois = dureePreavisManuelle.HasValue && dureePreavisManuelle.Value >= 0
+                ? dureePreavisManuelle.Value
+                : DeterminerDureePreavisMois(salarie, annees);
             stc.StatutPreavis = statutPreavis ?? DeterminerStatutPreavisDefaut(motif);
 
             if (stc.StatutPreavis == StatutPreavis.DispensePaye && stc.DureePreavisMois > 0)
@@ -144,8 +149,19 @@ namespace IUTSCalculator.Services
             if (OuvreDroitIndemniteLicenciement(motif) && annees >= 1)
             {
                 decimal tauxGlobal = CalculerTauxIndemniteLicenciement(annees, mois);
+
+                // Départ VOLONTAIRE à la retraite : demi-indemnité (art. 38 CCI-BF), comme
+                // l'annonce la documentation du module (CalculerIndemniteLicenciementLegal).
+                // L'écran versait jusqu'ici l'indemnité entière (défaut n° 8 du guide).
+                decimal indemnite = Math.Round(stc.SalaireReference * (tauxGlobal / 100m), 0);
+                if (motif == MotifDepart.RetraiteDepart)
+                {
+                    tauxGlobal = tauxGlobal / 2m;
+                    indemnite = Math.Round(indemnite / 2m, 0);
+                }
+
                 stc.TauxLicenciementApplique = tauxGlobal;
-                stc.IndemniteLicenciement = Math.Round(stc.SalaireReference * (tauxGlobal / 100m), 0);
+                stc.IndemniteLicenciement = indemnite;
             }
             else
             {
@@ -200,16 +216,29 @@ namespace IUTSCalculator.Services
         public static int DeterminerDureePreavisMois(Employee salarie, int anneesAnciennete)
         {
             if (salarie == null) return 1;
+            return EstCategoriePreavisLong(salarie) ? 3 : 1;
+        }
 
-            bool estCadre = salarie.IsHigherCategory ||
-                            (!string.IsNullOrEmpty(salarie.Category) &&
-                             salarie.Category.IndexOf("cadre", StringComparison.OrdinalIgnoreCase) >= 0);
+        /// <summary>
+        /// Vrai pour les catégories au préavis de trois mois : cadres, agents de maîtrise et
+        /// techniciens (convention collective interprofessionnelle du 9 juillet 1974,
+        /// art. 35 ; nouveau Code du travail, loi n° 013-2026/ALP, art. 76). Les autres
+        /// travailleurs payés au mois ont un mois ; ceux payés à l'heure ou à la journée,
+        /// huit jours — durée à saisir dans le formulaire.
+        ///
+        /// L'ancienne règle donnait trois mois dès que la catégorie CONTENAIT « cadre » —
+        /// « Non cadre » compris — et deux mois aux ouvriers et employés de cinq ans
+        /// d'ancienneté, palier que le texte ne prévoit pas (défaut n° 8 du guide).
+        /// </summary>
+        public static bool EstCategoriePreavisLong(Employee salarie)
+        {
+            if (salarie == null) return false;
+            if (salarie.IsHigherCategory) return true;
 
-            if (estCadre)
-                return 3; // Cadres et assimilés : 3 mois
-
-            // Ouvriers et employés : 1 mois pour moins de 5 ans, 2 mois pour 5 ans et plus
-            return anneesAnciennete >= 5 ? 2 : 1;
+            string c = Employee.NormaliserCategorie(salarie.Category);
+            if (c.Length == 0) return false;
+            if (c.Contains("non cadre") || c.Contains("non-cadre")) return false;
+            return c.Contains("cadre") || c.Contains("maitrise") || c.Contains("technicien");
         }
 
         /// <summary>
@@ -322,8 +351,9 @@ namespace IUTSCalculator.Services
         /// </summary>
         public static int CalculerDureePreavisMois(bool isCadre, decimal ancienneteAnnees)
         {
-            if (isCadre) return 3;
-            return ancienneteAnnees >= 5m ? 2 : 1;
+            // Même règle que DeterminerDureePreavisMois : 3 mois (cadres, maîtrise,
+            // techniciens), 1 mois sinon, sans palier d'ancienneté.
+            return isCadre ? 3 : 1;
         }
 
         /// <summary>
@@ -387,6 +417,178 @@ namespace IUTSCalculator.Services
             {
                 return 0m;
             }
+        }
+
+        // ── Bulletin de sortie (défaut n° 1 du guide) ─────────────────────────
+
+        /// <summary>Codes du plan de paie portés par le bulletin de sortie.</summary>
+        public const string CodeIndemniteConges = "INDCONGES";
+        public const string CodeIndemnitePreavis = "INDPREAVIS";
+        public const string CodeIndemniteDepart = "INDDEPART";
+        public const string CodeGratification = "GRATIF";
+        public const string CodeIndemnitesDiverses = "INDDIVERS";
+        public const string CodeSoldePrets = "PRET";
+        public const string CodeRetenueSortie = "RETSORTIE";
+
+        private static readonly string[] CodesPrets = { "PRET", "AVANCE", "ACOMPTE" };
+
+        /// <summary>
+        /// Prépare (sans l'enregistrer) le bulletin du mois de sortie qui porte le solde de
+        /// tout compte : la paie normale du mois — proratisée à la date de sortie, avec ses
+        /// variables, absences, heures, primes, avantages, rappels et saisies — plus les
+        /// indemnités de rupture du décompte, chacune sous sa rubrique du plan de paie, et
+        /// le solde des prêts. Le tout est calculé par le moteur de paie : IUTS au barème
+        /// normal, CNSS plafonnée, TPA, exonérations suivant les cases du plan (indemnité de
+        /// licenciement exonérée d'IUTS en vertu de l'article 106-5 du CGI ; préavis et
+        /// congés payés imposables).
+        ///
+        /// Jusqu'ici le décompte ne créait aucun bulletin : ses indemnités n'entraient ni
+        /// dans les déclarations, ni dans le livre de paie, ni dans les virements, et son
+        /// IUTS (barème simplifié) et sa CNSS (sans plafond) étaient des estimations — le
+        /// reçu ne correspondait pas à la somme versée.
+        ///
+        /// Le décompte est ensuite aligné sur ce bulletin (<see cref="AlignerSurBulletin"/>) :
+        /// le net à percevoir du reçu EST le net à payer du bulletin.
+        /// </summary>
+        public async Task<ResultatBulletinMois> PreparerBulletinSortieAsync(
+            SoldeToutCompte stc, Employee salarie, ChaineBulletinService chaine, IEnumerable<Rubrique> plan)
+        {
+            if (stc == null) throw new ArgumentNullException(nameof(stc));
+            if (salarie == null) throw new ArgumentNullException(nameof(salarie));
+            if (chaine == null) throw new ArgumentNullException(nameof(chaine));
+
+            // La fiche porte la date de sortie dès l'aperçu : le prorata de sortie
+            // s'applique avant même la validation.
+            var sortant = salarie.Clone();
+            sortant.DateSortie = stc.DateSortie.Date;
+
+            var periode = new DateTime(stc.DateSortie.Year, stc.DateSortie.Month, 1);
+            var avertissements = new List<string>();
+            // Saisies calculées APRÈS les lignes de sortie (voir plus bas), sur le net qui les
+            // inclut : c'est ce net qui sert ensuite à enregistrer les retenues.
+            var apport = await chaine.ChargerApportAsync(sortant, periode, m => avertissements.Add(m), avecSaisies: false);
+
+            var planParCode = (plan ?? Enumerable.Empty<Rubrique>())
+                .Where(r => r != null && !string.IsNullOrWhiteSpace(r.Code))
+                .GroupBy(r => r.Code.Trim().ToUpperInvariant())
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var lignes = new ApportRappels();
+
+            AjouterLigneSortie(lignes, apport, planParCode, avertissements, CodeIndemniteConges,
+                string.Format(CultureInfo.GetCultureInfo("fr-FR"), "Indemnité compensatrice de congés payés ({0:0.##} j)", stc.JoursCongesDus),
+                SensRubrique.Gain, stc.IndemniteConges, true, true, true);
+            AjouterLigneSortie(lignes, apport, planParCode, avertissements, CodeIndemnitePreavis,
+                string.Format("Indemnité compensatrice de préavis ({0} mois)", stc.DureePreavisMois),
+                SensRubrique.Gain, stc.IndemnitePreavis, true, false, true);
+            AjouterLigneSortie(lignes, apport, planParCode, avertissements, CodeIndemniteDepart,
+                stc.Motif == MotifDepart.RetraiteDepart || stc.Motif == MotifDepart.RetraiteMise
+                    ? "Indemnité de départ à la retraite"
+                    : "Indemnité de licenciement / de fin de service",
+                SensRubrique.Gain, stc.IndemniteLicenciement, false, false, false);
+            AjouterLigneSortie(lignes, apport, planParCode, avertissements, CodeGratification,
+                "Gratification / 13e mois (prorata de sortie)",
+                SensRubrique.Gain, stc.Indemnite13emeMois, true, true, true);
+            AjouterLigneSortie(lignes, apport, planParCode, avertissements, CodeIndemnitesDiverses,
+                string.IsNullOrWhiteSpace(stc.LibelleIndemnitesDiverses) ? "Indemnités diverses de sortie" : stc.LibelleIndemnitesDiverses,
+                SensRubrique.Gain, stc.IndemnitesDiverses, true, true, true);
+
+            // Prêts : le décompte retient tout le capital restant dû ; la retenue normale du
+            // mois est déjà dans l'apport — seul le complément est ajouté.
+            decimal pretsDuMois = apport.Lignes
+                .Where(l => l.Sens == SensRubrique.Retenue && CodesPrets.Contains((l.Code ?? "").ToUpperInvariant()))
+                .Sum(l => l.Montant);
+            decimal complementPrets = Math.Max(0m, stc.DeductionsPrets - pretsDuMois);
+            if (complementPrets > 0m)
+                lignes.AjouterLigne(CodeSoldePrets, "Solde des prêts et avances au départ", SensRubrique.Retenue,
+                                    complementPrets, false, false, false);
+
+            if (stc.DeductionsAutres > 0m)
+                lignes.AjouterLigne(CodeRetenueSortie,
+                    string.IsNullOrWhiteSpace(stc.LibelleDeductionsAutres) ? "Retenue de sortie" : stc.LibelleDeductionsAutres,
+                    SensRubrique.Retenue, stc.DeductionsAutres, false, false, false);
+
+            apport = apport.AvecRappels(lignes);
+            apport = await chaine.AjouterSaisiesAsync(apport, sortant, periode, m => avertissements.Add(m));
+
+            var resultat = await chaine.PreparerAsync(
+                sortant, periode, apport.JoursCongesPris, ModesReglementPaie.ModeDeLaFiche, null, apport);
+            resultat.Avertissements.AddRange(avertissements);
+            resultat.EstBulletinDeSortie = true;
+
+            AlignerSurBulletin(stc, resultat);
+            return resultat;
+        }
+
+        /// <summary>
+        /// Ajoute une ligne du décompte au bulletin, avec le traitement de sa rubrique dans le
+        /// plan de paie (repli sur le traitement par défaut si la rubrique n'existe pas).
+        /// Une rubrique déjà saisie dans les variables du mois n'est pas ajoutée une seconde
+        /// fois : c'est la saisie du mois qui fait foi, et l'écran le signale.
+        /// </summary>
+        private static void AjouterLigneSortie(
+            ApportRappels lignes, ApportVariables apport, Dictionary<string, Rubrique> plan, List<string> avertissements,
+            string code, string libelle, SensRubrique sens, decimal montant, bool iuts, bool cnss, bool tpa)
+        {
+            if (montant <= 0m) return;
+
+            if (apport.Lignes.Any(l => string.Equals(l.Code, code, StringComparison.OrdinalIgnoreCase)))
+            {
+                avertissements.Add(string.Format(
+                    "la rubrique {0} est déjà saisie dans les variables du mois : le montant du décompte ({1:N0} FCFA) n'est pas ajouté une seconde fois",
+                    code, montant));
+                return;
+            }
+
+            Rubrique r;
+            if (plan != null && plan.TryGetValue(code, out r))
+            {
+                iuts = r.SoumisIUTS;
+                cnss = r.SoumisCNSS;
+                tpa = r.SoumisTPA;
+            }
+            lignes.AjouterLigne(code, libelle, sens, montant, iuts, cnss, tpa);
+        }
+
+        /// <summary>
+        /// Recopie dans le décompte les montants du bulletin de sortie : IUTS et CNSS du
+        /// moteur, prêts retenus, autres retenues du bulletin, et salaire de présence (paie
+        /// normale du mois, prorata compris). Après alignement, le total brut du décompte
+        /// est le brut du bulletin et son net à percevoir, le net à payer du bulletin.
+        /// </summary>
+        public static void AlignerSurBulletin(SoldeToutCompte stc, ResultatBulletinMois resultat)
+        {
+            if (stc == null || resultat == null || resultat.Bulletin == null || resultat.Calcul == null) return;
+
+            var b = resultat.Bulletin;
+            var lignes = resultat.Apport != null ? resultat.Apport.Lignes : (IReadOnlyList<LigneApport>)new List<LigneApport>();
+            Func<string, decimal> gain = code => lignes
+                .Where(l => l.Sens == SensRubrique.Gain && string.Equals(l.Code, code, StringComparison.OrdinalIgnoreCase))
+                .Sum(l => l.Montant);
+
+            stc.IndemniteConges = gain(CodeIndemniteConges);
+            stc.IndemnitePreavis = gain(CodeIndemnitePreavis);
+            stc.IndemniteLicenciement = gain(CodeIndemniteDepart);
+            stc.Indemnite13emeMois = gain(CodeGratification);
+            stc.IndemnitesDiverses = gain(CodeIndemnitesDiverses);
+
+            decimal indemnites = stc.IndemniteConges + stc.IndemnitePreavis + stc.IndemniteLicenciement
+                               + stc.Indemnite13emeMois + stc.IndemnitesDiverses;
+            stc.SalairePresence = Math.Max(0m, b.SalaireBrut - indemnites);
+
+            stc.EstimationIUTS = resultat.Calcul.IUTSNet;
+            stc.EstimationCNSS = resultat.Calcul.CnssEmployee;
+            stc.DeductionsPrets = lignes
+                .Where(l => l.Sens == SensRubrique.Retenue && CodesPrets.Contains((l.Code ?? "").ToUpperInvariant()))
+                .Sum(l => l.Montant);
+
+            // Tout le reste de ce qui sépare le brut du net : retenue obligatoire, saisies,
+            // cotisation syndicale, reprise d'avantages en nature, retenue de sortie…
+            stc.DeductionsAutres = Math.Max(0m,
+                b.SalaireBrut - b.SalaireNetAPayer - stc.EstimationIUTS - stc.EstimationCNSS - stc.DeductionsPrets);
+            string saisie = stc.LibelleDeductionsAutres;
+            stc.LibelleDeductionsAutres = "Autres retenues du bulletin (retenue obligatoire, saisies, cotisations, reprises)" +
+                (string.IsNullOrWhiteSpace(saisie) ? "" : ", dont « " + saisie.Trim() + " »");
         }
 
         // ── Persistance & Historique ──────────────────────────────────────────

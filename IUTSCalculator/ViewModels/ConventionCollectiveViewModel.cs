@@ -31,8 +31,20 @@ namespace IUTSCalculator.ViewModels
         private GrilleSalaire _selectedGrille;
         private TrancheAnciennete _selectedTranche;
         private Employee _selectedEmployeeForSimulation;
-        private DateTime _dateSimulation = DateTime.Today;
+        private MoisOption _moisSimulation = MoisOption.Tous.FirstOrDefault(m => m.Numero == DateTime.Today.Month);
+        private int _anneeSimulation = DateTime.Today.Year;
         private CalculAncienneteResultat _resultatSimulation;
+
+        // Convention sélectionnée, chargée AVEC sa grille et ses tranches : la liste des
+        // conventions n'en contient que l'en-tête, et le simulateur calculait sur une
+        // convention sans grille ni barème (minimum et prime toujours nuls).
+        private ConventionCollective _conventionComplete;
+
+        // Situation simulée : reprise de la fiche du salarié, modifiable.
+        private DateTime? _dateEntreeSimulation;
+        private string _categorieSimulation;
+        private string _echelonSimulation;
+        private decimal _salaireBaseSimulation;
 
         // Édition convention
         private string _codeConvention;
@@ -117,28 +129,202 @@ namespace IUTSCalculator.ViewModels
             {
                 if (SetProperty(ref _selectedEmployeeForSimulation, value))
                 {
-                    ExecuterSimulation();
+                    ReprendreFicheSalarie();
                 }
             }
         }
 
-        public DateTime DateSimulation
+        #region Simulateur & conformité légale
+
+        public IEnumerable<MoisOption> MoisDisponibles => MoisOption.Tous;
+        public IEnumerable<int> AnneesDisponibles => Enumerable.Range(DateTime.Today.Year - 5, 7).ToList();
+
+        /// <summary>Mois de paie simulé.</summary>
+        public MoisOption MoisSimulation
         {
-            get => _dateSimulation;
-            set
-            {
-                if (SetProperty(ref _dateSimulation, value))
-                {
-                    ExecuterSimulation();
-                }
-            }
+            get => _moisSimulation;
+            set { if (SetProperty(ref _moisSimulation, value)) ExecuterSimulation(); }
+        }
+
+        public int AnneeSimulation
+        {
+            get => _anneeSimulation;
+            set { if (SetProperty(ref _anneeSimulation, value)) ExecuterSimulation(); }
+        }
+
+        /// <summary>
+        /// Premier jour du mois de paie simulé. L'ancienneté y est arrêtée selon la règle
+        /// unique de l'application (<see cref="ConventionCollectiveService.DateCalculAnciennete"/>).
+        /// </summary>
+        public DateTime DateSimulation => new DateTime(_anneeSimulation, (_moisSimulation ?? MoisOption.Tous.First()).Numero, 1);
+
+        public DateTime DateCalculAnciennete => ConventionCollectiveService.DateCalculAnciennete(DateSimulation);
+
+        public string DateCalculLibelle => string.Format(CultureFr,
+            "Ancienneté arrêtée au {0:dd/MM/yyyy} (1er du mois de paie, comme sur les bulletins).", DateCalculAnciennete);
+
+        public DateTime? DateEntreeSimulation
+        {
+            get => _dateEntreeSimulation;
+            set { if (SetProperty(ref _dateEntreeSimulation, value)) ExecuterSimulation(); }
+        }
+
+        public string CategorieSimulation
+        {
+            get => _categorieSimulation;
+            set { if (SetProperty(ref _categorieSimulation, value)) ExecuterSimulation(); }
+        }
+
+        public string EchelonSimulation
+        {
+            get => _echelonSimulation;
+            set { if (SetProperty(ref _echelonSimulation, value)) ExecuterSimulation(); }
+        }
+
+        /// <summary>Salaire de base contractuel simulé (repris de la fiche, modifiable).</summary>
+        public decimal SalaireBaseSimulation
+        {
+            get => _salaireBaseSimulation;
+            set { if (SetProperty(ref _salaireBaseSimulation, value)) ExecuterSimulation(); }
         }
 
         public CalculAncienneteResultat ResultatSimulation
         {
             get => _resultatSimulation;
-            set => SetProperty(ref _resultatSimulation, value);
+            set
+            {
+                if (SetProperty(ref _resultatSimulation, value))
+                    NotifierResultatSimulation();
+            }
         }
+
+        /// <summary>Vrai quand l'ancienneté peut être calculée (date d'entrée renseignée et antérieure au mois de paie).</summary>
+        public bool SimulationPossible => _resultatSimulation != null && !ReferenceEquals(_resultatSimulation, CalculAncienneteResultat.Vide);
+
+        public string AncienneteLibelle
+        {
+            get
+            {
+                if (_selectedEmployeeForSimulation == null || SelectedConvention == null) return "—";
+                if (!_dateEntreeSimulation.HasValue) return "Date d'entrée non renseignée";
+                if (_dateEntreeSimulation.Value.Date > DateCalculAnciennete) return "Entrée postérieure au mois de paie";
+                return _resultatSimulation == null ? "—" : _resultatSimulation.DescriptionAnciennete;
+            }
+        }
+
+        public string MinimumGrilleLibelle
+        {
+            get
+            {
+                if (!SimulationPossible) return "—";
+                return _resultatSimulation.SalaireMinimumConventionnel > 0m
+                    ? string.Format(CultureFr, "{0:N0} FCFA", _resultatSimulation.SalaireMinimumConventionnel)
+                    : "Aucune ligne de la grille";
+            }
+        }
+
+        public string BaseCalculLibelle
+        {
+            get
+            {
+                if (!SimulationPossible) return "—";
+                return string.Format(CultureFr, "{0:N0} FCFA — {1}", _resultatSimulation.BaseCalcul, _resultatSimulation.BaseUtilisee);
+            }
+        }
+
+        public string TauxLibelle
+        {
+            get
+            {
+                if (!SimulationPossible) return "—";
+                return _resultatSimulation.TauxPourcentage > 0m
+                    ? string.Format(CultureFr, "{0:0.##} % ({1})", _resultatSimulation.TauxPourcentage, _resultatSimulation.LibelleTranche)
+                    : "0 % (aucune tranche du barème atteinte)";
+            }
+        }
+
+        public string PrimeLibelle => SimulationPossible
+            ? string.Format(CultureFr, "{0:N0} FCFA", _resultatSimulation.Montant)
+            : "—";
+
+        /// <summary>Salaire saisi au moins égal au minimum de la grille.</summary>
+        public bool EstConforme => SimulationPossible && _resultatSimulation.SalaireMinimumConventionnel > 0m && !_resultatSimulation.EstSousLeMinimum;
+
+        /// <summary>Salaire saisi inférieur au minimum de la grille.</summary>
+        public bool EstNonConforme => SimulationPossible && _resultatSimulation.EstSousLeMinimum;
+
+        /// <summary>Conformité non vérifiable (pas de date d'entrée, ou catégorie / échelon absents de la grille).</summary>
+        public bool EstConformiteIndeterminee => _selectedEmployeeForSimulation != null && SelectedConvention != null && !EstConforme && !EstNonConforme;
+
+        public string MessageConformite
+        {
+            get
+            {
+                if (_selectedEmployeeForSimulation == null || SelectedConvention == null) return "";
+                if (!SimulationPossible)
+                    return _dateEntreeSimulation.HasValue
+                        ? "Le salarié n'est pas encore entré au 1er du mois de paie choisi : la conformité n'est pas évaluée pour ce mois."
+                        : "Renseignez la date d'entrée pour simuler l'ancienneté et contrôler le salaire minimum.";
+                var r = _resultatSimulation;
+                if (EstNonConforme)
+                    return string.Format(CultureFr,
+                        "Salaire de base saisi : {0:N0} FCFA, inférieur au minimum garanti de la grille ({1:N0} FCFA) : écart de {2:N0} FCFA à combler.",
+                        r.SalaireContractuel, r.SalaireMinimumConventionnel, r.EcartMinimum);
+                if (EstConforme)
+                    return string.Format(CultureFr,
+                        "Salaire de base saisi : {0:N0} FCFA, au moins égal au minimum garanti de la grille ({1:N0} FCFA).",
+                        r.SalaireContractuel, r.SalaireMinimumConventionnel);
+                return string.Format(CultureFr,
+                    "Conformité non vérifiable : aucune ligne de la grille de « {0} » ne correspond à la catégorie « {1} »{2}.",
+                    SelectedConvention.Libelle,
+                    string.IsNullOrWhiteSpace(_categorieSimulation) ? "(non renseignée)" : _categorieSimulation.Trim(),
+                    string.IsNullOrWhiteSpace(_echelonSimulation) ? "" : ", échelon « " + _echelonSimulation.Trim() + " »");
+            }
+        }
+
+        /// <summary>Ce que la paie appliquera réellement à ce salarié (convention de sa fiche).</summary>
+        public string NoteApplicationPaie
+        {
+            get
+            {
+                var e = _selectedEmployeeForSimulation;
+                var conv = SelectedConvention;
+                if (e == null || conv == null) return "";
+                if (!e.ConventionId.HasValue || e.ConventionId.Value <= 0)
+                    return "Simulation seulement : la fiche de ce salarié n'est rattachée à aucune convention, ses bulletins ne portent pas de prime d'ancienneté conventionnelle.";
+                if (e.ConventionId.Value != conv.Id)
+                {
+                    var autre = Conventions.FirstOrDefault(c => c.Id == e.ConventionId.Value);
+                    return "Simulation sur « " + conv.Libelle + " » : la fiche de ce salarié est rattachée à « " +
+                           (autre != null ? autre.Libelle : "une autre convention") + " », que ses bulletins appliquent.";
+                }
+                if (!conv.EstActive)
+                    return "Convention inactive : ses bulletins ne portent pas de prime d'ancienneté conventionnelle tant qu'elle n'est pas réactivée.";
+                return "Convention de la fiche du salarié : la prime calculée ici est celle de ses bulletins (rubrique PRIMEANC).";
+            }
+        }
+
+        private static readonly System.Globalization.CultureInfo CultureFr = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+
+        private void NotifierResultatSimulation()
+        {
+            OnPropertyChanged(nameof(DateSimulation));
+            OnPropertyChanged(nameof(DateCalculAnciennete));
+            OnPropertyChanged(nameof(DateCalculLibelle));
+            OnPropertyChanged(nameof(SimulationPossible));
+            OnPropertyChanged(nameof(AncienneteLibelle));
+            OnPropertyChanged(nameof(MinimumGrilleLibelle));
+            OnPropertyChanged(nameof(BaseCalculLibelle));
+            OnPropertyChanged(nameof(TauxLibelle));
+            OnPropertyChanged(nameof(PrimeLibelle));
+            OnPropertyChanged(nameof(EstConforme));
+            OnPropertyChanged(nameof(EstNonConforme));
+            OnPropertyChanged(nameof(EstConformiteIndeterminee));
+            OnPropertyChanged(nameof(MessageConformite));
+            OnPropertyChanged(nameof(NoteApplicationPaie));
+        }
+
+        #endregion
 
         #region Propriétés Formulaire Convention
 
@@ -238,6 +424,7 @@ namespace IUTSCalculator.ViewModels
         public ICommand SupprimerTrancheCommand { get; }
 
         public ICommand SimulerCommand { get; }
+        public ICommand ReprendreFicheCommand { get; }
 
         public ConventionCollectiveViewModel(
             ConventionCollectiveService conventionService,
@@ -251,7 +438,7 @@ namespace IUTSCalculator.ViewModels
             SelectedBaseCalculOption = OptionsBaseCalcul[0];
 
             ChargerCommand = new RelayCommand(async () => await ChargerToutAsync());
-            NouvelleConventionCommand = new RelayCommand(ReinitialiserChampsConvention);
+            NouvelleConventionCommand = new RelayCommand(NouvelleConvention);
             EnregistrerConventionCommand = new RelayCommand(async () => await EnregistrerConventionAsync());
             SupprimerConventionCommand = new RelayCommand(
                 async () => await SupprimerConventionAsync(),
@@ -270,6 +457,7 @@ namespace IUTSCalculator.ViewModels
                 () => SelectedTranche != null && SelectedTranche.Id > 0);
 
             SimulerCommand = new RelayCommand(ExecuterSimulation);
+            ReprendreFicheCommand = new RelayCommand(ReprendreFicheSalarie, () => SelectedEmployeeForSimulation != null);
         }
 
         public async Task ChargerToutAsync()
@@ -296,6 +484,7 @@ namespace IUTSCalculator.ViewModels
                     SelectedConvention = actuelle ?? (Conventions.Count > 0 ? Conventions[0] : null);
                 }
 
+                var matriculeSimule = SelectedEmployeeForSimulation?.EmployeeId;
                 var listeSalaries = await _dataService.LoadEmployeesAsync();
                 Employees.Clear();
                 foreach (var emp in listeSalaries)
@@ -303,10 +492,15 @@ namespace IUTSCalculator.ViewModels
                     Employees.Add(emp);
                 }
 
-                if (SelectedEmployeeForSimulation == null && Employees.Count > 0)
-                {
+                // Le salarié simulé est conservé (fiche relue) après un rechargement.
+                var memeSalarie = matriculeSimule == null ? null
+                    : Employees.FirstOrDefault(e => string.Equals(e.EmployeeId, matriculeSimule, StringComparison.OrdinalIgnoreCase));
+                if (memeSalarie != null)
+                    SelectedEmployeeForSimulation = memeSalarie;
+                else if (Employees.Count > 0)
                     SelectedEmployeeForSimulation = Employees[0];
-                }
+                else
+                    SelectedEmployeeForSimulation = null;
 
                 StatusMessage = $"{Conventions.Count} convention(s) collective(s) chargée(s).";
             }
@@ -327,6 +521,8 @@ namespace IUTSCalculator.ViewModels
                 Grilles.Clear();
                 Tranches.Clear();
                 ReinitialiserChampsConvention();
+                _conventionComplete = null;
+                ExecuterSimulation();
                 return;
             }
 
@@ -337,13 +533,21 @@ namespace IUTSCalculator.ViewModels
                 ?? OptionsBaseCalcul[0];
             EstActiveConvention = SelectedConvention.EstActive;
 
+            _conventionComplete = null;
+            ExecuterSimulation();
+
+            int idConvention = SelectedConvention.Id;
             _ = Task.Run(async () =>
             {
-                var convComplete = await _conventionService.ObtenirParIdAsync(SelectedConvention.Id);
+                var convComplete = await _conventionService.ObtenirParIdAsync(idConvention);
                 if (convComplete != null)
                 {
                     App.Current.Dispatcher.Invoke(() =>
                     {
+                        // Une autre convention a pu être sélectionnée pendant la lecture.
+                        if (SelectedConvention == null || SelectedConvention.Id != idConvention) return;
+                        _conventionComplete = convComplete;
+
                         Grilles.Clear();
                         foreach (var g in convComplete.Grilles.OrderBy(g => g.Ordre).ThenBy(g => g.Categorie).ThenBy(g => g.Echelon))
                         {
@@ -362,6 +566,17 @@ namespace IUTSCalculator.ViewModels
                     });
                 }
             });
+        }
+
+        /// <summary>
+        /// « Nouvelle convention » : désélectionne la convention affichée. Sans cela,
+        /// « Enregistrer convention » écrasait la convention sélectionnée au lieu d'en créer une.
+        /// </summary>
+        private void NouvelleConvention()
+        {
+            SelectedConvention = null;
+            ReinitialiserChampsConvention();
+            StatusMessage = "Nouvelle convention : saisissez le code et la désignation, puis « Enregistrer convention ».";
         }
 
         private void ReinitialiserChampsConvention()
@@ -427,6 +642,19 @@ namespace IUTSCalculator.ViewModels
                     BaseCalculAnciennete = SelectedBaseCalculOption?.Valeur ?? BaseCalculAnciennete.MinimumConventionnel,
                     EstActive = EstActiveConvention
                 };
+
+                // L'enregistrement d'une convention réécrit sa grille et son barème avec ceux
+                // qui lui sont transmis : ils sont relus en base, sinon modifier l'en-tête
+                // effaçait toute la grille des salaires minima et les tranches d'ancienneté.
+                if (conv.Id > 0)
+                {
+                    var enBase = await _conventionService.ObtenirParIdAsync(conv.Id);
+                    if (enBase != null)
+                    {
+                        conv.Grilles = enBase.Grilles;
+                        conv.TranchesAnciennete = enBase.TranchesAnciennete;
+                    }
+                }
 
                 await _conventionService.EnregistrerConventionAsync(conv, "Utilisateur");
                 StatusMessage = $"Convention '{conv.Libelle}' enregistrée avec succès.";
@@ -583,17 +811,49 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
+        /// <summary>Recopie dans le simulateur la situation enregistrée sur la fiche du salarié choisi.</summary>
+        private void ReprendreFicheSalarie()
+        {
+            var e = SelectedEmployeeForSimulation;
+            _dateEntreeSimulation = e?.DateEntreeNullable;
+            _categorieSimulation = e?.Category;
+            _echelonSimulation = e?.Echelon;
+            _salaireBaseSimulation = e?.BaseSalary ?? 0m;
+            OnPropertyChanged(nameof(DateEntreeSimulation));
+            OnPropertyChanged(nameof(CategorieSimulation));
+            OnPropertyChanged(nameof(EchelonSimulation));
+            OnPropertyChanged(nameof(SalaireBaseSimulation));
+            ExecuterSimulation();
+        }
+
+        /// <summary>
+        /// Calcule l'ancienneté, le minimum de la grille, la base, le taux et la prime avec
+        /// la méthode de la paie (<see cref="ConventionCollectiveService.CalculerAnciennete"/>),
+        /// sur la convention sélectionnée et la situation simulée, au 1er du mois de paie.
+        /// </summary>
         private void ExecuterSimulation()
         {
             if (SelectedEmployeeForSimulation == null || SelectedConvention == null)
             {
                 ResultatSimulation = null;
+                NotifierResultatSimulation();
                 return;
             }
 
-            // Calculer sur la convention sélectionnée (ou la convention de l'employé si rattaché)
-            var convCible = SelectedConvention;
-            ResultatSimulation = _conventionService.CalculerAnciennete(SelectedEmployeeForSimulation, DateSimulation, convCible);
+            // Grille et barème de la convention sélectionnée (en-tête seul tant qu'ils ne sont pas lus).
+            var convCible = _conventionComplete != null && _conventionComplete.Id == SelectedConvention.Id
+                ? _conventionComplete
+                : SelectedConvention;
+
+            // La fiche n'est pas modifiée : le calcul porte sur une copie.
+            var simule = SelectedEmployeeForSimulation.Clone();
+            simule.DateEntree = _dateEntreeSimulation.HasValue ? _dateEntreeSimulation.Value.Date : default(DateTime);
+            simule.Category = _categorieSimulation;
+            simule.Echelon = _echelonSimulation;
+            simule.BaseSalary = _salaireBaseSimulation;
+
+            ResultatSimulation = _conventionService.CalculerAnciennete(simule, DateCalculAnciennete, convCible);
+            NotifierResultatSimulation();
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -160,12 +161,13 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static async Task ChargerTranchesAsync(SQLiteConnection conn, BaremeLegal bareme)
+        private static async Task ChargerTranchesAsync(SQLiteConnection conn, BaremeLegal bareme, SQLiteTransaction tx = null)
         {
             bareme.Tranches.Clear();
 
             using (var cmd = conn.CreateCommand())
             {
+                if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText =
                     "SELECT Ordre, BorneInferieure, BorneSuperieure, Taux " +
                     "FROM BaremeTranches WHERE BaremeId = @id ORDER BY Ordre";
@@ -192,12 +194,13 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task ChargerChargesFamilleAsync(SQLiteConnection conn, BaremeLegal bareme)
+        private static async Task ChargerChargesFamilleAsync(SQLiteConnection conn, BaremeLegal bareme, SQLiteTransaction tx = null)
         {
             bareme.ChargesFamille.Clear();
 
             using (var cmd = conn.CreateCommand())
             {
+                if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText =
                     "SELECT NombreCharges, Taux FROM BaremeChargesFamille " +
                     "WHERE BaremeId = @id ORDER BY NombreCharges";
@@ -236,6 +239,11 @@ namespace IUTSCalculator.Services
         /// Enregistre un barème et ses collections. L'ensemble passe dans une seule
         /// transaction : un barème dont les tranches seraient écrites à moitié produirait
         /// des impôts faux sans jamais lever d'erreur.
+        ///
+        /// La création ou chaque valeur modifiée est journalisée (entité « Barèmes ») dans
+        /// la même transaction : le filtre « Barèmes » du journal d'audit restait toujours
+        /// vide (défaut 21). Les deux écrans qui enregistrent un barème — « Barèmes légaux »
+        /// et « Paramètres » — passent par ici.
         /// </summary>
         public async Task EnregistrerAsync(BaremeLegal bareme)
         {
@@ -246,6 +254,10 @@ namespace IUTSCalculator.Services
             {
                 try
                 {
+                    BaremeLegal ancien = bareme.Id > 0
+                        ? await LireParIdAsync(conn, transaction, bareme.Id)
+                        : null;
+
                     if (bareme.Id <= 0)
                     {
                         using (var cmd = conn.CreateCommand())
@@ -301,6 +313,8 @@ namespace IUTSCalculator.Services
 
                     await RemplacerTranchesAsync(conn, transaction, bareme);
                     await RemplacerChargesFamilleAsync(conn, transaction, bareme);
+
+                    await JournaliserEnregistrementAsync(conn, transaction, ancien, bareme);
 
                     transaction.Commit();
                 }
@@ -426,6 +440,8 @@ namespace IUTSCalculator.Services
                 {
                     try
                     {
+                        BaremeLegal ancien = await LireParIdAsync(conn, transaction, bareme.Id) ?? bareme;
+
                         foreach (string table in new[] { "BaremeTranches", "BaremeChargesFamille", "Baremes" })
                         {
                             using (var cmd = conn.CreateCommand())
@@ -439,6 +455,15 @@ namespace IUTSCalculator.Services
                             }
                         }
 
+                        await AuditService.EnregistrerDansTransactionAsync(
+                            conn, transaction,
+                            action: "Suppression barème",
+                            entite: AuditService.EntiteBaremes,
+                            entiteId: CleAudit(ancien),
+                            champ: "Barème complet",
+                            ancienneValeur: ancien.Designation,
+                            details: "Barème supprimé. Contenu : " + Resume(ancien));
+
                         transaction.Commit();
                     }
                     catch
@@ -448,6 +473,140 @@ namespace IUTSCalculator.Services
                         throw;
                     }
                 }
+            }
+        }
+
+        // ── Journal d'audit ──────────────────────────────────────────────────
+
+        private static async Task<BaremeLegal> LireParIdAsync(SQLiteConnection conn, SQLiteTransaction tx, int id)
+        {
+            BaremeLegal bareme = null;
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "SELECT " + ColonnesBareme + " FROM Baremes WHERE Id = @id";
+                cmd.Parameters.AddWithValue("@id", id);
+                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                        bareme = LireBareme(reader);
+                }
+            }
+
+            if (bareme != null)
+            {
+                await ChargerTranchesAsync(conn, bareme, tx);
+                await ChargerChargesFamilleAsync(conn, bareme, tx);
+            }
+
+            return bareme;
+        }
+
+        private static string CleAudit(BaremeLegal b)
+        {
+            return b.DateEffet.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        private static string Pourcentage(decimal fraction)
+        {
+            return (fraction * 100m).ToString("0.###", CultureInfo.GetCultureInfo("fr-FR")) + " %";
+        }
+
+        private static string Montant(decimal montant)
+        {
+            return montant.ToString("N0", CultureInfo.GetCultureInfo("fr-FR")) + " FCFA";
+        }
+
+        private static string ResumeTranches(BaremeLegal b)
+        {
+            return string.Join(" ; ", b.Tranches.OrderBy(t => t.Ordre).ThenBy(t => t.BorneInferieure).Select(t => t.Designation));
+        }
+
+        private static string ResumeChargesFamille(BaremeLegal b)
+        {
+            return string.Join(" ; ", b.ChargesFamille.OrderBy(c => c.NombreCharges).Select(c => c.Designation));
+        }
+
+        private static string Resume(BaremeLegal b)
+        {
+            return string.Format(
+                "CNSS salarié {0}, patronal {1} (PF {2}, RP {3}, pensions {4}), plafond {5} ; TPA {6} ; {7} tranche(s) IUTS : {8}.",
+                Pourcentage(b.TauxCnssSalarie), Pourcentage(b.TauxCnssEmployeurTotal),
+                Pourcentage(b.TauxCnssPrestationsFamiliales), Pourcentage(b.TauxCnssRisquesProfessionnels),
+                Pourcentage(b.TauxCnssPensionsPatronal), Montant(b.PlafondCnssMensuel),
+                Pourcentage(b.TauxTaxePatronaleApprentissage), b.Tranches.Count, ResumeTranches(b));
+        }
+
+        /// <summary>Champs comparés d'un barème : libellé et valeur lisible.</summary>
+        private static List<KeyValuePair<string, string>> Champs(BaremeLegal b)
+        {
+            return new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>("Date d'effet", b.DateEffet.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)),
+                new KeyValuePair<string, string>("Libellé", b.Libelle ?? ""),
+                new KeyValuePair<string, string>("Référence légale", b.Reference ?? ""),
+                new KeyValuePair<string, string>("Commentaire", b.Commentaire ?? ""),
+                new KeyValuePair<string, string>("Taux CNSS salarié (pensions)", Pourcentage(b.TauxCnssSalarie)),
+                new KeyValuePair<string, string>("Taux CNSS prestations familiales", Pourcentage(b.TauxCnssPrestationsFamiliales)),
+                new KeyValuePair<string, string>("Taux CNSS risques professionnels", Pourcentage(b.TauxCnssRisquesProfessionnels)),
+                new KeyValuePair<string, string>("Taux CNSS pensions (patronal)", Pourcentage(b.TauxCnssPensionsPatronal)),
+                new KeyValuePair<string, string>("Plafond mensuel CNSS", Montant(b.PlafondCnssMensuel)),
+                new KeyValuePair<string, string>("Taux de la taxe patronale d'apprentissage", Pourcentage(b.TauxTaxePatronaleApprentissage)),
+                new KeyValuePair<string, string>("Exonération logement — taux", Pourcentage(b.TauxMaxIndemniteLogement)),
+                new KeyValuePair<string, string>("Exonération logement — plafond", Montant(b.PlafondIndemniteLogement)),
+                new KeyValuePair<string, string>("Exonération transport — taux", Pourcentage(b.TauxMaxIndemniteTransport)),
+                new KeyValuePair<string, string>("Exonération transport — plafond", Montant(b.PlafondIndemniteTransport)),
+                new KeyValuePair<string, string>("Exonération fonction — taux", Pourcentage(b.TauxMaxIndemniteFonction)),
+                new KeyValuePair<string, string>("Exonération fonction — plafond", Montant(b.PlafondIndemniteFonction)),
+                new KeyValuePair<string, string>("Cotisation retraite déductible", Pourcentage(b.TauxMaxCotisationRetraiteDeductible)),
+                new KeyValuePair<string, string>("Abattement — catégories supérieures", Pourcentage(b.AbattementCategoriesSuperieures)),
+                new KeyValuePair<string, string>("Abattement — autres catégories", Pourcentage(b.AbattementAutresCategories)),
+                new KeyValuePair<string, string>("Tranches de l'IUTS", ResumeTranches(b)),
+                new KeyValuePair<string, string>("Réductions pour charges de famille", ResumeChargesFamille(b))
+            };
+        }
+
+        /// <summary>
+        /// Journalise la création d'un barème, ou chaque valeur modifiée d'un barème
+        /// existant (ancienne → nouvelle). Un enregistrement sans changement n'écrit rien.
+        /// </summary>
+        private static async Task JournaliserEnregistrementAsync(
+            SQLiteConnection conn, SQLiteTransaction tx, BaremeLegal ancien, BaremeLegal nouveau)
+        {
+            if (ancien == null)
+            {
+                await AuditService.EnregistrerDansTransactionAsync(
+                    conn, tx,
+                    action: "Création barème",
+                    entite: AuditService.EntiteBaremes,
+                    entiteId: CleAudit(nouveau),
+                    champ: "Barème complet",
+                    nouvelleValeur: nouveau.Designation,
+                    details: (nouveau.EstSysteme
+                        ? "Barème livré avec l'application, installé dans le dossier. "
+                        : "Nouveau barème daté (non rétroactif : il ne s'applique qu'à partir de sa date d'effet). ")
+                        + "Contenu : " + Resume(nouveau));
+                return;
+            }
+
+            var avant = Champs(ancien);
+            var apres = Champs(nouveau);
+            for (int i = 0; i < avant.Count; i++)
+            {
+                if (string.Equals(avant[i].Value, apres[i].Value, StringComparison.Ordinal)) continue;
+
+                await AuditService.EnregistrerDansTransactionAsync(
+                    conn, tx,
+                    action: "Modification barème",
+                    entite: AuditService.EntiteBaremes,
+                    entiteId: CleAudit(nouveau),
+                    champ: avant[i].Key,
+                    ancienneValeur: avant[i].Value,
+                    nouvelleValeur: apres[i].Value,
+                    details: string.Format(
+                        "Barème « {0} » modifié : la correction est rétroactive pour toutes les périodes qu'il couvre (bulletins recalculés).",
+                        nouveau.Designation));
             }
         }
 

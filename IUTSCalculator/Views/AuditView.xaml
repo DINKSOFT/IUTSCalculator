@@ -49,6 +49,10 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="Vérifier l'intégrité" Tag="{StaticResource IconLock}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        ToolTip="Recalcule la chaîne des empreintes SHA-256 de tout le journal et signale la première entrée modifiée, supprimée ou insérée après coup."
+                        Command="{Binding VerifierIntegriteCommand}"/>
                 <Button Content="Fichier CSV (.csv)" Tag="{StaticResource IconSave}"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Command="{Binding ExporterCsvCommand}"/>
@@ -226,8 +230,26 @@
                                        VerticalAlignment="Center"/>
 
                             <Border Background="#E6F0ED" BorderBrush="#2BA24C" BorderThickness="1"
-                                    CornerRadius="3" Padding="6,2">
-                                <TextBlock Text="✓ JOURNAL SCELLÉ" FontSize="10" FontWeight="Bold" Foreground="#1F7A4D"/>
+                                    CornerRadius="3" Padding="6,2"
+                                    ToolTip="Chaque entrée porte l'empreinte SHA-256 de son contenu et de l'entrée précédente. Cliquez sur « Vérifier l'intégrité » pour contrôler la chaîne."
+                                    Visibility="{Binding BadgeScelleNonVerifie, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="JOURNAL SCELLÉ (SHA-256)" FontSize="10" FontWeight="Bold" Foreground="#1F7A4D"/>
+                            </Border>
+                            <Border Background="#E6F0ED" BorderBrush="#2BA24C" BorderThickness="1"
+                                    CornerRadius="3" Padding="6,2"
+                                    Visibility="{Binding BadgeIntegriteVerifiee, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="✓ INTÉGRITÉ VÉRIFIÉE" FontSize="10" FontWeight="Bold" Foreground="#1F7A4D"/>
+                            </Border>
+                            <Border Background="#FBEAE8" BorderBrush="#9C2F28" BorderThickness="1"
+                                    CornerRadius="3" Padding="6,2"
+                                    Visibility="{Binding BadgeJournalAltere, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="⚠ JOURNAL ALTÉRÉ" FontSize="10" FontWeight="Bold" Foreground="#9C2F28"/>
+                            </Border>
+                            <Border Background="{StaticResource WarningTintBrush}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+                                    CornerRadius="3" Padding="6,2"
+                                    ToolTip="La base du dossier n'a pas encore reçu la mise à niveau qui ajoute les empreintes (schéma v38)."
+                                    Visibility="{Binding BadgeNonScelle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="JOURNAL NON SCELLÉ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource DangerBrush}"/>
                             </Border>
                         </StackPanel>
 
@@ -237,9 +259,30 @@
                                        FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Text=" entrée(s)" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"
-                                       VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Text="{Binding PaginationLibelle, Mode=OneWay}" FontSize="11"
+                                       Foreground="{StaticResource InkSubtleBrush}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       Visibility="{Binding APlusieursPages, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <Button Content="◀ Précédente" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,4,0"
+                                    Command="{Binding PagePrecedenteCommand}"
+                                    Visibility="{Binding APlusieursPages, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <Button Content="Suivante ▶" Style="{StaticResource SecondaryButtonStyle}" Margin="0"
+                                    Command="{Binding PageSuivanteCommand}"
+                                    Visibility="{Binding APlusieursPages, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </StackPanel>
                     </Grid>
+                </Border>
+
+                <!-- Résultat de « Vérifier l'intégrité » -->
+                <Border DockPanel.Dock="Top" Padding="16,8" Background="#EBF7F0"
+                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
+                        Visibility="{Binding BadgeIntegriteVerifiee, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding MessageIntegrite, Mode=OneWay}" TextWrapping="Wrap" FontSize="12" Foreground="#1F7A4D"/>
+                </Border>
+                <Border DockPanel.Dock="Top" Padding="16,8" Background="#FBEAE8"
+                        BorderBrush="#9C2F28" BorderThickness="0,0,0,1"
+                        Visibility="{Binding BadgeJournalAltere, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding MessageIntegrite, Mode=OneWay}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Foreground="#9C2F28"/>
                 </Border>
 
                 <!-- Panneau d'inspection en pied de tableau (si sélectionné) -->
@@ -302,9 +345,23 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
                           ScrollViewer.VerticalScrollBarVisibility="Auto"
                           Visibility="{Binding AEntrees, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource GridRowStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding EstAlteree}" Value="True">
+                                    <Setter Property="Background" Value="#FBEAE8"/>
+                                    <Setter Property="Foreground" Value="#9C2F28"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="N°" Binding="{Binding Id, Mode=OneWay}"
                                             Width="50" MinWidth="40"
+                                            ElementStyle="{StaticResource CellTextStyle}"/>
+
+                        <DataGridTextColumn Header="Scellement" Binding="{Binding StatutScellement, Mode=OneWay}"
+                                            Width="90" MinWidth="80"
                                             ElementStyle="{StaticResource CellTextStyle}"/>
 
                         <DataGridTextColumn Header="Date &amp; Heure"

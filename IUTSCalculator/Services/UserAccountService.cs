@@ -42,6 +42,10 @@ namespace IUTSCalculator.Services
         {
             _cachedUsers = users ?? new List<UserAccount>();
             string json = JsonSerializer.Serialize(_cachedUsers, _jsonOptions);
+            // Créer le dossier de données s'il n'existe pas encore (premier démarrage).
+            string dossier = Path.GetDirectoryName(_usersFilePath);
+            if (!string.IsNullOrEmpty(dossier))
+                Directory.CreateDirectory(dossier);
             await Task.Run(() => File.WriteAllText(_usersFilePath, json));
         }
 
@@ -50,7 +54,15 @@ namespace IUTSCalculator.Services
             await LoadUsersAsync();
             var user = _cachedUsers.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
             if (user != null && VerifyPassword(password, user.PasswordHash))
+            {
+                // Remise à niveau silencieuse d'un ancien hachage vers le format PBKDF2 salé.
+                if (EstAncienFormat(user.PasswordHash))
+                {
+                    user.PasswordHash = HashPassword(password);
+                    await SaveUsersAsync(_cachedUsers);
+                }
                 return user;
+            }
             return null;
         }
 
@@ -76,6 +88,22 @@ namespace IUTSCalculator.Services
             return true;
         }
 
+        public async Task<bool> ReinitialiserMotDePasseAsync(string userId, string nouveauMotDePasse)
+        {
+            await LoadUsersAsync();
+            var user = _cachedUsers.FirstOrDefault(u => u.UserId == userId);
+            if (user == null) return false;
+            user.PasswordHash = HashPassword(nouveauMotDePasse);
+            await SaveUsersAsync(_cachedUsers);
+            return true;
+        }
+
+        public async Task<int> CompterAdminsAsync()
+        {
+            await LoadUsersAsync();
+            return _cachedUsers.Count(u => u.Role == UserRole.Admin);
+        }
+
         public async Task<bool> UpdateUserRoleAsync(string userId, UserRole newRole)
         {
             await LoadUsersAsync();
@@ -86,20 +114,107 @@ namespace IUTSCalculator.Services
             return true;
         }
 
-        // --- Sécurité basique (à améliorer pour production) ---
+        /// <summary>
+        /// Modifie la fiche d'un compte en une seule opération : nom affiché, identifiant,
+        /// rôle et, si un nouveau mot de passe est fourni, le mot de passe. Renvoie null en cas
+        /// de succès, sinon le motif du refus (rien n'est alors enregistré).
+        ///
+        /// Garde-fous : identifiant obligatoire et unique (sans tenir compte des majuscules),
+        /// mot de passe de 6 caractères au moins, et au moins un administrateur restant.
+        /// </summary>
+        public async Task<string> ModifierUtilisateurAsync(
+            string userId, string nomAffiche, string identifiant, UserRole role, string nouveauMotDePasse)
+        {
+            await LoadUsersAsync();
+            var user = _cachedUsers.FirstOrDefault(u => u.UserId == userId);
+            if (user == null)
+                return "Ce compte n'existe plus : il a peut-être été supprimé entre-temps.";
+
+            identifiant = (identifiant ?? string.Empty).Trim();
+            nomAffiche = (nomAffiche ?? string.Empty).Trim();
+
+            if (identifiant.Length == 0)
+                return "L'identifiant est obligatoire.";
+
+            if (_cachedUsers.Any(u => u.UserId != userId &&
+                                      string.Equals(u.Username, identifiant, StringComparison.OrdinalIgnoreCase)))
+                return "Cet identifiant est déjà utilisé.";
+
+            if (!string.IsNullOrEmpty(nouveauMotDePasse) && nouveauMotDePasse.Length < 6)
+                return "Le nouveau mot de passe doit comporter au moins 6 caractères.";
+
+            if (user.Role == UserRole.Admin && role != UserRole.Admin &&
+                _cachedUsers.Count(u => u.Role == UserRole.Admin) <= 1)
+                return "Impossible : il doit rester au moins un administrateur.";
+
+            user.Username = identifiant;
+            user.DisplayName = nomAffiche.Length == 0 ? identifiant : nomAffiche;
+            user.Role = role;
+            if (!string.IsNullOrEmpty(nouveauMotDePasse))
+                user.PasswordHash = HashPassword(nouveauMotDePasse);
+
+            await SaveUsersAsync(_cachedUsers);
+            return null;
+        }
+
+        // --- Sécurité des mots de passe ---
+        // Format courant : "PBKDF2$<iterations>$<selBase64>$<hashBase64>".
+        // L'ancien format (SHA-256 sans sel, simple Base64) reste accepté en vérification
+        // pour compatibilité ; un compte qui s'y connecte est remis à niveau automatiquement.
+        private const int Pbkdf2Iterations = 100000;
+        private const int SelTaille = 16;
+        private const int HashTaille = 32;
+
+        // Conserve cette signature exacte : PasswordResetWindow l'appelle par réflexion.
         private string HashPassword(string password)
         {
-            using (var sha = SHA256.Create())
-            {
-                var bytes = Encoding.UTF8.GetBytes(password);
-                var hash = sha.ComputeHash(bytes);
-                return Convert.ToBase64String(hash);
-            }
+            byte[] sel = new byte[SelTaille];
+            using (var rng = RandomNumberGenerator.Create())
+                rng.GetBytes(sel);
+            byte[] hash;
+            using (var pbkdf2 = new Rfc2898DeriveBytes(password ?? string.Empty, sel, Pbkdf2Iterations, HashAlgorithmName.SHA256))
+                hash = pbkdf2.GetBytes(HashTaille);
+            return "PBKDF2$" + Pbkdf2Iterations.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                   + "$" + Convert.ToBase64String(sel) + "$" + Convert.ToBase64String(hash);
         }
 
         private bool VerifyPassword(string password, string hash)
         {
-            return HashPassword(password) == hash;
+            if (string.IsNullOrEmpty(hash)) return false;
+
+            if (hash.StartsWith("PBKDF2$", StringComparison.Ordinal))
+            {
+                var p = hash.Split('$');
+                if (p.Length != 4) return false;
+                if (!int.TryParse(p[1], out int iterations) || iterations < 1000) return false;
+                byte[] sel, attendu;
+                try { sel = Convert.FromBase64String(p[2]); attendu = Convert.FromBase64String(p[3]); }
+                catch (FormatException) { return false; }
+                byte[] calcule;
+                using (var pbkdf2 = new Rfc2898DeriveBytes(password ?? string.Empty, sel, iterations, HashAlgorithmName.SHA256))
+                    calcule = pbkdf2.GetBytes(attendu.Length);
+                return ComparerConstant(calcule, attendu);
+            }
+
+            // Ancien format SHA-256 sans sel (compatibilité ascendante).
+            using (var sha = SHA256.Create())
+            {
+                string legacy = Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(password ?? string.Empty)));
+                return legacy == hash;
+            }
+        }
+
+        private static bool ComparerConstant(byte[] a, byte[] b)
+        {
+            if (a == null || b == null || a.Length != b.Length) return false;
+            int diff = 0;
+            for (int i = 0; i < a.Length; i++) diff |= a[i] ^ b[i];
+            return diff == 0;
+        }
+
+        private static bool EstAncienFormat(string hash)
+        {
+            return !string.IsNullOrEmpty(hash) && !hash.StartsWith("PBKDF2$", StringComparison.Ordinal);
         }
     }
 }

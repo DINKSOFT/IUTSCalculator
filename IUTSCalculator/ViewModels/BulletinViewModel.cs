@@ -64,6 +64,8 @@ namespace IUTSCalculator.ViewModels
         // Avantages en nature (PAI-08).
         private readonly AvantageNatureService _avantageNatureService;
 
+        private readonly ChaineBulletinService _chaine;
+
         public ObservableCollection<Employee> Employees { get; } = new ObservableCollection<Employee>();
         public ObservableCollection<Employee> EmployeesFiltres { get; } = new ObservableCollection<Employee>();
 
@@ -134,19 +136,17 @@ namespace IUTSCalculator.ViewModels
             set => SetProperty(ref _congesPrisJours, value);
         }
 
-        private string _modeReglement = "Virement bancaire";
+        // « Mode de la fiche » par défaut : chaque salarié garde le mode de règlement de
+        // sa fiche (virement, chèque, espèces, mobile money) — défaut n° 5 du guide.
+        private string _modeReglement = ModesReglementPaie.ModeDeLaFiche;
         public string ModeReglement
         {
             get => _modeReglement;
             set => SetProperty(ref _modeReglement, value);
         }
 
-        public ObservableCollection<string> ModesReglement { get; } = new ObservableCollection<string>
-        {
-            "Virement bancaire",
-            "Chèque",
-            "Espèces"
-        };
+        public ObservableCollection<string> ModesReglement { get; } =
+            new ObservableCollection<string>(ModesReglementPaie.Liste());
 
         private string _numeroCompte;
         public string NumeroCompte
@@ -307,6 +307,13 @@ namespace IUTSCalculator.ViewModels
             _saisieOppositionService = saisieOppositionService;
             _rappelPaieService = rappelPaieService;
             _avantageNatureService = avantageNatureService;
+
+            // Chaîne commune aux écrans de paie (défaut n° 4 du guide) : même assemblage,
+            // même enregistrement (archive, saisies, rappels) que Calcul en lot et Calcul d'IUTS.
+            _chaine = new ChaineBulletinService(
+                _dataService, _bulletinService, _baremeService, _rubriqueService, _variablePaieService,
+                _absenceService, _pretService, _profilPaieService, _heureSupplementaireService,
+                _conventionCollectiveService, _rappelPaieService, _avantageNatureService, _saisieOppositionService);
 
             Title = "Bulletin de paie";
 
@@ -496,13 +503,13 @@ namespace IUTSCalculator.ViewModels
                 var modeReglement = ModeReglement;
                 var numeroCompte = NumeroCompte;
 
-                // Variables du mois : heures supplémentaires, primes, acomptes… Elles sont
-                // lues ici et non dans le service de bulletin, qui doit rester purement
-                // calculatoire et sans accès à la base.
-                var apport = await ChargerApportAsync(employee.EmployeeId, periode);
-
-                var bulletin = await Task.Run(() => _bulletinService.GenererBulletin(
-                    employee, periode, congesPris, modeReglement, numeroCompte, apport));
+                // Variables du mois, absences, prêts, profil, heures supplémentaires,
+                // convention, rappels, avantages en nature et saisies : la chaîne commune
+                // les assemble dans l'ordre (ChaineBulletinService).
+                var resultat = await _chaine.PreparerAsync(
+                    employee, periode, congesPris, modeReglement, numeroCompte, null, m => StatusMessage = m);
+                var apport = resultat.Apport;
+                var bulletin = resultat.Bulletin;
 
                 CurrentBulletin = bulletin;
 
@@ -518,38 +525,12 @@ namespace IUTSCalculator.ViewModels
                     mention += " Attention : " + avertissement + ".";
                 try
                 {
-                    var calcul = _bulletinService.DernierCalcul;
-                    if (calcul != null)
+                    if (resultat.Calcul != null)
                     {
-                        await _dataService.EnregistrerBulletinDuMoisAsync(calcul, periode, bulletin);
-
-                        if (_saisieOppositionService != null)
-                        {
-                            try
-                            {
-                                decimal netRef = _bulletinService.CalculerNetReference(employee, apport);
-                                await _saisieOppositionService.AppliquerEtEnregistrerRetenuesMoisAsync(
-                                    periode.Year, periode.Month, employee.EmployeeId, netRef, DateTime.Today);
-                            }
-                            catch
-                            {
-                                // Ne bloque pas l'enregistrement du bulletin si le suivi échoue
-                            }
-                        }
-
-                        if (_rappelPaieService != null)
-                        {
-                            try
-                            {
-                                await _rappelPaieService.MarquerImputesMoisAsync(periode.Year, periode.Month, employee.EmployeeId);
-                            }
-                            catch
-                            {
-                                // Ne bloque pas l'enregistrement du bulletin si le marquage des rappels échoue
-                            }
-                        }
-
+                        await _chaine.EnregistrerAsync(resultat, employee, periode);
                         mention += " Enregistré dans la paie du mois.";
+                        for (int i = apport.Avertissements.Count; i < resultat.Avertissements.Count; i++)
+                            mention += " Attention : " + resultat.Avertissements[i] + ".";
                     }
                 }
                 catch (InvalidOperationException ex)
@@ -747,13 +728,16 @@ namespace IUTSCalculator.ViewModels
                         }
                         else
                         {
-                            var apport = await ChargerApportAsync(employee.EmployeeId, mois.Mois);
-                            bulletin = await Task.Run(() => _bulletinService.GenererBulletin(
-                                employee, mois.Mois, congesPris, modeReglement, numeroCompte, apport));
-
-                            var calcul = _bulletinService.DernierCalcul;
-                            if (calcul != null)
-                                await _dataService.EnregistrerBulletinDuMoisAsync(calcul, mois.Mois, bulletin);
+                            // Même chaîne que « Générer » : les retenues de saisies et les
+                            // rappels du mois sont enregistrés avec le bulletin.
+                            var resultat = await _chaine.PreparerAsync(
+                                employee, mois.Mois, congesPris, modeReglement, numeroCompte, null,
+                                m => JournalPlage.Add($"⚠ {mois.Libelle} — {m}"));
+                            bulletin = resultat.Bulletin;
+                            if (resultat.Calcul != null)
+                                await _chaine.EnregistrerAsync(resultat, employee, mois.Mois);
+                            foreach (var avertissement in resultat.Avertissements)
+                                JournalPlage.Add($"⚠ {mois.Libelle} — {avertissement}");
                         }
 
                         string fileName = ConstruireNomFichierPlage(bulletin);
@@ -803,185 +787,6 @@ namespace IUTSCalculator.ViewModels
             foreach (char c in Path.GetInvalidFileNameChars())
                 nom = nom.Replace(c, '_');
             return Regex.Replace(nom, @"\s+", "_");
-        }
-
-        /// <summary>
-        /// Variables saisies pour ce salarié sur ce mois, traduites en apport pour le
-        /// moteur. Renvoie un apport vide — donc un bulletin inchangé — si le module des
-        /// variables n'est pas branché ou si la lecture échoue : une variable manquante
-        /// est un bulletin à corriger, une exception est un bulletin impossible à sortir.
-        /// </summary>
-        private async Task<ApportVariables> ChargerApportAsync(string employeeId, DateTime periode)
-        {
-            // Barème daté applicable à la période (module DEC-02 sur le socle SOC-02) :
-            // les taux CNSS et TPA du moteur suivent désormais la période du bulletin.
-            if (_baremeService != null)
-            {
-                try
-                {
-                    var bareme = await _baremeService.BaremeApplicableAsync(periode);
-                    _bulletinService.AppliquerBareme(bareme);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Barème illisible, bulletin généré avec les valeurs historiques : " + ex.Message;
-                    _bulletinService.AppliquerBareme(null);
-                }
-            }
-
-            var apport = ApportVariables.Aucun();
-
-            if (_variablePaieService != null && _rubriqueService != null)
-            {
-                try
-                {
-                    var plan = await _rubriqueService.ChargerAsync();
-                    apport = await _variablePaieService.ApportAsync(
-                        periode.Year, periode.Month, employeeId, plan);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Variables du mois illisibles, bulletin généré sans elles : " + ex.Message;
-                }
-            }
-
-            // Congés et absences (PAI-04) : jours de congé pris et retenue pour absence
-            // non rémunérée rejoignent le même apport, que le moteur reçoit d'un bloc.
-            if (_absenceService != null && SelectedEmployee != null)
-            {
-                try
-                {
-                    var reglages = await _dataService.LoadSettingsAsync();
-                    var baseRetenue = reglages != null
-                        ? reglages.BaseRetenueAbsence
-                        : BaseRetenueAbsence.TrentiemeMensuel;
-
-                    var absences = await _absenceService.ApportAsync(
-                        SelectedEmployee, periode.Year, periode.Month, baseRetenue);
-
-                    apport = apport.AvecAbsences(absences);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Absences illisibles, bulletin généré sans elles : " + ex.Message;
-                }
-            }
-
-            // Prêts, avances et acomptes (PAI-05) : le remboursement du mois rejoint le
-            // même apport, en retenue sur le net. Un échec de lecture ne bloque pas
-            // l'édition du bulletin, mais il se dit — un bulletin sans sa retenue de prêt
-            // paie au salarié une somme qu'il devra rendre le mois suivant.
-            if (_pretService != null)
-            {
-                try
-                {
-                    var prets = await _pretService.ApportAsync(employeeId, periode.Year, periode.Month);
-                    apport = apport.AvecPrets(prets);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Prêts illisibles, bulletin généré sans retenue de remboursement : " + ex.Message;
-                }
-            }
-
-            // Profil de paie (SOC-03) : les rubriques que le salarié tient de sa population.
-            // Appliqué EN DERNIER, car une rubrique déjà saisie dans les variables du mois
-            // écarte celle du profil — la saisie du mois est une décision explicite, le
-            // profil n'est qu'un défaut.
-            if (_profilPaieService != null && _rubriqueService != null && SelectedEmployee != null)
-            {
-                try
-                {
-                    var plan = await _rubriqueService.ChargerAsync();
-                    var profil = await _profilPaieService.ApportAsync(
-                        SelectedEmployee, periode.Year, periode.Month, plan);
-
-                    apport = apport.AvecProfil(profil);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Profil de paie illisible, bulletin généré sans lui : " + ex.Message;
-                }
-            }
-
-            // Heures supplémentaires (PAI-03) : valorisation des heures majorées (115%, 130%, 150%, 200%).
-            if (_heureSupplementaireService != null && SelectedEmployee != null)
-            {
-                try
-                {
-                    var heuresSup = await _heureSupplementaireService.ApportAsync(
-                        SelectedEmployee, periode.Year, periode.Month);
-                    apport = apport.AvecHeuresSupplementaires(heuresSup);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Heures supplémentaires illisibles, bulletin généré sans elles : " + ex.Message;
-                }
-            }
-
-            // Conventions collectives et prime d'ancienneté (SOC-05) : valorisation légale conventionnelle.
-            if (_conventionCollectiveService != null && SelectedEmployee != null)
-            {
-                try
-                {
-                    var apportConv = await _conventionCollectiveService.ApportAsync(
-                        SelectedEmployee, periode);
-                    apport = apport.AvecConventionCollective(apportConv);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Convention collective illisible, bulletin généré sans prime d'ancienneté : " + ex.Message;
-                }
-            }
-
-            // Rappels & régularisations (PAI-07) : salaires rétroactifs, primes, trop-perçus, régul IUTS.
-            if (_rappelPaieService != null)
-            {
-                try
-                {
-                    var rappels = await _rappelPaieService.ApportAsync(periode.Year, periode.Month, employeeId);
-                    apport = apport.AvecRappels(rappels);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Rappels et régularisations illisibles, bulletin généré sans eux : " + ex.Message;
-                }
-            }
-
-            // Avantages en nature (PAI-08) : réintégration fiscale et reprise en bas de bulletin.
-            if (_avantageNatureService != null)
-            {
-                try
-                {
-                    var avantages = await _avantageNatureService.ObtenirApportMoisAsync(employeeId, periode.Year, periode.Month);
-                    apport = apport.AvecAvantagesNature(avantages);
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Avantages en nature illisibles, bulletin généré sans eux : " + ex.Message;
-                }
-            }
-
-            // Saisies-arrêts, cessions et oppositions (PAI-06) : calcul légal de la quotité saisissable sur le net.
-            if (_saisieOppositionService != null && SelectedEmployee != null)
-            {
-                try
-                {
-                    decimal netRef = _bulletinService.CalculerNetReference(SelectedEmployee, apport);
-                    if (netRef > 0m)
-                    {
-                        var saisies = await _saisieOppositionService.ApportAsync(
-                            periode.Year, periode.Month, employeeId, netRef);
-                        apport = apport.AvecSaisies(saisies);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = "Saisies illisibles, bulletin généré sans retenue judiciaire : " + ex.Message;
-                }
-            }
-
-            return apport;
         }
 
         private async Task ExportPdfAsync()

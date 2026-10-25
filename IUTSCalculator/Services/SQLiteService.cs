@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Globalization;
 using System.IO;
+using IUTSCalculator.Models;
 
 namespace IUTSCalculator.Services
 {
@@ -22,11 +23,14 @@ namespace IUTSCalculator.Services
     ///     atteint par la base, et les migrations s'appliquent dans l'ordre. Une base
     ///     existante est convertie automatiquement à l'ouverture du dossier ; une copie de
     ///     sauvegarde est déposée à côté du fichier avant toute conversion de données.
+    ///     La conversion est faite <b>tout ou rien</b> : sur une copie de travail, contrôlée
+    ///     puis substituée à l'original. Une base mise à niveau par une version plus récente
+    ///     du programme est refusée (<see cref="BaseTropRecenteException"/>).
     /// </summary>
     public class SQLiteService : IDisposable
     {
         /// <summary>Niveau de schéma attendu par cette version de l'application.</summary>
-        private const int SchemaCible = 29;
+        public const int SchemaCible = 38;
 
         private readonly string _dbPath;
         private readonly string _connectionString;
@@ -48,12 +52,10 @@ namespace IUTSCalculator.Services
 
             // BusyTimeout : si une autre opération de l'application écrit au même moment,
             // on patiente au lieu de lever immédiatement SQLITE_BUSY.
-            _connectionString = string.Format(
-                CultureInfo.InvariantCulture,
-                "Data Source={0};Version=3;BusyTimeout=5000;",
-                _dbPath);
+            _connectionString = ChaineConnexion(_dbPath);
 
             EnsureSchema();
+            _schemaPret = true;
         }
 
         /// <summary>Chemin complet du fichier de base de données du dossier.</summary>
@@ -69,9 +71,26 @@ namespace IUTSCalculator.Services
         public SQLiteConnection CreateConnection()
         {
             var connection = new SQLiteConnection(_connectionString);
+
+            // Garde du profil « Lecture seule » (défaut n° 10) : posée par l'application,
+            // une fois le schéma prêt — la mise à niveau doit toujours pouvoir écrire.
+            var garde = GardeConnexion;
+            if (_schemaPret && garde != null)
+                garde(connection);
+
             connection.Open();
             return connection;
         }
+
+        /// <summary>
+        /// Contrôle appliqué à chaque connexion ouverte par <see cref="CreateConnection"/> une
+        /// fois le schéma du dossier prêt. L'application WPF y branche la garde du profil
+        /// « Lecture seule » (GardeLectureSeule) ; nul dans les outils et les tests.
+        /// </summary>
+        public static Action<SQLiteConnection> GardeConnexion;
+
+        /// <summary>Vrai une fois la vérification / mise à niveau du schéma terminée.</summary>
+        private bool _schemaPret;
 
         #region Mise à niveau du schéma
 
@@ -82,6 +101,7 @@ namespace IUTSCalculator.Services
 
             // Premier temps : déterminer l'état de la base, puis refermer la connexion
             // pour pouvoir copier le fichier en toute sécurité si une migration est due.
+            // (Ouvrir la base rejoue aussi un éventuel journal laissé par une coupure.)
             using (var connection = CreateConnection())
             {
                 CreerTableVersion(connection);
@@ -89,206 +109,400 @@ namespace IUTSCalculator.Services
                 version = LireVersion(connection);
             }
 
-            if (baseVierge)
-            {
-                using (var connection = CreateConnection())
-                {
-                    CreerSchemaComplet(connection);
-                    EnregistrerVersion(connection, SchemaCible);
-                }
+            // Une base déjà mise à niveau par une version PLUS RÉCENTE du programme ne doit
+            // pas être utilisée par celle-ci : elle ignorerait les tables qu'elle ne connaît
+            // pas et pourrait enregistrer des données incomplètes.
+            if (!baseVierge && version > SchemaCible)
+                throw new BaseTropRecenteException(_dbPath, version, SchemaCible);
+
+            if (!baseVierge && version == SchemaCible)
                 return;
+
+            if (!baseVierge)
+                SauvegarderAvantMigration();
+
+            // Tout ou rien : la création ou la mise à niveau se fait sur une COPIE du
+            // fichier, contrôlée, puis substituée à l'original en une seule opération.
+            // Une erreur, une coupure de courant ou un arrêt brutal en cours de route
+            // laissent le fichier du dossier exactement tel qu'il était.
+            string copie = _dbPath + SuffixeCopieMigration;
+            try
+            {
+                SupprimerSiPresent(copie);
+                SupprimerSiPresent(copie + "-journal");
+                File.Copy(_dbPath, copie);
+
+                using (var connection = OuvrirConnexion(copie))
+                {
+                    if (baseVierge)
+                    {
+                        CreerSchemaComplet(connection);
+                        EnregistrerVersion(connection, SchemaCible);
+                    }
+                    else
+                    {
+                        bool saineAvant = EstIntegre(connection);
+                        AppliquerMigrations(connection, version);
+                        if (saineAvant && !EstIntegre(connection))
+                            throw new InvalidOperationException("le contrôle d'intégrité de la base mise à niveau a échoué");
+                    }
+
+                    if (LireVersion(connection) != SchemaCible || !TableExiste(connection, "Employees"))
+                        throw new InvalidOperationException("la base obtenue n'est pas au niveau attendu (v" + SchemaCible + ")");
+                }
+
+                RemplacerParCopie(copie);
+            }
+            catch (Exception ex)
+            {
+                SupprimerSiPresent(copie);
+                SupprimerSiPresent(copie + "-journal");
+
+                if (baseVierge)
+                    throw new InvalidOperationException(
+                        "La création de la base du dossier a échoué : " + _dbPath + ". Détail : " + ex.Message, ex);
+
+                string sauvegarde = CheminSauvegardeMigration();
+                throw new InvalidOperationException(
+                    "La mise à niveau de la base du dossier a échoué : " + _dbPath +
+                    ". Le fichier du dossier n'a pas été modifié : la mise à niveau se fait sur une copie, " +
+                    "qui ne remplace l'original qu'une fois entièrement réussie et contrôlée" +
+                    (File.Exists(sauvegarde) ? " ; une sauvegarde se trouve en outre à côté (" + Path.GetFileName(sauvegarde) + ")" : "") +
+                    ". Détail : " + ex.Message, ex);
+            }
+        }
+
+        /// <summary>Chaîne des migrations, de la version lue jusqu'à <see cref="SchemaCible"/>.</summary>
+        private void AppliquerMigrations(SQLiteConnection connection, int version)
+        {
+            if (version < 1)
+            {
+                Migration1_ColonnesManquantes(connection);
+                EnregistrerVersion(connection, 1);
             }
 
-            if (version >= SchemaCible)
-                return;
+            if (version < 2)
+            {
+                Migration2_MontantsExacts(connection);
+                EnregistrerVersion(connection, 2);
+            }
 
-            SauvegarderAvantMigration();
+            if (version < 3)
+            {
+                Migration3_PlanDePaie(connection);
+                EnregistrerVersion(connection, 3);
+            }
 
-            using (var connection = CreateConnection())
+            if (version < 4)
+            {
+                Migration4_BaremesDates(connection);
+                EnregistrerVersion(connection, 4);
+            }
+
+            if (version < 5)
+            {
+                Migration5_PeriodesPaie(connection);
+                EnregistrerVersion(connection, 5);
+            }
+
+            if (version < 6)
+            {
+                Migration6_MatriculeCnss(connection);
+                EnregistrerVersion(connection, 6);
+            }
+
+            if (version < 7)
+            {
+                Migration7_VentilationCnss(connection);
+                EnregistrerVersion(connection, 7);
+            }
+
+            if (version < 8)
+            {
+                Migration8_DossierSalarie(connection);
+                EnregistrerVersion(connection, 8);
+            }
+
+            if (version < 9)
+            {
+                Migration9_VariablesPaie(connection);
+                EnregistrerVersion(connection, 9);
+            }
+
+            if (version < 10)
+            {
+                Migration10_ApportVariables(connection);
+                EnregistrerVersion(connection, 10);
+            }
+
+            if (version < 11)
+            {
+                Migration11_RubriquesDeSaisie(connection);
+                EnregistrerVersion(connection, 11);
+            }
+
+            if (version < 12)
+            {
+                Migration12_AffichageDevise(connection);
+                EnregistrerVersion(connection, 12);
+            }
+
+            if (version < 13)
+            {
+                Migration13_Absences(connection);
+                EnregistrerVersion(connection, 13);
+            }
+
+            if (version < 14)
+            {
+                Migration14_NetsManquants(connection);
+                EnregistrerVersion(connection, 14);
+            }
+
+            if (version < 15)
+            {
+                Migration15_ArchiveBulletin(connection);
+                EnregistrerVersion(connection, 15);
+            }
+
+            if (version < 16)
+            {
+                Migration16_Prets(connection);
+                EnregistrerVersion(connection, 16);
+            }
+
+            if (version < 17)
+            {
+                Migration17_ProfilsPaie(connection);
+                EnregistrerVersion(connection, 17);
+            }
+
+            if (version < 18)
+            {
+                Migration18_TaxePatronale(connection);
+                EnregistrerVersion(connection, 18);
+            }
+
+            if (version < 19)
+            {
+                Migration19_AssietteTPA(connection);
+                EnregistrerVersion(connection, 19);
+            }
+
+            if (version < 20)
+            {
+                Migration20_JournalAudit(connection);
+                EnregistrerVersion(connection, 20);
+            }
+
+            if (version < 21)
+            {
+                Migration21_HeuresSupplementaires(connection);
+                EnregistrerVersion(connection, 21);
+            }
+
+            if (version < 22)
+            {
+                Migration22_ConventionsEtGrilles(connection);
+                EnregistrerVersion(connection, 22);
+            }
+
+            if (version < 23)
+            {
+                Migration23_SoldeToutCompteEtSortie(connection);
+                EnregistrerVersion(connection, 23);
+            }
+
+            if (version < 24)
+            {
+                Migration24_SaisiesOppositionsEtCessions(connection);
+                EnregistrerVersion(connection, 24);
+            }
+
+            if (version < 25)
+            {
+                Migration25_RappelsEtRegularisations(connection);
+                EnregistrerVersion(connection, 25);
+            }
+
+            if (version < 26)
+            {
+                Migration26_AvantagesEnNature(connection);
+                EnregistrerVersion(connection, 26);
+            }
+
+            if (version < 27)
+            {
+                Migration27_RubriqueAvance(connection);
+                EnregistrerVersion(connection, 27);
+            }
+
+            if (version < 28)
+            {
+                Migration28_ServiceEtColonnesManquantes(connection);
+                EnregistrerVersion(connection, 28);
+            }
+
+            if (version < 29)
+            {
+                Migration29_OrganigrammeEtPostes(connection);
+                EnregistrerVersion(connection, 29);
+            }
+
+            if (version < 30)
+            {
+                Migration30_FichesDePostesEtCompetences(connection);
+                EnregistrerVersion(connection, 30);
+            }
+
+            if (version < 31)
+            {
+                Migration31_EntretiensEtEvaluations(connection);
+                EnregistrerVersion(connection, 31);
+            }
+
+            if (version < 32)
+            {
+                Migration32_FormationEtTPA(connection);
+                EnregistrerVersion(connection, 32);
+            }
+
+            if (version < 33)
+            {
+                Migration33_Recrutement(connection);
+                EnregistrerVersion(connection, 33);
+            }
+
+            if (version < 34)
+            {
+                Migration34_GestionDesTemps(connection);
+                Migration34_RubriquePanier(connection);
+                EnregistrerVersion(connection, 34);
+            }
+
+            if (version < 35)
+            {
+                Migration35_Discipline(connection);
+                EnregistrerVersion(connection, 35);
+            }
+
+            if (version < 36)
+            {
+                Migration36_PlanDePaieComplet(connection);
+                Migration36_MandatsRepresentatifs(connection);
+                EnregistrerVersion(connection, 36);
+            }
+
+            if (version < 37)
+            {
+                Migration37_SanteSecurite(connection);
+                EnregistrerVersion(connection, 37);
+            }
+
+            if (version < 38)
+            {
+                Migration38_CorrectionsPaie(connection);
+                // Migrations v38 des modules RH, des écritures et de l'audit
+                Migration38_SanteSecurite(connection);
+                Migration38_Entretiens(connection);
+                Migration38_Recrutement(connection);
+                Migration38_FichesDePostes(connection);
+                Migration38_ParametresComptables(connection);
+                Migration38_AuditScelle(connection);
+                EnregistrerVersion(connection, 38);
+            }
+        }
+
+        /// <summary>Suffixe de la copie de travail d'une mise à niveau (exclue des sauvegardes).</summary>
+        public const string SuffixeCopieMigration = ".migration.tmp";
+
+        private static string ChaineConnexion(string chemin)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "Data Source={0};Version=3;BusyTimeout=5000;", chemin);
+        }
+
+        private static SQLiteConnection OuvrirConnexion(string chemin)
+        {
+            var connection = new SQLiteConnection(ChaineConnexion(chemin));
+            connection.Open();
+            return connection;
+        }
+
+        private static bool EstIntegre(SQLiteConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "PRAGMA quick_check;";
+                return string.Equals(Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture), "ok", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Substitue la copie mise à niveau au fichier du dossier, en une opération du
+        /// système de fichiers. Un antivirus ou une connexion pas encore libérée peuvent
+        /// retenir brièvement le fichier : on réessaie quelques instants.
+        /// </summary>
+        private void RemplacerParCopie(string copie)
+        {
+            for (int essai = 1; ; essai++)
             {
                 try
                 {
-                    if (version < 1)
-                    {
-                        Migration1_ColonnesManquantes(connection);
-                        EnregistrerVersion(connection, 1);
-                    }
-
-                    if (version < 2)
-                    {
-                        Migration2_MontantsExacts(connection);
-                        EnregistrerVersion(connection, 2);
-                    }
-
-                    if (version < 3)
-                    {
-                        Migration3_PlanDePaie(connection);
-                        EnregistrerVersion(connection, 3);
-                    }
-
-                    if (version < 4)
-                    {
-                        Migration4_BaremesDates(connection);
-                        EnregistrerVersion(connection, 4);
-                    }
-
-                    if (version < 5)
-                    {
-                        Migration5_PeriodesPaie(connection);
-                        EnregistrerVersion(connection, 5);
-                    }
-
-                    if (version < 6)
-                    {
-                        Migration6_MatriculeCnss(connection);
-                        EnregistrerVersion(connection, 6);
-                    }
-
-                    if (version < 7)
-                    {
-                        Migration7_VentilationCnss(connection);
-                        EnregistrerVersion(connection, 7);
-                    }
-
-                    if (version < 8)
-                    {
-                        Migration8_DossierSalarie(connection);
-                        EnregistrerVersion(connection, 8);
-                    }
-
-                    if (version < 9)
-                    {
-                        Migration9_VariablesPaie(connection);
-                        EnregistrerVersion(connection, 9);
-                    }
-
-                    if (version < 10)
-                    {
-                        Migration10_ApportVariables(connection);
-                        EnregistrerVersion(connection, 10);
-                    }
-
-                    if (version < 11)
-                    {
-                        Migration11_RubriquesDeSaisie(connection);
-                        EnregistrerVersion(connection, 11);
-                    }
-
-                    if (version < 12)
-                    {
-                        Migration12_AffichageDevise(connection);
-                        EnregistrerVersion(connection, 12);
-                    }
-
-                    if (version < 13)
-                    {
-                        Migration13_Absences(connection);
-                        EnregistrerVersion(connection, 13);
-                    }
-
-                    if (version < 14)
-                    {
-                        Migration14_NetsManquants(connection);
-                        EnregistrerVersion(connection, 14);
-                    }
-
-                    if (version < 15)
-                    {
-                        Migration15_ArchiveBulletin(connection);
-                        EnregistrerVersion(connection, 15);
-                    }
-
-                    if (version < 16)
-                    {
-                        Migration16_Prets(connection);
-                        EnregistrerVersion(connection, 16);
-                    }
-
-                    if (version < 17)
-                    {
-                        Migration17_ProfilsPaie(connection);
-                        EnregistrerVersion(connection, 17);
-                    }
-
-                    if (version < 18)
-                    {
-                        Migration18_TaxePatronale(connection);
-                        EnregistrerVersion(connection, 18);
-                    }
-
-                    if (version < 19)
-                    {
-                        Migration19_AssietteTPA(connection);
-                        EnregistrerVersion(connection, 19);
-                    }
-
-                    if (version < 20)
-                    {
-                        Migration20_JournalAudit(connection);
-                        EnregistrerVersion(connection, 20);
-                    }
-
-                    if (version < 21)
-                    {
-                        Migration21_HeuresSupplementaires(connection);
-                        EnregistrerVersion(connection, 21);
-                    }
-
-                    if (version < 22)
-                    {
-                        Migration22_ConventionsEtGrilles(connection);
-                        EnregistrerVersion(connection, 22);
-                    }
-
-                    if (version < 23)
-                    {
-                        Migration23_SoldeToutCompteEtSortie(connection);
-                        EnregistrerVersion(connection, 23);
-                    }
-
-                    if (version < 24)
-                    {
-                        Migration24_SaisiesOppositionsEtCessions(connection);
-                        EnregistrerVersion(connection, 24);
-                    }
-
-                    if (version < 25)
-                    {
-                        Migration25_RappelsEtRegularisations(connection);
-                        EnregistrerVersion(connection, 25);
-                    }
-
-                    if (version < 26)
-                    {
-                        Migration26_AvantagesEnNature(connection);
-                        EnregistrerVersion(connection, 26);
-                    }
-
-                    if (version < 27)
-                    {
-                        Migration27_RubriqueAvance(connection);
-                        EnregistrerVersion(connection, 27);
-                    }
-
-                    if (version < 28)
-                    {
-                        Migration28_ServiceEtColonnesManquantes(connection);
-                        EnregistrerVersion(connection, 28);
-                    }
-
-                    if (version < 29)
-                    {
-                        Migration29_OrganigrammeEtPostes(connection);
-                        EnregistrerVersion(connection, 29);
-                    }
+                    File.Replace(copie, _dbPath, null);
+                    return;
                 }
-                catch (Exception ex)
+                catch (IOException) when (essai < 10)
                 {
-                    throw new InvalidOperationException(
-                        "La mise à niveau de la base du dossier a échoué : " + _dbPath +
-                        ". Aucune donnée n'a été modifiée ; une copie de sauvegarde se trouve " +
-                        "à côté du fichier. Détail : " + ex.Message, ex);
                 }
+                catch (UnauthorizedAccessException) when (essai < 10)
+                {
+                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                System.Threading.Thread.Sleep(200);
+            }
+        }
+
+        private static void SupprimerSiPresent(string chemin)
+        {
+            try
+            {
+                if (File.Exists(chemin)) File.Delete(chemin);
+            }
+            catch
+            {
+                // Un reste de copie de travail est sans conséquence : il est écrasé au prochain essai.
+            }
+        }
+
+        private string CheminSauvegardeMigration()
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0}.avant-v{1}.bak", _dbPath, SchemaCible);
+        }
+
+        /// <summary>
+        /// Version du schéma d'un fichier de base, lue sans rien modifier ni migrer
+        /// (0 : base sans table de version, -1 : fichier illisible).
+        /// </summary>
+        public static int LireVersionFichier(string chemin)
+        {
+            try
+            {
+                using (var connection = new SQLiteConnection(ChaineConnexion(chemin) + "Read Only=True;"))
+                {
+                    connection.Open();
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'SchemaVersion';";
+                        if (DbValue.IntFromDb(cmd.ExecuteScalar()) == 0) return 0;
+                        cmd.CommandText = "SELECT COALESCE(MAX(Version), 0) FROM SchemaVersion;";
+                        return DbValue.IntFromDb(cmd.ExecuteScalar());
+                    }
+                }
+            }
+            catch
+            {
+                return -1;
             }
         }
 
@@ -303,11 +517,7 @@ namespace IUTSCalculator.Services
                 if (!File.Exists(_dbPath))
                     return;
 
-                string sauvegarde = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}.avant-v{1}.bak",
-                    _dbPath,
-                    SchemaCible);
+                string sauvegarde = CheminSauvegardeMigration();
 
                 if (!File.Exists(sauvegarde))
                     File.Copy(_dbPath, sauvegarde);
@@ -315,7 +525,7 @@ namespace IUTSCalculator.Services
             catch
             {
                 // Une sauvegarde impossible (disque plein, droits) ne doit pas empêcher
-                // l'ouverture du dossier : la migration reste transactionnelle.
+                // l'ouverture du dossier : la mise à niveau se fait de toute façon sur une copie.
             }
         }
 
@@ -479,6 +689,32 @@ namespace IUTSCalculator.Services
             Migration25_RappelsEtRegularisations(connection);
             Migration26_AvantagesEnNature(connection);
             Migration29_OrganigrammeEtPostes(connection);
+            Migration30_FichesDePostesEtCompetences(connection);
+            Migration31_EntretiensEtEvaluations(connection);
+            Migration32_FormationEtTPA(connection);
+            Migration33_Recrutement(connection);
+            Migration34_GestionDesTemps(connection);
+            // Le plan d'un dossier neuf n'est jamais vide à ce stade (rubriques des
+            // migrations 25 et 26) : PANIER y est ajouté de la même façon.
+            Migration34_RubriquePanier(connection);
+            Migration35_Discipline(connection);
+            Migration36_MandatsRepresentatifs(connection);
+            Migration37_SanteSecurite(connection);
+
+            // En DERNIER : les migrations 25, 26 et 34 ont déjà déposé quelques rubriques,
+            // ce qui empêchait RubriqueService d'amorcer le plan (il ne le fait que sur un
+            // plan vide). Le plan initial complet est donc posé ici, sans rien écraser.
+            Migration36_PlanDePaieComplet(connection);
+
+            // Puis les corrections v38, qui portent aussi sur le plan qu'on vient de poser.
+            Migration38_CorrectionsPaie(connection);
+            // Migrations v38 des modules RH, des écritures et de l'audit
+            Migration38_SanteSecurite(connection);
+            Migration38_Entretiens(connection);
+            Migration38_Recrutement(connection);
+            Migration38_FichesDePostes(connection);
+            Migration38_ParametresComptables(connection);
+            Migration38_AuditScelle(connection);
         }
 
         /// <summary>
@@ -1772,6 +2008,490 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
+        /// Migration 30 — Postes & fiches de poste : missions, compétences requises, classification conventionnelle, effectif budgété vs pourvu (module RH-02).
+        /// </summary>
+        private void Migration30_FichesDePostesEtCompetences(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS Competences (
+                    Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code         TEXT NOT NULL UNIQUE,
+                    Libelle      TEXT NOT NULL,
+                    Domaine      INTEGER NOT NULL DEFAULT 0,
+                    Description  TEXT,
+                    DateCreation TEXT NOT NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS PosteCompetences (
+                    Id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    PosteId        INTEGER NOT NULL,
+                    CompetenceId   INTEGER NOT NULL,
+                    NiveauRequis   INTEGER NOT NULL DEFAULT 2,
+                    EstObligatoire INTEGER NOT NULL DEFAULT 1,
+                    Commentaire    TEXT,
+                    FOREIGN KEY(PosteId) REFERENCES Postes(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(CompetenceId) REFERENCES Competences(Id) ON DELETE CASCADE
+                );");
+
+            // Extension de la table Postes pour la fiche de poste détaillée et la classification conventionnelle
+            AjouterColonneSiAbsente(connection, "Postes", "FinalitePrincipale", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "ActivitesCles", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "NiveauEtudeRequis", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "DiplomeRequis", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "ExperienceMinimaleAnnees", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "Postes", "ConditionsTravail", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "ConventionId", "INTEGER");
+            AjouterColonneSiAbsente(connection, "Postes", "CategorieConventionnelle", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "EchelonConventionnel", "TEXT");
+            AjouterColonneSiAbsente(connection, "Postes", "SalaireMinimumConventionnel", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "Postes", "SalaireMinBudgete", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "Postes", "SalaireMaxBudgete", "INTEGER NOT NULL DEFAULT 0");
+
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_Competences_Code ON Competences(Code);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_Competences_Domaine ON Competences(Domaine);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_PosteCompetences_Poste ON PosteCompetences(PosteId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_PosteCompetences_Competence ON PosteCompetences(CompetenceId);");
+
+            // Pré-remplissage du catalogue initial des compétences courantes
+            InsererCompetenceInitiale(connection, "COMPTA-OHADA", "Comptabilité générale & SYSCOHADA", 0, "Maîtrise des écritures, règles et états financiers SYSCOHADA révisé.");
+            InsererCompetenceInitiale(connection, "PAIE-BF", "Gestion de la paie burkinabè", 0, "Calcul du brut, des cotisations CNSS et de la retenue IUTS selon le CGI.");
+            InsererCompetenceInitiale(connection, "DROIT-TRAVAIL", "Droit du travail burkinabè", 3, "Application du Code du travail, conventions collectives et gestion des contrats.");
+            InsererCompetenceInitiale(connection, "FISCALITE-RH", "Fiscalité des rémunérations & TPA", 3, "Déclarations fiscales IUTS, TPA et retenues à la source.");
+            InsererCompetenceInitiale(connection, "EXCEL-AVANCE", "Bureautique & Excel avancé", 0, "Tableaux croisés dynamiques, formules complexes, modélisation financière et RH.");
+            InsererCompetenceInitiale(connection, "MANAGEMENT", "Management d'équipe & Leadership", 1, "Encadrement, animation des équipes, fixation des objectifs et entretiens annuels.");
+            InsererCompetenceInitiale(connection, "COMMUNICATION", "Communication professionnelle", 2, "Aisance relationnelle, écoute active et communication écrite/orale claire.");
+            InsererCompetenceInitiale(connection, "NEGOCIATION", "Négociation & Relation partenaires", 0, "Techniques de négociation commerciale, fournisseurs et partenaires sociaux.");
+            InsererCompetenceInitiale(connection, "ANALYSE-FIN", "Analyse financière & Budgétaire", 0, "Élaboration, suivi budgétaire et tableaux de bord financiers.");
+            InsererCompetenceInitiale(connection, "RIGUEUR", "Rigueur, Discrétion & Confidentialité", 2, "Respect scrupuleux du secret professionnel et fiabilité dans l'exécution.");
+        }
+
+        private void InsererCompetenceInitiale(SQLiteConnection connection, string code, string libelle, int domaine, string description)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    INSERT OR IGNORE INTO Competences (Code, Libelle, Domaine, Description, DateCreation)
+                    VALUES (@code, @libelle, @domaine, @desc, @date);";
+                cmd.Parameters.AddWithValue("@code", code);
+                cmd.Parameters.AddWithValue("@libelle", libelle);
+                cmd.Parameters.AddWithValue("@domaine", domaine);
+                cmd.Parameters.AddWithValue("@desc", description);
+                cmd.Parameters.AddWithValue("@date", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Migration 31 — Entretiens & évaluations : campagnes annuelles, grilles d'évaluation, objectifs, notation et suivi des entretiens individuels (module RH-03).
+        /// </summary>
+        private void Migration31_EntretiensEtEvaluations(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS CampagnesEvaluation (
+                    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code          TEXT NOT NULL UNIQUE,
+                    Titre         TEXT NOT NULL,
+                    AnneeExercice INTEGER NOT NULL,
+                    DateDebut     TEXT NOT NULL,
+                    DateFin       TEXT NOT NULL,
+                    Statut        INTEGER NOT NULL DEFAULT 0,
+                    Description   TEXT,
+                    DateCreation  TEXT NOT NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS EntretiensEvaluation (
+                    Id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CampagneId             INTEGER NOT NULL,
+                    EmployeeId             TEXT NOT NULL,
+                    EvaluateurMatricule    TEXT,
+                    DateEntretien          TEXT,
+                    Statut                 INTEGER NOT NULL DEFAULT 0,
+                    NoteGlobale            TEXT NOT NULL DEFAULT '0.00',
+                    PointsForts            TEXT,
+                    AxesProgres            TEXT,
+                    CommentairesSalarie    TEXT,
+                    CommentairesEvaluateur TEXT,
+                    AvisDirectionRH        TEXT,
+                    SouhaitsEvolution      TEXT,
+                    DateValidation         TEXT,
+                    DateCreation           TEXT NOT NULL,
+                    FOREIGN KEY(CampagneId) REFERENCES CampagnesEvaluation(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(EmployeeId) REFERENCES Employees(EmployeeId),
+                    FOREIGN KEY(EvaluateurMatricule) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS EntretienCriteres (
+                    Id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EntretienId    INTEGER NOT NULL,
+                    CompetenceId   INTEGER,
+                    Categorie      TEXT NOT NULL,
+                    Libelle        TEXT NOT NULL,
+                    Note           INTEGER NOT NULL DEFAULT 3,
+                    Poids          INTEGER NOT NULL DEFAULT 1,
+                    Commentaire    TEXT,
+                    FOREIGN KEY(EntretienId) REFERENCES EntretiensEvaluation(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(CompetenceId) REFERENCES Competences(Id) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS EntretienObjectifs (
+                    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EntretienId      INTEGER NOT NULL,
+                    TypeObjectif     INTEGER NOT NULL DEFAULT 0,
+                    Intitule         TEXT NOT NULL,
+                    IndicateurMesure TEXT,
+                    CibleAttendue    TEXT,
+                    ResultatObtenu   TEXT,
+                    TauxAtteintePct  INTEGER NOT NULL DEFAULT 0,
+                    Appreciation     TEXT,
+                    Echeance         TEXT,
+                    Poids            INTEGER NOT NULL DEFAULT 1,
+                    FOREIGN KEY(EntretienId) REFERENCES EntretiensEvaluation(Id) ON DELETE CASCADE
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS EntretienBesoinsFormation (
+                    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EntretienId      INTEGER NOT NULL,
+                    CompetenceId     INTEGER,
+                    ThemeFormation   TEXT NOT NULL,
+                    CompetenceVisee  TEXT,
+                    Priorite         INTEGER NOT NULL DEFAULT 1,
+                    AvisEvaluateur   TEXT,
+                    Statut           INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY(EntretienId) REFERENCES EntretiensEvaluation(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(CompetenceId) REFERENCES Competences(Id) ON DELETE SET NULL
+                );");
+
+            Executer(connection,
+                "CREATE UNIQUE INDEX IF NOT EXISTS UX_EntretiensEvaluation_Campagne_Employe ON EntretiensEvaluation(CampagneId, EmployeeId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_CampagnesEvaluation_Code ON CampagnesEvaluation(Code);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_CampagnesEvaluation_Annee ON CampagnesEvaluation(AnneeExercice);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretiensEvaluation_Campagne ON EntretiensEvaluation(CampagneId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretiensEvaluation_Employe ON EntretiensEvaluation(EmployeeId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretiensEvaluation_Evaluateur ON EntretiensEvaluation(EvaluateurMatricule);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretiensEvaluation_Statut ON EntretiensEvaluation(Statut);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretienCriteres_Entretien ON EntretienCriteres(EntretienId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretienCriteres_Competence ON EntretienCriteres(CompetenceId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretienObjectifs_Entretien ON EntretienObjectifs(EntretienId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretienBesoinsFormation_Entretien ON EntretienBesoinsFormation(EntretienId);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EntretienBesoinsFormation_Competence ON EntretienBesoinsFormation(CompetenceId);");
+        }
+
+        /// <summary>
+        /// Migration 32 — Gestion de la formation : plan annuel, sessions, participants, coûts et organismes,
+        /// avec liaison naturelle vers la TPA (Taxe Patronale et d'Apprentissage) et passerelle RH-03 (module RH-04).
+        /// </summary>
+        private void Migration32_FormationEtTPA(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS PlansFormation (
+                    Id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code                  TEXT NOT NULL UNIQUE,
+                    Titre                 TEXT NOT NULL,
+                    AnneeExercice         INTEGER NOT NULL,
+                    BudgetPrevisionnel    INTEGER NOT NULL DEFAULT 0,
+                    Statut                INTEGER NOT NULL DEFAULT 0,
+                    ObjectifsStrategiques TEXT,
+                    DateValidation        TEXT,
+                    DateCreation          TEXT NOT NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS OrganismesFormation (
+                    Id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    RaisonSociale  TEXT NOT NULL,
+                    ContactNom     TEXT,
+                    Telephone      TEXT,
+                    Email          TEXT,
+                    Adresse        TEXT,
+                    NumeroAgrement TEXT,
+                    Specialites    TEXT,
+                    Actif          INTEGER NOT NULL DEFAULT 1
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS FormationsCatalogue (
+                    Id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code                     TEXT NOT NULL UNIQUE,
+                    Intitule                 TEXT NOT NULL,
+                    Domaine                  TEXT,
+                    CompetenceViseeId        INTEGER,
+                    TypeFormation            INTEGER NOT NULL DEFAULT 0,
+                    DureeHeures              INTEGER NOT NULL DEFAULT 0,
+                    CoutEstimeParParticipant INTEGER NOT NULL DEFAULT 0,
+                    ObjectifsPedagogiques    TEXT,
+                    Prerequis                TEXT,
+                    Actif                    INTEGER NOT NULL DEFAULT 1,
+                    FOREIGN KEY(CompetenceViseeId) REFERENCES Competences(Id) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS SessionsFormation (
+                    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    FormationId      INTEGER NOT NULL,
+                    PlanFormationId  INTEGER NOT NULL,
+                    OrganismeId      INTEGER,
+                    CodeSession      TEXT NOT NULL UNIQUE,
+                    IntituleSession  TEXT,
+                    DateDebut        TEXT NOT NULL,
+                    DateFin          TEXT NOT NULL,
+                    Lieu             TEXT,
+                    FormateurNom     TEXT,
+                    Statut           INTEGER NOT NULL DEFAULT 0,
+                    CoutPedagogique  INTEGER NOT NULL DEFAULT 0,
+                    CoutLogistique   INTEGER NOT NULL DEFAULT 0,
+                    CoutAutre        INTEGER NOT NULL DEFAULT 0,
+                    CoutTotalReel    INTEGER NOT NULL DEFAULT 0,
+                    Commentaire      TEXT,
+                    FOREIGN KEY(FormationId) REFERENCES FormationsCatalogue(Id),
+                    FOREIGN KEY(PlanFormationId) REFERENCES PlansFormation(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(OrganismeId) REFERENCES OrganismesFormation(Id) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS SessionInscriptions (
+                    Id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                    SessionId          INTEGER NOT NULL,
+                    EmployeeId         TEXT NOT NULL,
+                    DateInscription    TEXT NOT NULL,
+                    StatutPresence     INTEGER NOT NULL DEFAULT 0,
+                    NoteEvaluation     TEXT,
+                    AttestationObtenue INTEGER NOT NULL DEFAULT 0,
+                    FraisImputes       INTEGER NOT NULL DEFAULT 0,
+                    Commentaire        TEXT,
+                    FOREIGN KEY(SessionId) REFERENCES SessionsFormation(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(EmployeeId) REFERENCES Employees(EmployeeId)
+                );");
+
+            // Passerelle avec le recueil des besoins RH-03 via helper idempotent
+            AjouterColonneSiAbsente(connection, "EntretienBesoinsFormation", "SessionFormationId", "INTEGER REFERENCES SessionsFormation(Id)");
+
+            // Index de performance et d'intégrité
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_PlansFormation_Annee ON PlansFormation(AnneeExercice);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_FormationsCatalogue_Competence ON FormationsCatalogue(CompetenceViseeId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_SessionsFormation_Plan ON SessionsFormation(PlanFormationId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_SessionsFormation_Formation ON SessionsFormation(FormationId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_SessionsFormation_Organisme ON SessionsFormation(OrganismeId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_SessionsFormation_Statut ON SessionsFormation(Statut);");
+            Executer(connection, "CREATE UNIQUE INDEX IF NOT EXISTS UX_SessionInscriptions_Session_Employe ON SessionInscriptions(SessionId, EmployeeId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_SessionInscriptions_Employe ON SessionInscriptions(EmployeeId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_EntretienBesoinsFormation_Session ON EntretienBesoinsFormation(SessionFormationId);");
+
+            // Amorçage : 2 organismes de référence
+            Executer(connection, @"
+                INSERT OR IGNORE INTO OrganismesFormation (RaisonSociale, ContactNom, Telephone, Email, NumeroAgrement, Specialites, Actif)
+                VALUES ('Direction des Ressources Humaines (Interne)', 'Responsable Formation', '+226 25 00 00 00', 'formation@sigma-rh.bf', 'INTERNE', 'Accueil, Intégration, Procédures internes, Sécurité', 1);");
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO OrganismesFormation (RaisonSociale, ContactNom, Telephone, Email, NumeroAgrement, Specialites, Actif)
+                VALUES ('Institut Burkinabè de Management & Ingénierie (IBMI)', 'Dr. Ouedraogo', '+226 25 30 12 34', 'contact@ibmi-bf.com', 'AGR-FAFPA/2024/082', 'Management, Droit social, Fiscalité OHADA, Comptabilité', 1);");
+
+            // Amorçage : 3 actions de formation au catalogue résolues par code de compétence
+            Executer(connection, @"
+                INSERT OR IGNORE INTO FormationsCatalogue (Code, Intitule, Domaine, CompetenceViseeId, TypeFormation, DureeHeures, CoutEstimeParParticipant, ObjectifsPedagogiques, Actif)
+                VALUES (
+                    'MGT-01',
+                    'Management opérationnel d''équipe & Conduite des entretiens',
+                    'Management & RH',
+                    (SELECT Id FROM Competences WHERE Code = 'MANAGEMENT'),
+                    1, 24, 15000000,
+                    'Maîtriser les leviers de motivation, fixer des objectifs SMART et conduire les entretiens annuels d''évaluation.',
+                    1
+                );");
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO FormationsCatalogue (Code, Intitule, Domaine, CompetenceViseeId, TypeFormation, DureeHeures, CoutEstimeParParticipant, ObjectifsPedagogiques, Actif)
+                VALUES (
+                    'FISC-01',
+                    'Fiscalité des rémunérations, Déclarations IUTS & TPA',
+                    'Fiscalité & Paie',
+                    (SELECT Id FROM Competences WHERE Code = 'FISCALITE-RH'),
+                    1, 16, 12000000,
+                    'Maîtriser les règles d''assiette IUTS et TPA, le calendrier déclaratif DGI et les déductions pour charges familiales.',
+                    1
+                );");
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO FormationsCatalogue (Code, Intitule, Domaine, CompetenceViseeId, TypeFormation, DureeHeures, CoutEstimeParParticipant, ObjectifsPedagogiques, Actif)
+                VALUES (
+                    'PAIE-01',
+                    'Pratique de la paie burkinabè et déclarations sociales CNSS',
+                    'Paie & Social',
+                    (SELECT Id FROM Competences WHERE Code = 'PAIE-BF'),
+                    0, 20, 8000000,
+                    'Calcul des éléments de paie, application des plafonds de cotisations CNSS et édition des états nominatifs.',
+                    1
+                );");
+        }
+
+        /// <summary>
+        /// Migration 33 — Recrutement & gestion des candidatures (module RH-05).
+        /// Crée les tables RecrutementBesoins, RecrutementCandidats, RecrutementCandidatures,
+        /// RecrutementEntretiens, les index de performance et d'unicité, ainsi qu'un jeu
+        /// d'amorçage initial.
+        /// </summary>
+        private void Migration33_Recrutement(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS RecrutementBesoins (
+                    Id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Reference              TEXT NOT NULL UNIQUE,
+                    IntitulePoste          TEXT NOT NULL,
+                    PosteId                INTEGER,
+                    Departement            TEXT,
+                    Motif                  INTEGER NOT NULL DEFAULT 0,
+                    NombrePostes           INTEGER NOT NULL DEFAULT 1,
+                    NombreRecrutes         INTEGER NOT NULL DEFAULT 0,
+                    TypeContratVise        TEXT NOT NULL DEFAULT 'CDI',
+                    RemunerationProposeeMin INTEGER,
+                    RemunerationProposeeMax INTEGER,
+                    DateExpression         TEXT NOT NULL,
+                    DateEcheanceSouhaitee  TEXT,
+                    DateCloture            TEXT,
+                    Statut                 INTEGER NOT NULL DEFAULT 0,
+                    ResponsableRecrutement TEXT,
+                    DescriptionProfil      TEXT,
+                    DateCreation           TEXT NOT NULL,
+                    FOREIGN KEY(PosteId) REFERENCES Postes(Id) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS RecrutementCandidats (
+                    Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Nom                 TEXT NOT NULL,
+                    Prenoms             TEXT NOT NULL,
+                    Email               TEXT,
+                    Telephone           TEXT,
+                    DiplomeLePlusEleve  TEXT,
+                    AnneesExperience    INTEGER NOT NULL DEFAULT 0,
+                    DerniereFonction    TEXT,
+                    CompetencesCles     TEXT,
+                    CvChemin            TEXT,
+                    VivierActif         INTEGER NOT NULL DEFAULT 1,
+                    Commentaires        TEXT,
+                    DateCreation        TEXT NOT NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS RecrutementCandidatures (
+                    Id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    BesoinId              INTEGER NOT NULL,
+                    CandidatId            INTEGER NOT NULL,
+                    DatePostulation       TEXT NOT NULL,
+                    CanalSource           INTEGER NOT NULL DEFAULT 0,
+                    PretentionSalariale   INTEGER,
+                    EtapeActuelle         INTEGER NOT NULL DEFAULT 0,
+                    Statut                INTEGER NOT NULL DEFAULT 0,
+                    ScoreEvaluation       REAL,
+                    AvisGlobal            INTEGER,
+                    CommentaireEvaluation TEXT,
+                    DateEmbauche          TEXT,
+                    SalaireNegocie        INTEGER,
+                    SalarieCreeMatricule  TEXT,
+                    DateCreation          TEXT NOT NULL,
+                    FOREIGN KEY(BesoinId) REFERENCES RecrutementBesoins(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(CandidatId) REFERENCES RecrutementCandidats(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(SalarieCreeMatricule) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS RecrutementEntretiens (
+                    Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CandidatureId       INTEGER NOT NULL,
+                    Etape               INTEGER NOT NULL DEFAULT 3,
+                    DateEntretien       TEXT NOT NULL,
+                    EvaluateurNom       TEXT NOT NULL,
+                    EvaluateurMatricule TEXT,
+                    NoteGlobale         REAL,
+                    Avis                INTEGER,
+                    PointsForts         TEXT,
+                    AxesAmelioration    TEXT,
+                    Synthese            TEXT,
+                    DateCreation        TEXT NOT NULL,
+                    FOREIGN KEY(CandidatureId) REFERENCES RecrutementCandidatures(Id) ON DELETE CASCADE,
+                    FOREIGN KEY(EvaluateurMatricule) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+                );");
+
+            // Index de performance et d'intégrité
+            Executer(connection, "CREATE UNIQUE INDEX IF NOT EXISTS UX_RecrutementCandidatures_Besoin_Candidat ON RecrutementCandidatures(BesoinId, CandidatId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementBesoins_Statut ON RecrutementBesoins(Statut);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementBesoins_Poste ON RecrutementBesoins(PosteId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementCandidats_Email ON RecrutementCandidats(Email);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementCandidats_Vivier ON RecrutementCandidats(VivierActif);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementCandidatures_Besoin ON RecrutementCandidatures(BesoinId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementCandidatures_Candidat ON RecrutementCandidatures(CandidatId);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementCandidatures_Etape ON RecrutementCandidatures(EtapeActuelle);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementCandidatures_Statut ON RecrutementCandidatures(Statut);");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_RecrutementEntretiens_Candidature ON RecrutementEntretiens(CandidatureId);");
+
+            // Amorçage initial si les tables sont neuves
+            Executer(connection, @"
+                INSERT OR IGNORE INTO RecrutementBesoins (
+                    Reference, IntitulePoste, Departement, Motif, NombrePostes, NombreRecrutes,
+                    TypeContratVise, RemunerationProposeeMin, RemunerationProposeeMax,
+                    DateExpression, DateEcheanceSouhaitee, Statut, ResponsableRecrutement,
+                    DescriptionProfil, DateCreation
+                ) VALUES (
+                    'REC-2026-001', 'Gestionnaire Paie & Administration RH', 'Ressources Humaines', 0, 1, 0,
+                    'CDI', 35000000, 45000000,
+                    date('now'), date('now', '+30 days'), 1, 'Direction RH',
+                    'Bac+3 en Gestion/RH, 3 ans d''expérience en paie burkinabè (IUTS/CNSS) et maîtrise de la réglementation du travail.',
+                    datetime('now')
+                );");
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO RecrutementBesoins (
+                    Reference, IntitulePoste, Departement, Motif, NombrePostes, NombreRecrutes,
+                    TypeContratVise, RemunerationProposeeMin, RemunerationProposeeMax,
+                    DateExpression, DateEcheanceSouhaitee, Statut, ResponsableRecrutement,
+                    DescriptionProfil, DateCreation
+                ) VALUES (
+                    'REC-2026-002', 'Comptable Trésorerie & Fiscalité', 'Finances & Comptabilité', 1, 1, 0,
+                    'CDI', 40000000, 50000000,
+                    date('now'), date('now', '+45 days'), 1, 'Direction Financière',
+                    'Licence ou Master CCA, pratique confirmée des états financiers OHADA et déclarations fiscales mensuelles.',
+                    datetime('now')
+                );");
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO RecrutementCandidats (
+                    Nom, Prenoms, Email, Telephone, DiplomeLePlusEleve, AnneesExperience,
+                    DerniereFonction, CompetencesCles, VivierActif, Commentaires, DateCreation
+                ) VALUES (
+                    'TRAORE', 'Aminata', 'aminata.traore@candidat.bf', '+226 70 12 34 56',
+                    'Licence Gestion des Ressources Humaines', 4,
+                    'Assistante RH & Paie', 'Paie burkinabè, IUTS, CNSS, Déclarations sociales, Recrutement',
+                    1, 'Excellente maîtrise des logiciels de paie et bon sens relationnel.', datetime('now')
+                );");
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO RecrutementCandidats (
+                    Nom, Prenoms, Email, Telephone, DiplomeLePlusEleve, AnneesExperience,
+                    DerniereFonction, CompetencesCles, VivierActif, Commentaires, DateCreation
+                ) VALUES (
+                    'SOME', 'Arnaud', 'arnaud.some@candidat.bf', '+226 76 98 76 54',
+                    'Master Comptabilité Contrôle Audit', 5,
+                    'Comptable Général', 'SYSCOHADA révisé, Rapprochements bancaires, Fiscalité DGI, Excel avancé',
+                    1, 'Expérience de 3 ans en cabinet d''expertise comptable.', datetime('now')
+                );");
+        }
+
+        /// <summary>
         /// Plan de paie (module SOC-01). Les montants et plafonds suivent la convention
         /// de la base : INTEGER en centimes. Les taux, eux, sont des proportions à
         /// nombreuses décimales et sont donc stockés en TEXT, comme TaxRate.
@@ -1804,6 +2524,621 @@ namespace IUTSCalculator.Services
 
             Executer(connection,
                 "CREATE INDEX IF NOT EXISTS IX_Rubriques_Ordre ON Rubriques(Ordre);");
+        }
+
+        /// <summary>
+        /// Migration 34 — Gestion des temps et rotations (module RH-08) et barème daté des
+        /// heures supplémentaires.
+        ///
+        ///   • <c>BaremesHeuresSup</c> : majorations datées. Deux barèmes livrés : les taux
+        ///     historiques de PAI-03 (15/30/50/100, dimanche de jour à 50 %) au 01/01/2000,
+        ///     pour que tout mois antérieur recalculé reste identique au centime, puis les
+        ///     cinq tranches 15/35/50/60/120 à partir de la paie d'octobre 2026 ;
+        ///   • <c>HeuresSupplementaires</c> : cinquième tranche (dimanche/férié de jour),
+        ///     colonnes Heures60/Montant60 à zéro pour l'existant ;
+        ///   • <c>Absences.PeriodeImputation</c> : mois de paie (« yyyy-MM ») auquel une
+        ///     absence relevée au planning est imputée en entier quand la période de
+        ///     pointage ne suit pas le mois civil (arrêté au 20, par exemple). Vide pour
+        ///     toute absence existante : son traitement ne change pas ;
+        ///   • équipes et cycles de rotation, affectations, planning jour par jour, jours
+        ///     fériés et paramètres du relevé des temps.
+        ///
+        /// Idempotente (CREATE IF NOT EXISTS, ajout de colonne si absente, amorçage si
+        /// vide) : elle est aussi rejouée par <see cref="CreerSchemaComplet"/>.
+        /// </summary>
+        private void Migration34_GestionDesTemps(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS BaremesHeuresSup (
+                    Id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                    DateEffet         TEXT    NOT NULL,
+                    Libelle           TEXT,
+                    Reference         TEXT,
+                    EstSysteme        INTEGER NOT NULL DEFAULT 0,
+                    TauxTranche1      TEXT    NOT NULL DEFAULT '0.15',
+                    TauxTranche2      TEXT    NOT NULL DEFAULT '0.35',
+                    TauxNuit          TEXT    NOT NULL DEFAULT '0.50',
+                    TauxFerieJour     TEXT    NOT NULL DEFAULT '0.60',
+                    TauxFerieNuit     TEXT    NOT NULL DEFAULT '1.20',
+                    SeuilTranche1     TEXT    NOT NULL DEFAULT '8',
+                    DureeHebdoLegale  TEXT    NOT NULL DEFAULT '40'
+                );");
+            Executer(connection,
+                "CREATE UNIQUE INDEX IF NOT EXISTS UX_BaremesHeuresSup_DateEffet ON BaremesHeuresSup (DateEffet);");
+
+            int baremes;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM BaremesHeuresSup;";
+                baremes = DbValue.IntFromDb(cmd.ExecuteScalar());
+            }
+
+            if (baremes == 0)
+            {
+                foreach (var b in new[] { BaremeHeuresSup.Historique(), BaremeHeuresSup.CinqTranches2026() })
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText =
+                            "INSERT INTO BaremesHeuresSup (DateEffet, Libelle, Reference, EstSysteme, TauxTranche1, " +
+                            "TauxTranche2, TauxNuit, TauxFerieJour, TauxFerieNuit, SeuilTranche1, DureeHebdoLegale) " +
+                            "VALUES (@d, @l, @r, 1, @t1, @t2, @tn, @tfj, @tfn, @s1, @dh);";
+                        cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(b.DateEffet));
+                        cmd.Parameters.AddWithValue("@l", b.Libelle);
+                        cmd.Parameters.AddWithValue("@r", b.Reference);
+                        cmd.Parameters.AddWithValue("@t1", DbValue.DecimalToDb(b.TauxTranche1));
+                        cmd.Parameters.AddWithValue("@t2", DbValue.DecimalToDb(b.TauxTranche2));
+                        cmd.Parameters.AddWithValue("@tn", DbValue.DecimalToDb(b.TauxNuit));
+                        cmd.Parameters.AddWithValue("@tfj", DbValue.DecimalToDb(b.TauxFerieJour));
+                        cmd.Parameters.AddWithValue("@tfn", DbValue.DecimalToDb(b.TauxFerieNuit));
+                        cmd.Parameters.AddWithValue("@s1", DbValue.DecimalToDb(b.SeuilTranche1));
+                        cmd.Parameters.AddWithValue("@dh", DbValue.DecimalToDb(b.DureeHebdoLegale));
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            AjouterColonneSiAbsente(connection, "HeuresSupplementaires", "Heures60", "TEXT NOT NULL DEFAULT '0'");
+            AjouterColonneSiAbsente(connection, "HeuresSupplementaires", "Montant60", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "Absences", "PeriodeImputation", "TEXT");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS EquipesTravail (
+                    Id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code                    TEXT    NOT NULL UNIQUE,
+                    Libelle                 TEXT,
+                    Site                    TEXT,
+                    Motif                   TEXT    NOT NULL DEFAULT '',
+                    DateDebutCycle          TEXT    NOT NULL,
+                    DureePosteJour          TEXT    NOT NULL DEFAULT '12',
+                    DureePosteNuit          TEXT    NOT NULL DEFAULT '12',
+                    HeuresNormalesParPoste  TEXT    NOT NULL DEFAULT '8',
+                    ModeSemaine             INTEGER NOT NULL DEFAULT 0,
+                    DimancheMajore          INTEGER NOT NULL DEFAULT 0,
+                    PanierMode              INTEGER NOT NULL DEFAULT 0,
+                    PanierValeur            TEXT    NOT NULL DEFAULT '0',
+                    Active                  INTEGER NOT NULL DEFAULT 1,
+                    Commentaire             TEXT,
+                    DateCreation            TEXT    NOT NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS EquipesMembres (
+                    EmployeeId       TEXT    PRIMARY KEY,
+                    EquipeId         INTEGER NOT NULL,
+                    DateAffectation  TEXT,
+                    FOREIGN KEY(EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE,
+                    FOREIGN KEY(EquipeId) REFERENCES EquipesTravail(Id) ON DELETE CASCADE
+                );");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_EquipesMembres_Equipe ON EquipesMembres (EquipeId);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS PlanningJours (
+                    Id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeId        TEXT    NOT NULL,
+                    DateJour          TEXT    NOT NULL,
+                    Code              TEXT    NOT NULL,
+                    Heures            TEXT,
+                    EquipeId          INTEGER,
+                    Source            INTEGER NOT NULL DEFAULT 0,
+                    Commentaire       TEXT,
+                    DateModification  TEXT,
+                    FOREIGN KEY(EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE
+                );");
+            Executer(connection,
+                "CREATE UNIQUE INDEX IF NOT EXISTS UX_PlanningJours_Employe_Date ON PlanningJours (EmployeeId, DateJour);");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_PlanningJours_Date ON PlanningJours (DateJour);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS JoursFeries (
+                    Id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    DateJour TEXT    NOT NULL UNIQUE,
+                    Libelle  TEXT
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS ParametresTemps (
+                    Id                 INTEGER PRIMARY KEY CHECK (Id = 1),
+                    JourArrete         INTEGER NOT NULL DEFAULT 0,
+                    AJCompteDansSeuil  INTEGER NOT NULL DEFAULT 0
+                );");
+            Executer(connection,
+                "INSERT OR IGNORE INTO ParametresTemps (Id, JourArrete, AJCompteDansSeuil) VALUES (1, 0, 0);");
+        }
+
+        /// <summary>
+        /// Migration 34 (suite) — rubrique « Prime de panier » alimentée par le relevé des
+        /// temps (RH-08). Elle figure aussi dans <c>RubriqueService.RubriquesDeSaisie()</c>.
+        /// Insérée seulement dans un plan déjà alimenté, pour ne jamais empêcher l'amorçage
+        /// d'un plan vide ; en pratique les migrations 25 et 26 alimentent déjà tout plan,
+        /// y compris celui d'un dossier neuf (voir ETAT-DEVELOPPEMENT.md, dette RH-08).
+        /// Soumise à l'IUTS et à la CNSS par prudence : se corrige depuis « Plan de paie ».
+        /// </summary>
+        private void Migration34_RubriquePanier(SQLiteConnection connection)
+        {
+            if (!TableExiste(connection, "Rubriques"))
+                return;
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM Rubriques;";
+                if (DbValue.IntFromDb(cmd.ExecuteScalar()) == 0)
+                    return;
+            }
+
+            Executer(connection, @"
+                INSERT OR IGNORE INTO Rubriques
+                (Code, Libelle, Sens, ModeCalcul, MontantFixe, TauxSalarial, TauxPatronal,
+                 CodeBase, SoumisIUTS, SoumisCNSS, Plafonne, Plafond, PourcentagePlafond,
+                 Ordre, Active, EstSysteme, CompteComptable, CompteContrepartie, Commentaire)
+                VALUES ('PANIER', 'Prime de panier', 0, 0, 0, '0', '0', '', 1, 1, 0, 0, '0',
+                        62, 1, 0, '6612', '4221',
+                        'Nombre de paniers (postes travaillés) en quantité. Alimentée par la Gestion des temps (RH-08).');");
+        }
+
+        /// <summary>
+        /// Migration 35 — Discipline & procédures (module RH-06).
+        ///
+        /// Quatre tables : les paramètres de délai du dossier (une seule ligne), le catalogue
+        /// des sanctions du règlement intérieur (livré avec cinq sanctions modifiables), les
+        /// procédures disciplinaires et leurs pièces. Les dates nullables sont stockées en
+        /// TEXT vide, comme ailleurs ; le nombre de jours de mise à pied en TEXT invariant.
+        /// Aucune donnée existante n'est transformée.
+        /// </summary>
+        private void Migration35_Discipline(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS ParametresDiscipline (
+                    Id                              INTEGER PRIMARY KEY CHECK (Id = 1),
+                    DelaiEngagementJours            INTEGER NOT NULL DEFAULT 60,
+                    DelaiReponseJoursOuvrables      INTEGER NOT NULL DEFAULT 3,
+                    DelaiConvocationJoursOuvrables  INTEGER NOT NULL DEFAULT 5,
+                    DelaiDecisionJours              INTEGER NOT NULL DEFAULT 30,
+                    ReferenceReglementInterieur     TEXT,
+                    Signataire                      TEXT,
+                    FonctionSignataire              TEXT
+                );");
+            Executer(connection, "INSERT OR IGNORE INTO ParametresDiscipline (Id) VALUES (1);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS TypesSanction (
+                    Id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Code              TEXT    NOT NULL UNIQUE,
+                    Libelle           TEXT    NOT NULL,
+                    Nature            INTEGER NOT NULL DEFAULT 0,
+                    Ordre             INTEGER NOT NULL DEFAULT 0,
+                    ExigeExplication  INTEGER NOT NULL DEFAULT 1,
+                    ExigeEntretien    INTEGER NOT NULL DEFAULT 0,
+                    DureeMaxJours     INTEGER NOT NULL DEFAULT 0,
+                    FauteLourde       INTEGER NOT NULL DEFAULT 0,
+                    EffacementMois    INTEGER NOT NULL DEFAULT 0,
+                    Actif             INTEGER NOT NULL DEFAULT 1,
+                    EstSysteme        INTEGER NOT NULL DEFAULT 0
+                );");
+
+            int types;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM TypesSanction;";
+                types = DbValue.IntFromDb(cmd.ExecuteScalar());
+            }
+
+            if (types == 0)
+            {
+                foreach (var t in TypeSanction.CatalogueParDefaut())
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText =
+                            "INSERT OR IGNORE INTO TypesSanction (Code, Libelle, Nature, Ordre, ExigeExplication, " +
+                            "ExigeEntretien, DureeMaxJours, FauteLourde, EffacementMois, Actif, EstSysteme) " +
+                            "VALUES (@c, @l, @n, @o, @ex, @en, @d, @fl, @ef, 1, 1);";
+                        cmd.Parameters.AddWithValue("@c", t.Code);
+                        cmd.Parameters.AddWithValue("@l", t.Libelle);
+                        cmd.Parameters.AddWithValue("@n", (int)t.Nature);
+                        cmd.Parameters.AddWithValue("@o", t.Ordre);
+                        cmd.Parameters.AddWithValue("@ex", t.ExigeExplication ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@en", t.ExigeEntretien ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@d", t.DureeMaxJours);
+                        cmd.Parameters.AddWithValue("@fl", t.FauteLourde ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@ef", t.EffacementMois);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS ProceduresDisciplinaires (
+                    Id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Reference                TEXT    NOT NULL UNIQUE,
+                    EmployeeId               TEXT    NOT NULL,
+                    DateFaits                TEXT    NOT NULL,
+                    DateConnaissance         TEXT    NOT NULL,
+                    LieuFaits                TEXT,
+                    CategorieFaits           TEXT,
+                    DescriptionFaits         TEXT,
+                    Temoins                  TEXT,
+                    Gravite                  INTEGER NOT NULL DEFAULT 0,
+                    SalarieProtege           INTEGER NOT NULL DEFAULT 0,
+                    MandatProtege            TEXT,
+                    DateDemandeExplication   TEXT,
+                    DateReponse              TEXT,
+                    ResumeReponse            TEXT,
+                    ConservatoireDebut       TEXT,
+                    ConservatoireFin         TEXT,
+                    DateConvocation          TEXT,
+                    DateEntretien            TEXT,
+                    HeureLieuEntretien       TEXT,
+                    AssistantEntretien       TEXT,
+                    CompteRenduEntretien     TEXT,
+                    DecisionInspection       INTEGER NOT NULL DEFAULT 0,
+                    DateDemandeInspection    TEXT,
+                    DateDecisionInspection   TEXT,
+                    ReferenceInspection      TEXT,
+                    TypeSanctionId           INTEGER,
+                    DateDecision             TEXT,
+                    MotifsDecision           TEXT,
+                    MiseAPiedDebut           TEXT,
+                    MiseAPiedFin             TEXT,
+                    MiseAPiedJours           TEXT    NOT NULL DEFAULT '0',
+                    DateEffetLicenciement    TEXT,
+                    ClasseeSansSuite         INTEGER NOT NULL DEFAULT 0,
+                    MotifClassement          TEXT,
+                    DateNotification         TEXT,
+                    ModeNotification         TEXT,
+                    DateAccuseReception      TEXT,
+                    DateRecours              TEXT,
+                    InstanceRecours          TEXT,
+                    IssueRecours             TEXT,
+                    AbsenceMiseAPiedId       INTEGER,
+                    AbsenceConservatoireId   INTEGER,
+                    Commentaire              TEXT,
+                    DateCreation             TEXT    NOT NULL,
+                    DateModification         TEXT    NOT NULL,
+                    CreePar                  TEXT
+                );");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_ProceduresDisciplinaires_Employe ON ProceduresDisciplinaires (EmployeeId);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS PiecesDisciplinaires (
+                    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ProcedureId   INTEGER NOT NULL REFERENCES ProceduresDisciplinaires(Id) ON DELETE CASCADE,
+                    Type          INTEGER NOT NULL DEFAULT 10,
+                    Libelle       TEXT,
+                    NomFichier    TEXT    NOT NULL,
+                    NomOriginal   TEXT,
+                    DateAjout     TEXT    NOT NULL,
+                    EstGeneree    INTEGER NOT NULL DEFAULT 0
+                );");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_PiecesDisciplinaires_Procedure ON PiecesDisciplinaires (ProcedureId);");
+        }
+
+        /// <summary>
+        /// Migration 36 (1/2) — plan de paie jamais amorcé.
+        ///
+        /// <c>RubriqueService.ChargerAsync</c> n'amorce le plan initial (salaire de base,
+        /// indemnités, CNSS, IUTS, rubriques de saisie) que si la table est VIDE. Or les
+        /// migrations 11, 25, 26, 27 et 34 y insèrent leurs propres rubriques sans regarder
+        /// si le plan a été amorcé : un dossier créé après l'arrivée de PAI-07 (ou dont le
+        /// plan n'avait jamais été ouvert avant ces migrations) se retrouvait avec RAPPEL*,
+        /// AVNAT_*, PANIER… mais sans SALBASE ni HSUP, PRIME, ACOMPTE, PRET, etc. Les
+        /// variables saisies sur ces codes étaient alors ignorées du bulletin.
+        ///
+        /// Signature sûre du défaut : l'absence de SALBASE. Une rubrique système ne se
+        /// supprime jamais (elle se désactive), donc un plan amorcé contient toujours
+        /// SALBASE et n'est pas touché. Dans un plan touché, le plan initial complet est
+        /// inséré en INSERT OR IGNORE : une rubrique déjà présente, éventuellement modifiée
+        /// par l'utilisateur, est conservée telle quelle.
+        /// </summary>
+        private void Migration36_PlanDePaieComplet(SQLiteConnection connection)
+        {
+            if (!TableExiste(connection, "Rubriques"))
+                return;
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM Rubriques WHERE Code = @c;";
+                cmd.Parameters.AddWithValue("@c", RubriqueService.CodeSalaireBase);
+                if (DbValue.IntFromDb(cmd.ExecuteScalar()) > 0)
+                    return;
+            }
+
+            // Un plan entièrement vide reste à la charge de RubriqueService, comme avant :
+            // on ne change pas le comportement des dossiers qui n'ont rien.
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM Rubriques;";
+                if (DbValue.IntFromDb(cmd.ExecuteScalar()) == 0)
+                    return;
+            }
+
+            AjouterColonneSiAbsente(connection, "Rubriques", "SoumisTPA", "INTEGER NOT NULL DEFAULT 1");
+
+            using (var tx = connection.BeginTransaction())
+            {
+                foreach (var r in RubriqueService.PlanDePaieInitial())
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"
+                            INSERT OR IGNORE INTO Rubriques
+                            (Code, Libelle, Sens, ModeCalcul, MontantFixe, TauxSalarial, TauxPatronal, CodeBase,
+                             SoumisIUTS, SoumisCNSS, SoumisTPA, Plafonne, Plafond, PourcentagePlafond, Ordre, Active,
+                             EstSysteme, CompteComptable, CompteContrepartie, Commentaire)
+                            VALUES
+                            (@Code, @Libelle, @Sens, @ModeCalcul, @MontantFixe, @TauxSalarial, @TauxPatronal, @CodeBase,
+                             @SoumisIUTS, @SoumisCNSS, @SoumisTPA, @Plafonne, @Plafond, @PourcentagePlafond, @Ordre, @Active,
+                             @EstSysteme, @CompteComptable, @CompteContrepartie, @Commentaire);";
+                        cmd.Parameters.AddWithValue("@Code", (r.Code ?? "").Trim().ToUpperInvariant());
+                        cmd.Parameters.AddWithValue("@Libelle", r.Libelle ?? "");
+                        cmd.Parameters.AddWithValue("@Sens", (int)r.Sens);
+                        cmd.Parameters.AddWithValue("@ModeCalcul", (int)r.ModeCalcul);
+                        cmd.Parameters.AddWithValue("@MontantFixe", DbValue.MoneyToDb(r.MontantFixe));
+                        cmd.Parameters.AddWithValue("@TauxSalarial", DbValue.DecimalToDb(r.TauxSalarial));
+                        cmd.Parameters.AddWithValue("@TauxPatronal", DbValue.DecimalToDb(r.TauxPatronal));
+                        cmd.Parameters.AddWithValue("@CodeBase", r.CodeBase ?? "");
+                        cmd.Parameters.AddWithValue("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@SoumisTPA", r.SoumisTPA ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@Plafonne", r.Plafonne ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@Plafond", DbValue.MoneyToDb(r.Plafond));
+                        cmd.Parameters.AddWithValue("@PourcentagePlafond", DbValue.DecimalToDb(r.PourcentagePlafond));
+                        cmd.Parameters.AddWithValue("@Ordre", r.Ordre);
+                        cmd.Parameters.AddWithValue("@Active", r.Active ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@EstSysteme", r.EstSysteme ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@CompteComptable", r.CompteComptable ?? "");
+                        cmd.Parameters.AddWithValue("@CompteContrepartie", r.CompteContrepartie ?? "");
+                        cmd.Parameters.AddWithValue("@Commentaire", r.Commentaire ?? "");
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                tx.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Migration 36 (2/2) — registre des mandats représentatifs (RH-06).
+        ///
+        /// Un délégué du personnel ou un délégué syndical ne se licencie qu'avec
+        /// l'autorisation de l'inspecteur du travail. Jusqu'ici, la qualité de salarié
+        /// protégé se cochait à la main sur chaque procédure — un oubli suffisait à laisser
+        /// passer un licenciement irrégulier. Le registre la rend automatique.
+        /// </summary>
+        private void Migration36_MandatsRepresentatifs(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS MandatsRepresentatifs (
+                    Id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeId      TEXT    NOT NULL,
+                    Mandat          TEXT    NOT NULL,
+                    DateDebut       TEXT    NOT NULL,
+                    DateFin         TEXT,
+                    FinProtection   TEXT,
+                    Commentaire     TEXT
+                );");
+            Executer(connection,
+                "CREATE INDEX IF NOT EXISTS IX_MandatsRepresentatifs_Employe ON MandatsRepresentatifs (EmployeeId);");
+        }
+
+        /// <summary>
+        /// Migration 37 — Santé & sécurité au travail (module RH-07).
+        ///
+        /// Paramètres (une ligne), périodicité des visites propre à un poste, visites
+        /// médicales, catalogue des EPI (amorcé avec les équipements courants, durée de vie
+        /// 12 mois à ajuster), remises d'EPI, accidents du travail. Aucune donnée existante
+        /// n'est transformée. La rémunération journalière d'un accident est un montant :
+        /// INTEGER en centimes, comme ailleurs.
+        /// </summary>
+        private void Migration37_SanteSecurite(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS ParametresSST (
+                    Id                              INTEGER PRIMARY KEY CHECK (Id = 1),
+                    PeriodiciteVisiteMois           INTEGER NOT NULL DEFAULT 12,
+                    RepriseApresArretJours          INTEGER NOT NULL DEFAULT 21,
+                    DelaiDeclarationJoursOuvrables  INTEGER NOT NULL DEFAULT 2,
+                    TauxIndemniteJournaliere        TEXT    NOT NULL DEFAULT '0.6666666666666666666666666667',
+                    JoursMoisReference              INTEGER NOT NULL DEFAULT 30,
+                    AlerteAvanceJours               INTEGER NOT NULL DEFAULT 30
+                );");
+            Executer(connection, "INSERT OR IGNORE INTO ParametresSST (Id) VALUES (1);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS PeriodicitesVisitePoste (
+                    PosteId  INTEGER PRIMARY KEY,
+                    Mois     INTEGER NOT NULL
+                );");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS VisitesMedicales (
+                    Id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeId       TEXT    NOT NULL,
+                    Type             INTEGER NOT NULL DEFAULT 1,
+                    DatePrevue       TEXT,
+                    DateVisite       TEXT,
+                    Medecin          TEXT,
+                    Aptitude         INTEGER NOT NULL DEFAULT 0,
+                    Restrictions     TEXT,
+                    ProchaineVisite  TEXT,
+                    AccidentId       INTEGER,
+                    Commentaire      TEXT,
+                    DateSaisie       TEXT    NOT NULL
+                );");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_VisitesMedicales_Employe ON VisitesMedicales (EmployeeId);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS TypesEPI (
+                    Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Libelle       TEXT    NOT NULL UNIQUE,
+                    DureeVieMois  INTEGER NOT NULL DEFAULT 12,
+                    Norme         TEXT,
+                    Actif         INTEGER NOT NULL DEFAULT 1
+                );");
+            int nbEpi;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM TypesEPI;";
+                nbEpi = DbValue.IntFromDb(cmd.ExecuteScalar());
+            }
+            if (nbEpi == 0)
+            {
+                foreach (var libelle in LibellesSST.EpiCourants)
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = "INSERT OR IGNORE INTO TypesEPI (Libelle, DureeVieMois, Actif) VALUES (@l, 12, 1);";
+                        cmd.Parameters.AddWithValue("@l", libelle);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS DotationsEPI (
+                    Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeId          TEXT    NOT NULL,
+                    TypeEpiId           INTEGER NOT NULL,
+                    DateRemise          TEXT    NOT NULL,
+                    Quantite            INTEGER NOT NULL DEFAULT 1,
+                    Taille              TEXT,
+                    DateRenouvellement  TEXT,
+                    Etat                INTEGER NOT NULL DEFAULT 0,
+                    DateRetour          TEXT,
+                    Commentaire         TEXT
+                );");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_DotationsEPI_Employe ON DotationsEPI (EmployeeId);");
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS AccidentsTravail (
+                    Id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Reference                  TEXT    NOT NULL UNIQUE,
+                    EmployeeId                 TEXT    NOT NULL,
+                    Nature                     INTEGER NOT NULL DEFAULT 0,
+                    DateAccident               TEXT    NOT NULL,
+                    Heure                      TEXT,
+                    Lieu                       TEXT,
+                    Circonstances              TEXT,
+                    SiegeLesion                TEXT,
+                    NatureLesion               TEXT,
+                    Temoins                    TEXT,
+                    PremiersSoins              TEXT,
+                    AvecArret                  INTEGER NOT NULL DEFAULT 0,
+                    DebutArret                 TEXT,
+                    FinArret                   TEXT,
+                    DateReprise                TEXT,
+                    Mortel                     INTEGER NOT NULL DEFAULT 0,
+                    DateDeclarationCnss        TEXT,
+                    DateDeclarationInspection  TEXT,
+                    ReferenceCnss              TEXT,
+                    SalaireJournalier          INTEGER NOT NULL DEFAULT 0,
+                    TauxIpp                    TEXT    NOT NULL DEFAULT '0',
+                    AbsenceId                  INTEGER,
+                    Commentaire                TEXT,
+                    DateCreation               TEXT    NOT NULL,
+                    DateModification           TEXT    NOT NULL
+                );");
+            Executer(connection, "CREATE INDEX IF NOT EXISTS IX_AccidentsTravail_Employe ON AccidentsTravail (EmployeeId);");
+        }
+
+        /// <summary>
+        /// Migration 38 — corrections de la paie relevées en préparant le guide de formation
+        /// (version 1.4.37.1). Idempotente : la rejouer ne change rien.
+        /// </summary>
+        private void Migration38_CorrectionsPaie(SQLiteConnection connection)
+        {
+            // Défaut 7 — reprise du solde de congés à l'ouverture du dossier.
+            if (TableExiste(connection, "Employees"))
+            {
+                AjouterColonneSiAbsente(connection, "Employees", "SoldeCongesReprise", "TEXT NOT NULL DEFAULT '0'");
+                AjouterColonneSiAbsente(connection, "Employees", "DateRepriseConges", "TEXT");
+            }
+
+            // Défaut 25 — remboursements de frais et frais de mission : ni salaire ni
+            // avantage, donc hors assiette de la TPA. La case TPA restait cochée d'office.
+            // Seules les rubriques encore dans leur réglage d'origine (ni IUTS ni CNSS) sont
+            // corrigées : un dossier qui a rendu ses frais imposables garde son choix.
+            // N'agit que sur les calculs futurs : les bulletins archivés gardent leur TPA.
+            if (TableExiste(connection, "Rubriques"))
+            {
+                AjouterColonneSiAbsente(connection, "Rubriques", "SoumisTPA", "INTEGER NOT NULL DEFAULT 1");
+                Executer(connection, @"
+                    UPDATE Rubriques SET SoumisTPA = 0
+                    WHERE Code IN ('REMBFRAIS', 'FRAISMISS')
+                      AND SoumisTPA = 1 AND SoumisIUTS = 0 AND SoumisCNSS = 0;");
+
+                // Défaut 1 — rubriques du bulletin de sortie (solde de tout compte). Ajoutées
+                // sans rien écraser : un dossier qui les a déjà créées garde son réglage. Un
+                // plan entièrement vide reste amorcé par RubriqueService (il les contient).
+                bool planExiste;
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM Rubriques;";
+                    planExiste = DbValue.IntFromDb(cmd.ExecuteScalar()) > 0;
+                }
+
+                if (planExiste)
+                {
+                    var codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "INDCONGES", "INDDEPART", "INDDIVERS", "RETSORTIE" };
+                    using (var tx = connection.BeginTransaction())
+                    {
+                        foreach (var r in RubriqueService.PlanDePaieInitial())
+                        {
+                            if (r == null || !codes.Contains(r.Code ?? "")) continue;
+                            using (var cmd = connection.CreateCommand())
+                            {
+                                cmd.Transaction = tx;
+                                cmd.CommandText = @"
+                                    INSERT OR IGNORE INTO Rubriques
+                                    (Code, Libelle, Sens, ModeCalcul, MontantFixe, TauxSalarial, TauxPatronal, CodeBase,
+                                     SoumisIUTS, SoumisCNSS, SoumisTPA, Plafonne, Plafond, PourcentagePlafond, Ordre, Active,
+                                     EstSysteme, CompteComptable, CompteContrepartie, Commentaire)
+                                    VALUES
+                                    (@Code, @Libelle, @Sens, @ModeCalcul, 0, '0', '0', '',
+                                     @SoumisIUTS, @SoumisCNSS, @SoumisTPA, 0, 0, '0', @Ordre, 1,
+                                     0, @CompteComptable, @CompteContrepartie, @Commentaire);";
+                                cmd.Parameters.AddWithValue("@Code", r.Code.Trim().ToUpperInvariant());
+                                cmd.Parameters.AddWithValue("@Libelle", r.Libelle ?? "");
+                                cmd.Parameters.AddWithValue("@Sens", (int)r.Sens);
+                                cmd.Parameters.AddWithValue("@ModeCalcul", (int)r.ModeCalcul);
+                                cmd.Parameters.AddWithValue("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
+                                cmd.Parameters.AddWithValue("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
+                                cmd.Parameters.AddWithValue("@SoumisTPA", r.SoumisTPA ? 1 : 0);
+                                cmd.Parameters.AddWithValue("@Ordre", r.Ordre);
+                                cmd.Parameters.AddWithValue("@CompteComptable", r.CompteComptable ?? "");
+                                cmd.Parameters.AddWithValue("@CompteContrepartie", r.CompteContrepartie ?? "");
+                                cmd.Parameters.AddWithValue("@Commentaire", r.Commentaire ?? "");
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                        tx.Commit();
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -2072,6 +3407,131 @@ namespace IUTSCalculator.Services
             }
         }
 
+        /// <summary>
+        /// Migration 38 (RH-07, défaut n° 13) — suivi du remboursement des indemnités journalières
+        /// par la CNSS : dépôt du dossier, montant et date du remboursement, sur la fiche de
+        /// l'accident. Idempotente ; base neuve : la table vient d'être créée par la migration 37.
+        /// </summary>
+        private void Migration38_SanteSecurite(SQLiteConnection connection)
+        {
+            AjouterColonneSiAbsente(connection, "AccidentsTravail", "DateDepotIJ", "TEXT");
+            AjouterColonneSiAbsente(connection, "AccidentsTravail", "MontantRembourseIJ", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "AccidentsTravail", "DateRemboursementIJ", "TEXT");
+        }
+
+        /// <summary>
+        /// Migration 38 — RH-03 Entretiens : auteur de la validation d'un entretien
+        /// (« Valider &amp; Sceller »), à côté de la date de validation déjà existante.
+        /// Idempotente. Les entretiens validés avant cette version gardent une date et un auteur
+        /// vides : aucune source fiable ne permet de les reconstituer, rien n'est réécrit.
+        /// </summary>
+        private void Migration38_Entretiens(SQLiteConnection connection)
+        {
+            AjouterColonneSiAbsente(connection, "EntretiensEvaluation", "ValidePar", "TEXT");
+        }
+
+        /// <summary>
+        /// Migration 38 — RH-05 Recrutement : conditions d'embauche reprises sur la fiche salarié
+        /// (type de contrat, indemnités proposées par l'offre, en centimes comme tous les montants).
+        /// Idempotente ; aucune donnée existante n'est modifiée.
+        /// </summary>
+        private void Migration38_Recrutement(SQLiteConnection connection)
+        {
+            AjouterColonneSiAbsente(connection, "Employees", "TypeContrat", "TEXT");
+            AjouterColonneSiAbsente(connection, "RecrutementCandidatures", "TypeContratEmbauche", "TEXT");
+            AjouterColonneSiAbsente(connection, "RecrutementBesoins", "IndemniteLogement", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "RecrutementBesoins", "IndemniteTransport", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "RecrutementBesoins", "IndemniteFonction", "INTEGER NOT NULL DEFAULT 0");
+            AjouterColonneSiAbsente(connection, "RecrutementBesoins", "IndemniteSujetion", "INTEGER NOT NULL DEFAULT 0");
+        }
+
+        /// <summary>
+        /// Migration 38 — fiches de poste (RH-02, défaut 15) : signale les niveaux de compétence
+        /// enregistrés avant la correction du sélecteur, SANS les réécrire (une valeur 1 pouvait
+        /// venir de « Niv 1 » comme de « Niv 2 »). Idempotente.
+        /// </summary>
+        private void Migration38_FichesDePostes(SQLiteConnection connection)
+        {
+            if (!TableExiste(connection, "PosteCompetences"))
+                return;
+
+            // Déjà passée : rien n'est refait (sinon des niveaux confirmés depuis redeviendraient « à vérifier »).
+            foreach (var colonne in ColonnesDe(connection, "PosteCompetences"))
+            {
+                if (string.Equals(colonne, "NiveauAVerifier", StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+
+            AjouterColonneSiAbsente(connection, "PosteCompetences", "NiveauAVerifier", "INTEGER NOT NULL DEFAULT 0");
+
+            // Les exigences existantes ont été saisies avec l'ancien sélecteur (seul chemin d'écriture de la table).
+            Executer(connection, "UPDATE PosteCompetences SET NiveauAVerifier = 1;");
+        }
+
+        /// <summary>
+        /// Migration 38 — écritures de paie (défaut 20) : comptes et paramètres d'export réglables
+        /// par dossier. Valeurs initiales = anciennes valeurs codées en dur (aucun résultat ne
+        /// change tant que l'utilisateur ne modifie rien). Idempotente.
+        /// </summary>
+        private void Migration38_ParametresComptables(SQLiteConnection connection)
+        {
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS ParametresComptables (
+                    Cle     TEXT PRIMARY KEY,
+                    Valeur  TEXT NOT NULL DEFAULT ''
+                );");
+            foreach (var valeur in ParametresComptables.ValeursInitiales())
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "INSERT OR IGNORE INTO ParametresComptables (Cle, Valeur) VALUES (@cle, @valeur);";
+                    cmd.Parameters.AddWithValue("@cle", valeur.Key);
+                    cmd.Parameters.AddWithValue("@valeur", valeur.Value);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Migration 38 — journal d'audit scellé (défaut 21) : chaînage SHA-256 des entrées
+        /// postérieures à la migration, borne des entrées antérieures (« non scellées »), et
+        /// déclencheurs interdisant la modification ou la suppression d'une entrée. Idempotente.
+        /// </summary>
+        private void Migration38_AuditScelle(SQLiteConnection connection)
+        {
+            if (!TableExiste(connection, "JournalAudit"))
+                Migration20_JournalAudit(connection);
+
+            Executer(connection, @"
+                CREATE TABLE IF NOT EXISTS JournalAuditScellement (
+                    Id                  INTEGER PRIMARY KEY CHECK (Id = 1),
+                    DateScellement      TEXT    NOT NULL,
+                    DernierIdNonScelle  INTEGER NOT NULL
+                );");
+            Executer(connection, @"
+                INSERT OR IGNORE INTO JournalAuditScellement (Id, DateScellement, DernierIdNonScelle)
+                VALUES (1,
+                        strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'),
+                        MAX(COALESCE((SELECT MAX(Id) FROM JournalAudit), 0),
+                            COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'JournalAudit'), 0)));");
+
+            AjouterColonneSiAbsente(connection, "JournalAudit", "Empreinte", "TEXT");
+            AjouterColonneSiAbsente(connection, "JournalAudit", "EmpreintePrecedente", "TEXT");
+
+            Executer(connection, @"
+                CREATE TRIGGER IF NOT EXISTS TR_JournalAudit_SansModification
+                BEFORE UPDATE ON JournalAudit
+                BEGIN
+                    SELECT RAISE(ABORT, 'Journal d''audit scellé : une entrée enregistrée ne peut pas être modifiée.');
+                END;");
+            Executer(connection, @"
+                CREATE TRIGGER IF NOT EXISTS TR_JournalAudit_SansSuppression
+                BEFORE DELETE ON JournalAudit
+                BEGIN
+                    SELECT RAISE(ABORT, 'Journal d''audit scellé : une entrée enregistrée ne peut pas être supprimée.');
+                END;");
+        }
+
         #endregion
 
         #region Utilitaires de schéma
@@ -2143,5 +3603,28 @@ namespace IUTSCalculator.Services
         {
             GC.SuppressFinalize(this);
         }
+    }
+
+    /// <summary>
+    /// La base du dossier a été mise à niveau par une version plus récente du programme.
+    /// L'ouvrir avec celle-ci risquerait d'enregistrer des données incomplètes : il faut
+    /// installer la version la plus récente (ou restaurer une sauvegarde antérieure).
+    /// </summary>
+    public class BaseTropRecenteException : InvalidOperationException
+    {
+        public BaseTropRecenteException(string chemin, int versionBase, int versionProgramme)
+            : base(string.Format(CultureInfo.InvariantCulture,
+                "Ce dossier a été mis à jour par une version plus récente de Sigma Paie & RH (base de données v{0} ; " +
+                "ce programme gère jusqu'à la v{1}). Pour ne rien perdre, il ne sera pas ouvert avec cette version : " +
+                "installez la dernière version du programme. Fichier : {2}", versionBase, versionProgramme, chemin))
+        {
+            Chemin = chemin;
+            VersionBase = versionBase;
+            VersionProgramme = versionProgramme;
+        }
+
+        public string Chemin { get; }
+        public int VersionBase { get; }
+        public int VersionProgramme { get; }
     }
 }

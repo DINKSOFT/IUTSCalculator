@@ -67,6 +67,20 @@ namespace IUTSCalculator.ViewModels
         public ICommand CancelEditCommand { get; }
         public ICommand DeleteDossierCommand { get; }
         public ICommand ChoisirLogoCommand { get; }
+        public ICommand SauvegarderCommand { get; }
+        public ICommand RestaurerCommand { get; }
+
+        /// <summary>« Version 1.4.38.1 du 22/10/2026 — base de données v38 ».</summary>
+        public string VersionProgramme => VersionApplication.Complet;
+
+        /// <summary>
+        /// La restauration n'est permise qu'avant d'ouvrir un dossier (au démarrage), et pas
+        /// au profil « Lecture seule » : elle remplace des données (défaut n° 10).
+        /// </summary>
+        public bool PeutRestaurer => !DossierSession.Instance.HasOpenDossier && PeutModifier;
+
+        /// <summary>Créer, modifier, supprimer un dossier ou restaurer : interdit en lecture seule.</summary>
+        public bool PeutModifier => !UserSession.Instance.IsAuthenticated || UserSession.Instance.CanEdit;
 
         public DossierSelectionViewModel()
         {
@@ -75,12 +89,24 @@ namespace IUTSCalculator.ViewModels
 
             LoadDossiersCommand = new RelayCommand(async () => await LoadDossiersAsync());
             OpenDossierCommand = new RelayCommand(async () => await OpenDossierAsync(), () => SelectedDossier != null && !IsEditing);
-            NewDossierCommand = new RelayCommand(StartNewDossier, () => !IsEditing);
-            EditDossierCommand = new RelayCommand(StartEditDossier, () => SelectedDossier != null && !IsEditing);
+            NewDossierCommand = new RelayCommand(StartNewDossier, () => !IsEditing && PeutModifier);
+            EditDossierCommand = new RelayCommand(StartEditDossier, () => SelectedDossier != null && !IsEditing && PeutModifier);
             SaveDossierCommand = new RelayCommand(async () => await SaveDossierAsync(), CanSaveDossier);
             CancelEditCommand = new RelayCommand(CancelEdit, () => IsEditing);
-            DeleteDossierCommand = new RelayCommand(async () => await DeleteDossierAsync(), () => SelectedDossier != null && !IsEditing);
+            DeleteDossierCommand = new RelayCommand(async () => await DeleteDossierAsync(), () => SelectedDossier != null && !IsEditing && PeutModifier);
             ChoisirLogoCommand = new RelayCommand(ChoisirLogo, () => IsEditing);
+            SauvegarderCommand = new RelayCommand(async () =>
+            {
+                IsBusy = true;
+                try { StatusMessage = await SauvegardeInteractive.SauvegarderAsync() ?? StatusMessage; }
+                finally { IsBusy = false; }
+            }, () => !IsBusy && !IsEditing);
+            RestaurerCommand = new RelayCommand(async () =>
+            {
+                IsBusy = true;
+                try { StatusMessage = await SauvegardeInteractive.RestaurerAsync() ?? StatusMessage; }
+                finally { IsBusy = false; }
+            }, () => !IsBusy && !IsEditing && PeutRestaurer);
 
             _ = LoadDossiersAsync();
         }
@@ -116,13 +142,34 @@ namespace IUTSCalculator.ViewModels
             if (SelectedDossier == null)
                 return;
 
+            var dossier = SelectedDossier;
             try
             {
                 IsBusy = true;
-                StatusMessage = $"Ouverture du dossier « {SelectedDossier.RaisonSociale} »...";
+                StatusMessage = $"Ouverture du dossier « {dossier.RaisonSociale} » (vérification et mise à niveau de la base)...";
 
-                DossierSession.Instance.Open(SelectedDossier);
-                await _registryService.TouchDossierAsync(SelectedDossier.DossierId);
+                // La base est préparée ICI, avant de quitter cet écran : une base trop récente
+                // ou une mise à niveau impossible s'affichent clairement, et le dossier n'est
+                // pas ouvert (le fichier, lui, n'est jamais modifié dans ces deux cas).
+                try
+                {
+                    await Task.Run(() => { using (new SQLiteService(dossier.DbFileName)) { } });
+                }
+                catch (BaseTropRecenteException ex)
+                {
+                    StatusMessage = "Dossier non ouvert : base créée par une version plus récente du programme.";
+                    MessageBox.Show(ex.Message, "Version du programme trop ancienne", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = "Dossier non ouvert : sa base n'a pas pu être préparée.";
+                    MessageBox.Show(ex.Message, "Ouverture du dossier", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                DossierSession.Instance.Open(dossier);
+                await _registryService.TouchDossierAsync(dossier.DossierId);
 
                 DossierOpened?.Invoke(this, EventArgs.Empty);
             }

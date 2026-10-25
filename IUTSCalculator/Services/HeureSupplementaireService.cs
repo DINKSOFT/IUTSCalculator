@@ -15,10 +15,11 @@ namespace IUTSCalculator.Services
         private readonly SQLiteService _sqliteService;
         private readonly AuditService _auditService;
         private readonly PeriodePaieService _periodePaieService;
+        private readonly BaremeHeuresSupService _baremeService;
 
         private const string Colonnes =
-            "h.Id, h.EmployeeId, h.Annee, h.Mois, h.Heures15, h.Heures30, h.Heures50, h.Heures100, " +
-            "h.TauxHoraireBase, h.Montant15, h.Montant30, h.Montant50, h.Montant100, h.MontantTotal, " +
+            "h.Id, h.EmployeeId, h.Annee, h.Mois, h.Heures15, h.Heures30, h.Heures50, h.Heures60, h.Heures100, " +
+            "h.TauxHoraireBase, h.Montant15, h.Montant30, h.Montant50, h.Montant60, h.Montant100, h.MontantTotal, " +
             "h.Commentaire, h.DateCreation, h.DateModification";
 
         public HeureSupplementaireService(
@@ -29,6 +30,13 @@ namespace IUTSCalculator.Services
             _sqliteService = sqliteService ?? throw new ArgumentNullException(nameof(sqliteService));
             _auditService = auditService;
             _periodePaieService = periodePaieService;
+            _baremeService = new BaremeHeuresSupService(sqliteService);
+        }
+
+        /// <summary>Barème de majorations applicable au mois (RH-08 : taux datés).</summary>
+        public Task<BaremeHeuresSup> BaremeApplicableAsync(int annee, int mois)
+        {
+            return _baremeService.ApplicableAsync(annee, mois);
         }
 
         /// <summary>
@@ -38,6 +46,7 @@ namespace IUTSCalculator.Services
         public async Task<List<HeureSupplementaire>> ChargerSaisieMoisAsync(int annee, int mois)
         {
             var resultat = new List<HeureSupplementaire>();
+            var bareme = await _baremeService.ApplicableAsync(annee, mois);
 
             using (var conn = _sqliteService.CreateConnection())
             {
@@ -99,7 +108,7 @@ namespace IUTSCalculator.Services
                         existant.Matricule = emp.Matricule;
                         existant.NomComplet = emp.Nom;
                         existant.SalaireDeBase = emp.SalaireBase;
-                        existant.RecalculerMontants();
+                        existant.AppliquerBareme(bareme);
                         existant.EstModifie = false;
                         resultat.Add(existant);
                     }
@@ -117,12 +126,14 @@ namespace IUTSCalculator.Services
                             Heures15 = 0m,
                             Heures30 = 0m,
                             Heures50 = 0m,
+                            Heures60 = 0m,
                             Heures100 = 0m,
                             DateCreation = DateTime.Now,
                             DateModification = DateTime.Now,
                             EstModifie = false
                         };
-                        nouveau.RecalculerMontants();
+                        nouveau.AppliquerBareme(bareme);
+                        nouveau.EstModifie = false;
                         resultat.Add(nouveau);
                     }
                 }
@@ -151,7 +162,11 @@ namespace IUTSCalculator.Services
                 {
                     if (await reader.ReadAsync())
                     {
-                        return Lire(reader);
+                        var hs = Lire(reader);
+                        // Taux du mois, montants tels qu'enregistrés (ApportAsync revalorise ensuite).
+                        hs.AppliquerBareme(BaremeHeuresSupService.Applicable(conn, new DateTime(annee, mois, 1)), revaloriser: false);
+                        hs.EstModifie = false;
+                        return hs;
                     }
                 }
             }
@@ -173,17 +188,22 @@ namespace IUTSCalculator.Services
                     $"La période de paie {mois:D2}/{annee} est clôturée. Impossible de modifier les heures supplémentaires.");
             }
 
+            // Un seul circuit par salarié et par mois (défaut n° 23 du guide) : refuser les
+            // heures du module pour un salarié qui a déjà une variable HSUP ce mois-ci.
+            await VerifierSansVariableHsupAsync(annee, mois, lignes);
+
             int enregistres = 0;
             decimal montantTotalSaisi = 0m;
             decimal totalHeuresSaisies = 0m;
             DateTime now = DateTime.Now;
+            var bareme = await _baremeService.ApplicableAsync(annee, mois);
 
             using (var conn = _sqliteService.CreateConnection())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var hs in lignes)
                 {
-                    hs.RecalculerMontants();
+                    hs.AppliquerBareme(bareme);
 
                     // Si toutes les heures sont nulles et qu'il n'existe pas en base, on ne crée pas de ligne vide inutile
                     if (hs.Id == 0 && hs.TotalHeures <= 0m && string.IsNullOrWhiteSpace(hs.Commentaire))
@@ -197,13 +217,13 @@ namespace IUTSCalculator.Services
                             cmd.CommandText = @"
                                 INSERT INTO HeuresSupplementaires (
                                     EmployeeId, Annee, Mois,
-                                    Heures15, Heures30, Heures50, Heures100,
-                                    TauxHoraireBase, Montant15, Montant30, Montant50, Montant100, MontantTotal,
+                                    Heures15, Heures30, Heures50, Heures60, Heures100,
+                                    TauxHoraireBase, Montant15, Montant30, Montant50, Montant60, Montant100, MontantTotal,
                                     Commentaire, DateCreation, DateModification
                                 ) VALUES (
                                     @emp, @a, @m,
-                                    @h15, @h30, @h50, @h100,
-                                    @th, @m15, @m30, @m50, @m100, @mtot,
+                                    @h15, @h30, @h50, @h60, @h100,
+                                    @th, @m15, @m30, @m50, @m60, @m100, @mtot,
                                     @comm, @dc, @dm
                                 );";
                             cmd.Parameters.AddWithValue("@emp", hs.EmployeeId);
@@ -212,11 +232,13 @@ namespace IUTSCalculator.Services
                             cmd.Parameters.AddWithValue("@h15", DbValue.DecimalToDb(hs.Heures15));
                             cmd.Parameters.AddWithValue("@h30", DbValue.DecimalToDb(hs.Heures30));
                             cmd.Parameters.AddWithValue("@h50", DbValue.DecimalToDb(hs.Heures50));
+                            cmd.Parameters.AddWithValue("@h60", DbValue.DecimalToDb(hs.Heures60));
                             cmd.Parameters.AddWithValue("@h100", DbValue.DecimalToDb(hs.Heures100));
                             cmd.Parameters.AddWithValue("@th", DbValue.MoneyToDb(hs.TauxHoraireBase));
                             cmd.Parameters.AddWithValue("@m15", DbValue.MoneyToDb(hs.Montant15));
                             cmd.Parameters.AddWithValue("@m30", DbValue.MoneyToDb(hs.Montant30));
                             cmd.Parameters.AddWithValue("@m50", DbValue.MoneyToDb(hs.Montant50));
+                            cmd.Parameters.AddWithValue("@m60", DbValue.MoneyToDb(hs.Montant60));
                             cmd.Parameters.AddWithValue("@m100", DbValue.MoneyToDb(hs.Montant100));
                             cmd.Parameters.AddWithValue("@mtot", DbValue.MoneyToDb(hs.MontantTotal));
                             cmd.Parameters.AddWithValue("@comm", hs.Commentaire ?? string.Empty);
@@ -230,19 +252,21 @@ namespace IUTSCalculator.Services
                         {
                             cmd.CommandText = @"
                                 UPDATE HeuresSupplementaires SET
-                                    Heures15 = @h15, Heures30 = @h30, Heures50 = @h50, Heures100 = @h100,
-                                    TauxHoraireBase = @th, Montant15 = @m15, Montant30 = @m30, Montant50 = @m50, Montant100 = @m100, MontantTotal = @mtot,
+                                    Heures15 = @h15, Heures30 = @h30, Heures50 = @h50, Heures60 = @h60, Heures100 = @h100,
+                                    TauxHoraireBase = @th, Montant15 = @m15, Montant30 = @m30, Montant50 = @m50, Montant60 = @m60, Montant100 = @m100, MontantTotal = @mtot,
                                     Commentaire = @comm, DateModification = @dm
                                 WHERE Id = @id;";
                             cmd.Parameters.AddWithValue("@id", hs.Id);
                             cmd.Parameters.AddWithValue("@h15", DbValue.DecimalToDb(hs.Heures15));
                             cmd.Parameters.AddWithValue("@h30", DbValue.DecimalToDb(hs.Heures30));
                             cmd.Parameters.AddWithValue("@h50", DbValue.DecimalToDb(hs.Heures50));
+                            cmd.Parameters.AddWithValue("@h60", DbValue.DecimalToDb(hs.Heures60));
                             cmd.Parameters.AddWithValue("@h100", DbValue.DecimalToDb(hs.Heures100));
                             cmd.Parameters.AddWithValue("@th", DbValue.MoneyToDb(hs.TauxHoraireBase));
                             cmd.Parameters.AddWithValue("@m15", DbValue.MoneyToDb(hs.Montant15));
                             cmd.Parameters.AddWithValue("@m30", DbValue.MoneyToDb(hs.Montant30));
                             cmd.Parameters.AddWithValue("@m50", DbValue.MoneyToDb(hs.Montant50));
+                            cmd.Parameters.AddWithValue("@m60", DbValue.MoneyToDb(hs.Montant60));
                             cmd.Parameters.AddWithValue("@m100", DbValue.MoneyToDb(hs.Montant100));
                             cmd.Parameters.AddWithValue("@mtot", DbValue.MoneyToDb(hs.MontantTotal));
                             cmd.Parameters.AddWithValue("@comm", hs.Commentaire ?? string.Empty);
@@ -296,69 +320,110 @@ namespace IUTSCalculator.Services
             if (hs == null || hs.TotalHeures <= 0m)
                 return ApportHeuresSupplementaires.Vide;
 
-            // Recalculer sur la base du salaire de base actuel du salarié
+            // Recalculer sur la base du salaire de base actuel du salarié, aux taux du
+            // barème applicable au mois (ObtenirPourEmployeAsync l'a déjà appliqué).
             hs.SalaireDeBase = employe.BaseSalary;
             hs.RecalculerMontants();
 
             if (hs.MontantTotal <= 0m)
                 return ApportHeuresSupplementaires.Vide;
 
+            return new ApportHeuresSupplementaires(LignesBulletin(hs), hs.MontantTotal, hs.TotalHeures);
+        }
+
+        /// <summary>
+        /// Lignes détaillées du bulletin, une par tranche servie. Le code et le libellé
+        /// portent le taux réellement appliqué (HS35 « Heures supplémentaires 135% ») :
+        /// avec le barème historique, on retrouve exactement HS15/HS30/HS50/HS100.
+        /// </summary>
+        public static List<LigneApport> LignesBulletin(HeureSupplementaire hs)
+        {
             var lignes = new List<LigneApport>();
+            if (hs == null) return lignes;
 
-            // Lignes détaillées pour le bulletin
-            if (hs.Heures15 > 0m && hs.Montant15 > 0m)
+            // Avec le barème de 2000, la nuit d'un jour ouvrable et le jour d'un dimanche ou
+            // d'un férié sont majorés au même taux (50 %) : les deux tranches sortaient sous
+            // le même code HS50, indiscernables dans les états (défaut n° 23 du guide). La
+            // tranche « dimanche/férié de jour » prend alors le suffixe J ; sans collision de
+            // taux (barème 2026), les codes restent ceux d'avant.
+            bool collisionFerieJour = hs.TauxFerieJour == hs.TauxNuit
+                                   || hs.TauxFerieJour == hs.TauxTranche1
+                                   || hs.TauxFerieJour == hs.TauxTranche2
+                                   || hs.TauxFerieJour == hs.TauxFerieNuit;
+
+            Ajouter(lignes, hs.Heures15, hs.Montant15, hs.TauxTranche1, null, null);
+            Ajouter(lignes, hs.Heures30, hs.Montant30, hs.TauxTranche2, null, null);
+            Ajouter(lignes, hs.Heures50, hs.Montant50, hs.TauxNuit, null, null);
+            Ajouter(lignes, hs.Heures60, hs.Montant60, hs.TauxFerieJour, "dimanche/férié", collisionFerieJour ? "J" : null);
+            Ajouter(lignes, hs.Heures100, hs.Montant100, hs.TauxFerieNuit, null, null);
+
+            return lignes;
+        }
+
+        /// <summary>
+        /// Refuse d'enregistrer des heures du module pour un salarié qui porte déjà une
+        /// variable HSUP sur le même mois (voir VariablePaieService).
+        /// </summary>
+        private async Task VerifierSansVariableHsupAsync(int annee, int mois, IEnumerable<HeureSupplementaire> lignes)
+        {
+            var salaries = lignes
+                .Where(h => h != null && h.TotalHeures > 0m && !string.IsNullOrWhiteSpace(h.EmployeeId))
+                .Select(h => h.EmployeeId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (salaries.Count == 0) return;
+
+            var enDouble = new List<string>();
+            using (var conn = _sqliteService.CreateConnection())
             {
-                lignes.Add(new LigneApport(
-                    code: "HS15",
-                    libelle: $"Heures supplémentaires 115% ({hs.Heures15:0.##} h)",
-                    sens: SensRubrique.Gain,
-                    quantite: hs.Heures15,
-                    montant: hs.Montant15,
-                    soumisIUTS: true,
-                    soumisCNSS: true,
-                    soumisTPA: true));
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='VariablesPaie';";
+                    if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 0) return;
+                }
+
+                foreach (var employe in salaries)
+                {
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT COUNT(*) FROM VariablesPaie WHERE Annee = @a AND Mois = @m " +
+                                          "AND EmployeeId = @e AND UPPER(TRIM(CodeRubrique)) = 'HSUP';";
+                        cmd.Parameters.AddWithValue("@a", annee);
+                        cmd.Parameters.AddWithValue("@m", mois);
+                        cmd.Parameters.AddWithValue("@e", employe);
+                        if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0)
+                            enDouble.Add(employe);
+                    }
+                }
             }
 
-            if (hs.Heures30 > 0m && hs.Montant30 > 0m)
+            if (enDouble.Count > 0)
             {
-                lignes.Add(new LigneApport(
-                    code: "HS30",
-                    libelle: $"Heures supplémentaires 130% ({hs.Heures30:0.##} h)",
-                    sens: SensRubrique.Gain,
-                    quantite: hs.Heures30,
-                    montant: hs.Montant30,
-                    soumisIUTS: true,
-                    soumisCNSS: true,
-                    soumisTPA: true));
+                throw new InvalidOperationException(string.Format(
+                    "Heures refusées pour {0} : une variable HSUP est déjà saisie pour {1:00}/{2} dans « Variables du mois ». " +
+                    "Supprimez-la ou n'utilisez que l'un des deux circuits, sinon les heures seraient payées deux fois. " +
+                    "Rien n'a été enregistré.", string.Join(", ", enDouble), mois, annee));
             }
+        }
 
-            if (hs.Heures50 > 0m && hs.Montant50 > 0m)
-            {
-                lignes.Add(new LigneApport(
-                    code: "HS50",
-                    libelle: $"Heures supplémentaires 150% ({hs.Heures50:0.##} h)",
-                    sens: SensRubrique.Gain,
-                    quantite: hs.Heures50,
-                    montant: hs.Montant50,
-                    soumisIUTS: true,
-                    soumisCNSS: true,
-                    soumisTPA: true));
-            }
+        private static void Ajouter(List<LigneApport> lignes, decimal heures, decimal montant, decimal taux, string precision, string suffixeCode)
+        {
+            if (heures <= 0m || montant <= 0m) return;
 
-            if (hs.Heures100 > 0m && hs.Montant100 > 0m)
-            {
-                lignes.Add(new LigneApport(
-                    code: "HS100",
-                    libelle: $"Heures supplémentaires 200% ({hs.Heures100:0.##} h)",
-                    sens: SensRubrique.Gain,
-                    quantite: hs.Heures100,
-                    montant: hs.Montant100,
-                    soumisIUTS: true,
-                    soumisCNSS: true,
-                    soumisTPA: true));
-            }
+            string code = "HS" + Math.Round(taux * 100m, 0).ToString(System.Globalization.CultureInfo.InvariantCulture) + (suffixeCode ?? "");
+            string libelle = string.IsNullOrEmpty(precision)
+                ? $"Heures supplémentaires {BaremeHeuresSup.TauxBulletin(taux)} ({heures:0.##} h)"
+                : $"Heures supplémentaires {BaremeHeuresSup.TauxBulletin(taux)} {precision} ({heures:0.##} h)";
 
-            return new ApportHeuresSupplementaires(lignes, hs.MontantTotal, hs.TotalHeures);
+            lignes.Add(new LigneApport(
+                code: code,
+                libelle: libelle,
+                sens: SensRubrique.Gain,
+                quantite: heures,
+                montant: montant,
+                soumisIUTS: true,
+                soumisCNSS: true,
+                soumisTPA: true));
         }
 
         /// <summary>
@@ -376,6 +441,8 @@ namespace IUTSCalculator.Services
 
             if (mapSalaries.Count == 0) return dico;
 
+            var bareme = await _baremeService.ApplicableAsync(annee, mois);
+
             using (var conn = _sqliteService.CreateConnection())
             using (var cmd = conn.CreateCommand())
             {
@@ -391,21 +458,11 @@ namespace IUTSCalculator.Services
                         if (mapSalaries.TryGetValue(hs.EmployeeId, out var emp))
                         {
                             hs.SalaireDeBase = emp.BaseSalary;
-                            hs.RecalculerMontants();
+                            hs.AppliquerBareme(bareme);
 
                             if (hs.MontantTotal > 0m)
                             {
-                                var lignes = new List<LigneApport>();
-                                if (hs.Heures15 > 0m && hs.Montant15 > 0m)
-                                    lignes.Add(new LigneApport("HS15", $"Heures supplémentaires 115% ({hs.Heures15:0.##} h)", SensRubrique.Gain, hs.Heures15, hs.Montant15, true, true, true));
-                                if (hs.Heures30 > 0m && hs.Montant30 > 0m)
-                                    lignes.Add(new LigneApport("HS30", $"Heures supplémentaires 130% ({hs.Heures30:0.##} h)", SensRubrique.Gain, hs.Heures30, hs.Montant30, true, true, true));
-                                if (hs.Heures50 > 0m && hs.Montant50 > 0m)
-                                    lignes.Add(new LigneApport("HS50", $"Heures supplémentaires 150% ({hs.Heures50:0.##} h)", SensRubrique.Gain, hs.Heures50, hs.Montant50, true, true, true));
-                                if (hs.Heures100 > 0m && hs.Montant100 > 0m)
-                                    lignes.Add(new LigneApport("HS100", $"Heures supplémentaires 200% ({hs.Heures100:0.##} h)", SensRubrique.Gain, hs.Heures100, hs.Montant100, true, true, true));
-
-                                dico[hs.EmployeeId] = new ApportHeuresSupplementaires(lignes, hs.MontantTotal, hs.TotalHeures);
+                                dico[hs.EmployeeId] = new ApportHeuresSupplementaires(LignesBulletin(hs), hs.MontantTotal, hs.TotalHeures);
                             }
                         }
                     }
@@ -426,11 +483,13 @@ namespace IUTSCalculator.Services
                 Heures15 = DbValue.DecimalFromDb(reader["Heures15"]),
                 Heures30 = DbValue.DecimalFromDb(reader["Heures30"]),
                 Heures50 = DbValue.DecimalFromDb(reader["Heures50"]),
+                Heures60 = DbValue.DecimalFromDb(reader["Heures60"]),
                 Heures100 = DbValue.DecimalFromDb(reader["Heures100"]),
                 TauxHoraireBase = DbValue.MoneyFromDb(reader["TauxHoraireBase"]),
                 Montant15 = DbValue.MoneyFromDb(reader["Montant15"]),
                 Montant30 = DbValue.MoneyFromDb(reader["Montant30"]),
                 Montant50 = DbValue.MoneyFromDb(reader["Montant50"]),
+                Montant60 = DbValue.MoneyFromDb(reader["Montant60"]),
                 Montant100 = DbValue.MoneyFromDb(reader["Montant100"]),
                 MontantTotal = DbValue.MoneyFromDb(reader["MontantTotal"]),
                 Commentaire = DbValue.TextFromDb(reader["Commentaire"]),

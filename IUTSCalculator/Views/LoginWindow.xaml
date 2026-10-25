@@ -19,15 +19,8 @@
                          PasswordChanged="PasswordBox_PasswordChanged"/>
             <TextBlock Text="{Binding StatusMessage}" Foreground="Red" FontSize="12" Margin="0,0,0,8" TextWrapping="Wrap"/>
             <Button Style="{StaticResource MenuButtonStyle}" Content="Se connecter" Command="{Binding LoginCommand}"/>
-                                        
-            <Button Content="Mot de passe oublié ?"
-                    Command="{Binding ResetPasswordCommand}"
-                    Height="30"
-                    Background="Transparent"
-                    Foreground="#0078D7"
-                    BorderThickness="0"
-                    HorizontalAlignment="Right"
-                    />
+            <TextBlock Text="Mot de passe oublié ? Contactez un administrateur."
+                       FontSize="11" Foreground="#888" HorizontalAlignment="Center" Margin="0,12,0,0"/>
         </StackPanel>
     </Border>
 </Window>

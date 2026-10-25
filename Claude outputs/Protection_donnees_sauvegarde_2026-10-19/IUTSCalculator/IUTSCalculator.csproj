@@ -1,0 +1,726 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\NUnit.4.3.2\build\NUnit.props" Condition="Exists('..\packages\NUnit.4.3.2\build\NUnit.props')" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{09A81460-2855-4763-AB99-4B39B012A90C}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>IUTSCalculator</RootNamespace>
+    <AssemblyName>Sigma Paie &amp; RH</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Icon-Sigma-Paie-et-RH.-svg.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="BouncyCastle.Cryptography, Version=2.0.0.0, Culture=neutral, PublicKeyToken=072edcf4a5328938, processorArchitecture=MSIL">
+      <HintPath>..\packages\BouncyCastle.Cryptography.2.6.1\lib\net461\BouncyCastle.Cryptography.dll</HintPath>
+    </Reference>
+    <Reference Include="ClosedXML, Version=0.105.0.0, Culture=neutral, PublicKeyToken=fd1eb21b62ae805b, processorArchitecture=MSIL">
+      <HintPath>..\packages\ClosedXML.0.105.0\lib\netstandard2.0\ClosedXML.dll</HintPath>
+    </Reference>
+    <Reference Include="ClosedXML.Parser, Version=1.0.0.0, Culture=neutral, PublicKeyToken=1d5f7376574c51ec, processorArchitecture=MSIL">
+      <HintPath>..\packages\ClosedXML.Parser.2.0.0\lib\netstandard2.0\ClosedXML.Parser.dll</HintPath>
+    </Reference>
+    <Reference Include="CsvHelper, Version=33.0.0.0, Culture=neutral, PublicKeyToken=8c4959082be5c823, processorArchitecture=MSIL">
+      <HintPath>..\packages\CsvHelper.33.1.0\lib\net48\CsvHelper.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml, Version=3.3.0.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
+      <HintPath>..\packages\DocumentFormat.OpenXml.3.3.0\lib\net46\DocumentFormat.OpenXml.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml.Framework, Version=3.3.0.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
+      <HintPath>..\packages\DocumentFormat.OpenXml.Framework.3.3.0\lib\net46\DocumentFormat.OpenXml.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="ExcelNumberFormat, Version=1.1.0.0, Culture=neutral, PublicKeyToken=23c6f5d73be07eca, processorArchitecture=MSIL">
+      <HintPath>..\packages\ExcelNumberFormat.1.1.0\lib\net20\ExcelNumberFormat.dll</HintPath>
+    </Reference>
+    <Reference Include="itextsharp, Version=5.5.13.4, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+      <HintPath>..\packages\iTextSharp.5.5.13.4\lib\net461\itextsharp.dll</HintPath>
+    </Reference>
+    <Reference Include="itextsharp.xmlworker, Version=5.5.13.4, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+      <HintPath>..\packages\itextsharp.xmlworker.5.5.13.4\lib\net461\itextsharp.xmlworker.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=9.0.0.6, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.9.0.6\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.Cryptography, Version=9.0.0.20, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.Cryptography.9.0.20\lib\net462\Microsoft.Bcl.Cryptography.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.HashCode, Version=6.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.HashCode.6.0.0\lib\net462\Microsoft.Bcl.HashCode.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.IO.RecyclableMemoryStream, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.IO.RecyclableMemoryStream.3.0.1\lib\netstandard2.0\Microsoft.IO.RecyclableMemoryStream.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework, Version=4.3.2.0, Culture=neutral, PublicKeyToken=2638cd05610744eb, processorArchitecture=MSIL">
+      <HintPath>..\packages\NUnit.4.3.2\lib\net462\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework.legacy, Version=4.3.2.0, Culture=neutral, PublicKeyToken=2638cd05610744eb, processorArchitecture=MSIL">
+      <HintPath>..\packages\NUnit.4.3.2\lib\net462\nunit.framework.legacy.dll</HintPath>
+    </Reference>
+    <Reference Include="RBush, Version=4.0.0.0, Culture=neutral, PublicKeyToken=c77e27b81f4d0187, processorArchitecture=MSIL">
+      <HintPath>..\packages\RBush.Signed.4.0.0\lib\net47\RBush.dll</HintPath>
+    </Reference>
+    <Reference Include="SixLabors.Fonts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=d998eea7b14cab13, processorArchitecture=MSIL">
+      <HintPath>..\packages\SixLabors.Fonts.1.0.0\lib\netstandard2.0\SixLabors.Fonts.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.6.1\lib\net462\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ComponentModel.Annotations, Version=4.2.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ComponentModel.Annotations.5.0.0\lib\net461\System.ComponentModel.Annotations.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.SQLite, Version=1.0.119.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.119.0\lib\net46\System.Data.SQLite.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Formats.Asn1, Version=9.0.0.20, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Formats.Asn1.9.0.20\lib\net462\System.Formats.Asn1.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Memory, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.6.3\lib\net462\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.6.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.6.1\lib\net462\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.1.2\lib\net462\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Security.AccessControl, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.AccessControl.6.0.0\lib\net461\System.Security.AccessControl.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Xml, Version=9.0.0.20, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Cryptography.Xml.9.0.20\lib\net462\System.Security.Cryptography.Xml.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Principal.Windows, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Principal.Windows.5.0.0\lib\net461\System.Security.Principal.Windows.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encodings.Web.8.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json, Version=8.0.0.5, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.8.0.5\lib\net462\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.AccessControl, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.AccessControl.8.0.0\lib\net462\System.Threading.AccessControl.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Channels, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Channels.8.0.0\lib\net462\System.Threading.Channels.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.4.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.6.3\lib\net462\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xaml">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Compile Include="Converters\BooleanToTextConverter.cs" />
+    <Compile Include="Converters\BoolToTypeConverter.cs" />
+    <Compile Include="Converters\PourcentageConverter.cs" />
+    <Compile Include="Converters\DecimalToStringConverter.cs" />
+    <Compile Include="Converters\StringEqualsConverter.cs" />
+    <Compile Include="Helpers\Constants.cs" />
+    <Compile Include="Helpers\EditionTranches.cs" />
+    <Compile Include="Helpers\RelayCommand.cs" />
+    <Compile Include="Models\AppSettings.cs" />
+    <Compile Include="Models\Bulletin.cs" />
+    <Compile Include="Models\BulletinTemplate.cs" />
+    <Compile Include="Models\Rubrique.cs" />
+    <Compile Include="Models\BaremeLegal.cs" />
+    <Compile Include="Models\PeriodePaie.cs" />
+    <Compile Include="Models\PersonneACharge.cs" />
+    <Compile Include="Models\VariablePaie.cs" />
+    <Compile Include="Models\Absence.cs" />
+    <Compile Include="Models\Pret.cs" />
+    <Compile Include="Models\ProfilPaie.cs" />
+    <Compile Include="Models\DeclarationCnss.cs" />
+    <Compile Include="Models\DeclarationIutsTpa.cs" />
+    <Compile Include="Models\LivrePaie.cs" />
+    <Compile Include="Models\EtatAnnuelSalaires.cs" />
+    <Compile Include="Models\TableauBordMasseSalariale.cs" />
+    <Compile Include="Models\EcritureComptable.cs" />
+    <Compile Include="Models\OrdreVirement.cs" />
+    <Compile Include="Models\EntreeAudit.cs" />
+    <Compile Include="Models\HeureSupplementaire.cs" />
+    <Compile Include="Models\ConventionCollective.cs" />
+    <Compile Include="Models\GrilleSalaire.cs" />
+    <Compile Include="Models\TrancheAnciennete.cs" />
+    <Compile Include="Models\CalculAncienneteResultat.cs" />
+    <Compile Include="Models\MotifDepart.cs" />
+    <Compile Include="Models\SoldeToutCompte.cs" />
+    <Compile Include="Models\SaisieOpposition.cs" />
+    <Compile Include="Models\RappelPaie.cs" />
+    <Compile Include="Models\ApportRappels.cs" />
+    <Compile Include="Models\AvantageNature.cs" />
+    <Compile Include="Models\Organigramme.cs" />
+    <Compile Include="Models\FichePoste.cs" />
+    <Compile Include="Models\Evaluation.cs" />
+    <Compile Include="Models\Formation.cs" />
+    <Compile Include="Models\Recrutement.cs" />
+    <Compile Include="Models\BaremeHeuresSup.cs" />
+    <Compile Include="Models\GestionTemps.cs" />
+    <Compile Include="Models\Discipline.cs" />
+    <Compile Include="Models\SanteSecurite.cs" />
+    <Compile Include="Models\Dossier.cs" />
+    <Compile Include="Models\PayslipMonthly.cs" />
+    <Compile Include="Models\UserAccount.cs" />
+    <Compile Include="Services\DataService.cs" />
+    <Compile Include="Services\EmployeeCsvService.cs" />
+    <Compile Include="Services\DossierRegistryService.cs" />
+    <Compile Include="Services\DossierSession.cs" />
+    <Compile Include="Services\ExcelExportHelper.cs" />
+    <Compile Include="Services\PDFExportService.cs" />
+    <Compile Include="Services\BulletinService.cs" />
+    <Compile Include="Services\BulletinExportService.cs" />
+    <Compile Include="Services\QrCodeService.cs" />
+    <Compile Include="Services\DbValue.cs" />
+    <Compile Include="Services\RubriqueService.cs" />
+    <Compile Include="Services\BaremeService.cs" />
+    <Compile Include="Services\PeriodePaieService.cs" />
+    <Compile Include="Services\PersonneAChargeService.cs" />
+    <Compile Include="Services\VariablePaieService.cs" />
+    <Compile Include="Services\AbsenceService.cs" />
+    <Compile Include="Services\AbsenceExcelService.cs" />
+    <Compile Include="Services\PretService.cs" />
+    <Compile Include="Services\ProfilPaieService.cs" />
+    <Compile Include="Services\ApportVariables.cs" />
+    <Compile Include="Services\DeclarationCnssService.cs" />
+    <Compile Include="Services\DeclarationIutsTpaService.cs" />
+    <Compile Include="Services\ParametresSociaux.cs" />
+    <Compile Include="Services\ControleEquivalenceService.cs" />
+    <Compile Include="Services\DeclarationCnssExportService.cs" />
+    <Compile Include="Services\DeclarationIutsTpaExportService.cs" />
+    <Compile Include="Services\LivrePaieService.cs" />
+    <Compile Include="Services\LivrePaieExportService.cs" />
+    <Compile Include="Services\EtatAnnuelSalairesService.cs" />
+    <Compile Include="Services\EtatAnnuelSalairesExportService.cs" />
+    <Compile Include="Services\TableauBordMasseSalarialeService.cs" />
+    <Compile Include="Services\TableauBordMasseSalarialeExportService.cs" />
+    <Compile Include="Services\EcriturePaieService.cs" />
+    <Compile Include="Services\EcriturePaieExportService.cs" />
+    <Compile Include="Services\OrdreVirementService.cs" />
+    <Compile Include="Services\OrdreVirementExportService.cs" />
+    <Compile Include="Services\AuditService.cs" />
+    <Compile Include="Services\AuditExportService.cs" />
+    <Compile Include="Services\HeureSupplementaireService.cs" />
+    <Compile Include="Services\HeuresSupExportService.cs" />
+    <Compile Include="Services\ConventionCollectiveService.cs" />
+    <Compile Include="Services\SoldeToutCompteService.cs" />
+    <Compile Include="Services\SoldeToutCompteExportService.cs" />
+    <Compile Include="Services\SaisieOppositionService.cs" />
+    <Compile Include="Services\SaisieOppositionExportService.cs" />
+    <Compile Include="Services\RappelPaieService.cs" />
+    <Compile Include="Services\RappelPaieExportService.cs" />
+    <Compile Include="Services\AvantageNatureService.cs" />
+    <Compile Include="Services\AvantageNatureExportService.cs" />
+    <Compile Include="Services\OrganigrammeService.cs" />
+    <Compile Include="Services\OrganigrammeExportService.cs" />
+    <Compile Include="Services\FichePosteService.cs" />
+    <Compile Include="Services\FichePosteExportService.cs" />
+    <Compile Include="Services\EvaluationService.cs" />
+    <Compile Include="Services\EvaluationExportService.cs" />
+    <Compile Include="Services\FormationService.cs" />
+    <Compile Include="Services\FormationExportService.cs" />
+    <Compile Include="Services\RecrutementService.cs" />
+    <Compile Include="Services\RecrutementExportService.cs" />
+    <Compile Include="Services\BaremeHeuresSupService.cs" />
+    <Compile Include="Services\CalculTemps.cs" />
+    <Compile Include="Services\GestionTempsService.cs" />
+    <Compile Include="Services\GestionTempsExcelService.cs" />
+    <Compile Include="Services\ControleDiscipline.cs" />
+    <Compile Include="Services\DisciplineService.cs" />
+    <Compile Include="Services\DisciplineExportService.cs" />
+    <Compile Include="Services\ControleSanteSecurite.cs" />
+    <Compile Include="Services\SanteSecuriteService.cs" />
+    <Compile Include="Services\SanteSecuriteExportService.cs" />
+    <Compile Include="Services\RattrapageCnssService.cs" />
+    <Compile Include="Services\SQLiteService.cs" />
+    <Compile Include="Services\TaxCalculatorService.cs" />
+    <Compile Include="Services\TaxDataService.cs" />
+    <Compile Include="Services\TaxParametersUpdatedEventArgs.cs" />
+    <Compile Include="Services\UserAccountService.cs" />
+    <Compile Include="Services\UserSession.cs" />
+    <Compile Include="ViewModels\BaseSalaryEstimatorViewModel.cs" />
+    <Compile Include="ViewModels\BaseViewModel.cs" />
+    <Compile Include="ViewModels\BatchSalaryCalculationViewModel.cs" />
+    <Compile Include="ViewModels\BatchSalaryEstimationViewModel.cs" />
+    <Compile Include="ViewModels\CalculationViewModel.cs" />
+    <Compile Include="ViewModels\DossierSelectionViewModel.cs" />
+    <Compile Include="ViewModels\EmployeeManagementViewModel.cs" />
+    <Compile Include="ViewModels\HistoryViewModel.cs" />
+    <Compile Include="ViewModels\LoginViewModel.cs" />
+    <Compile Include="ViewModels\MainViewModel.cs" />
+    <Compile Include="ViewModels\PayslipMonthlyViewModel.cs" />
+    <Compile Include="ViewModels\BulletinViewModel.cs" />
+    <Compile Include="ViewModels\BulletinBatchViewModel.cs" />
+    <Compile Include="ViewModels\BulletinTemplateOption.cs" />
+    <Compile Include="ViewModels\SelectableEmployee.cs" />
+    <Compile Include="ViewModels\MoisSelectionnable.cs" />
+    <Compile Include="ViewModels\RubriqueViewModel.cs" />
+    <Compile Include="ViewModels\BaremeViewModel.cs" />
+    <Compile Include="ViewModels\PeriodePaieViewModel.cs" />
+    <Compile Include="ViewModels\DeclarationCnssViewModel.cs" />
+    <Compile Include="ViewModels\DeclarationIutsTpaViewModel.cs" />
+    <Compile Include="ViewModels\LivrePaieViewModel.cs" />
+    <Compile Include="ViewModels\EtatAnnuelSalairesViewModel.cs" />
+    <Compile Include="ViewModels\TableauBordMasseSalarialeViewModel.cs" />
+    <Compile Include="ViewModels\EcriturePaieViewModel.cs" />
+    <Compile Include="ViewModels\OrdreVirementViewModel.cs" />
+    <Compile Include="ViewModels\ControleEquivalenceViewModel.cs" />
+    <Compile Include="ViewModels\VariablePaieViewModel.cs" />
+    <Compile Include="ViewModels\AbsenceViewModel.cs" />
+    <Compile Include="ViewModels\PretViewModel.cs" />
+    <Compile Include="ViewModels\ProfilPaieViewModel.cs" />
+    <Compile Include="ViewModels\AuditViewModel.cs" />
+    <Compile Include="ViewModels\HeuresSupplementairesViewModel.cs" />
+    <Compile Include="ViewModels\ConventionCollectiveViewModel.cs" />
+    <Compile Include="ViewModels\SoldeToutCompteViewModel.cs" />
+    <Compile Include="ViewModels\SaisieOppositionViewModel.cs" />
+    <Compile Include="ViewModels\RappelPaieViewModel.cs" />
+    <Compile Include="ViewModels\AvantageNatureViewModel.cs" />
+    <Compile Include="ViewModels\OrganigrammeViewModel.cs" />
+    <Compile Include="ViewModels\SuiviPostesBudgetViewModel.cs" />
+    <Compile Include="ViewModels\EntretiensEvaluationsViewModel.cs" />
+    <Compile Include="ViewModels\FormationViewModel.cs" />
+    <Compile Include="ViewModels\RecrutementViewModel.cs" />
+    <Compile Include="ViewModels\GestionTempsViewModel.cs" />
+    <Compile Include="ViewModels\DisciplineViewModel.cs" />
+    <Compile Include="ViewModels\SanteSecuriteViewModel.cs" />
+    <Compile Include="ViewModels\SettingsViewModel.cs" />
+    <Compile Include="Views\BaseSalaryEstimatorView.xaml.cs">
+      <DependentUpon>BaseSalaryEstimatorView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BatchSalaryCalculationView.xaml.cs">
+      <DependentUpon>BatchSalaryCalculationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BatchSalaryEstimationView.xaml.cs">
+      <DependentUpon>BatchSalaryEstimationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\CalculationView.xaml.cs">
+      <DependentUpon>CalculationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Licensing\LicenceFormat.cs" />
+    <Compile Include="Licensing\LicenceModules.cs" />
+    <Compile Include="Licensing\LicenceClesPubliques.cs" />
+    <Compile Include="Licensing\EmpreinteMachine.cs" />
+    <Compile Include="Licensing\EtatLicence.cs" />
+    <Compile Include="Licensing\LicenceService.cs" />
+    <Compile Include="Licensing\GardeIntegrite.cs" />
+    <Compile Include="Views\DossierSelectionWindow.xaml.cs">
+      <DependentUpon>DossierSelectionWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\CreerAdminWindow.xaml.cs">
+      <DependentUpon>CreerAdminWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\UserManagementWindow.xaml.cs">
+      <DependentUpon>UserManagementWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ActivationWindow.xaml.cs">
+      <DependentUpon>ActivationWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\HistoryView.xaml.cs">
+      <DependentUpon>HistoryView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\LoginWindow.xaml.cs">
+      <DependentUpon>LoginWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BulletinView.xaml.cs">
+      <DependentUpon>BulletinView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BulletinBatchView.xaml.cs">
+      <DependentUpon>BulletinBatchView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\PasswordResetWindow.xaml.cs">
+      <DependentUpon>PasswordResetWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SettingsView.xaml.cs">
+      <DependentUpon>SettingsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\EmployeeManagementView.xaml.cs">
+      <DependentUpon>EmployeeManagementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RubriqueView.xaml.cs">
+      <DependentUpon>RubriqueView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BaremeView.xaml.cs">
+      <DependentUpon>BaremeView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\PeriodePaieView.xaml.cs">
+      <DependentUpon>PeriodePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DeclarationCnssView.xaml.cs">
+      <DependentUpon>DeclarationCnssView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DeclarationIutsTpaView.xaml.cs">
+      <DependentUpon>DeclarationIutsTpaView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ControleEquivalenceView.xaml.cs">
+      <DependentUpon>ControleEquivalenceView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\VariablePaieView.xaml.cs">
+      <DependentUpon>VariablePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AbsenceView.xaml.cs">
+      <DependentUpon>AbsenceView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\PretView.xaml.cs">
+      <DependentUpon>PretView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ProfilPaieView.xaml.cs">
+      <DependentUpon>ProfilPaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\LivrePaieView.xaml.cs">
+      <DependentUpon>LivrePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\EtatAnnuelSalairesView.xaml.cs">
+      <DependentUpon>EtatAnnuelSalairesView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\TableauBordMasseSalarialeView.xaml.cs">
+      <DependentUpon>TableauBordMasseSalarialeView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\EcriturePaieView.xaml.cs">
+      <DependentUpon>EcriturePaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\OrdreVirementView.xaml.cs">
+      <DependentUpon>OrdreVirementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AuditView.xaml.cs">
+      <DependentUpon>AuditView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\HeuresSupplementairesView.xaml.cs">
+      <DependentUpon>HeuresSupplementairesView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ConventionCollectiveView.xaml.cs">
+      <DependentUpon>ConventionCollectiveView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SoldeToutCompteView.xaml.cs">
+      <DependentUpon>SoldeToutCompteView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SaisieOppositionView.xaml.cs">
+      <DependentUpon>SaisieOppositionView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RappelPaieView.xaml.cs">
+      <DependentUpon>RappelPaieView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AvantageNatureView.xaml.cs">
+      <DependentUpon>AvantageNatureView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\OrganigrammeView.xaml.cs">
+      <DependentUpon>OrganigrammeView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SuiviPostesBudgetView.xaml.cs">
+      <DependentUpon>SuiviPostesBudgetView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\EntretiensEvaluationsView.xaml.cs">
+      <DependentUpon>EntretiensEvaluationsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\FormationView.xaml.cs">
+      <DependentUpon>FormationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\RecrutementView.xaml.cs">
+      <DependentUpon>RecrutementView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\GestionTempsView.xaml.cs">
+      <DependentUpon>GestionTempsView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\DisciplineView.xaml.cs">
+      <DependentUpon>DisciplineView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SanteSecuriteView.xaml.cs">
+      <DependentUpon>SanteSecuriteView.xaml</DependentUpon>
+    </Compile>
+    <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Page Include="Resources\DarkTheme.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\BaseSalaryEstimatorView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\BatchSalaryCalculationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\BatchSalaryEstimationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\CalculationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DossierSelectionWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\CreerAdminWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\UserManagementWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ActivationWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\HistoryView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\LoginWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\BulletinView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\BulletinBatchView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\PasswordResetWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SettingsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\EmployeeManagementView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RubriqueView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\BaremeView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\PeriodePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DeclarationCnssView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DeclarationIutsTpaView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ControleEquivalenceView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\VariablePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AbsenceView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\PretView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ProfilPaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\LivrePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\EtatAnnuelSalairesView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\TableauBordMasseSalarialeView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\EcriturePaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\OrdreVirementView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AuditView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\HeuresSupplementairesView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\ConventionCollectiveView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SoldeToutCompteView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SaisieOppositionView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RappelPaieView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AvantageNatureView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\OrganigrammeView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SuiviPostesBudgetView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\EntretiensEvaluationsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\FormationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\RecrutementView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\GestionTempsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\DisciplineView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\SanteSecuriteView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Models\Employee.cs" />
+    <Compile Include="Models\FamilyCharge.cs" />
+    <Compile Include="Models\TaxBracket.cs" />
+    <Compile Include="Models\TaxCalculation.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <None Include="packages.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icon-Sigma-Paie-et-RH.-svg.ico" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Ce projet fait référence à des packages NuGet qui sont manquants sur cet ordinateur. Utilisez l'option de restauration des packages NuGet pour les télécharger. Pour plus d'informations, consultez http://go.microsoft.com/fwlink/?LinkID=322105. Le fichier manquant est : {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\NUnit.4.3.2\build\NUnit.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\NUnit.4.3.2\build\NUnit.props'))" />
+    <Error Condition="!Exists('..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.119.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.119.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets'))" />
+    <Error Condition="!Exists('..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets'))" />
+  </Target>
+  <Import Project="..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.119.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets" Condition="Exists('..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.119.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" />
+  <Import Project="..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets" Condition="Exists('..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets')" />
+</Project>

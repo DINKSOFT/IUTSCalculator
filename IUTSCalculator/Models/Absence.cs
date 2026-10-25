@@ -74,6 +74,7 @@ namespace IUTSCalculator.Models
         private decimal _nombreHeures;
         private string _commentaire;
         private DateTime _dateSaisie = DateTime.Now;
+        private string _periodeImputation;
 
         public int Id
         {
@@ -167,6 +168,46 @@ namespace IUTSCalculator.Models
             set { Definir(ref _dateSaisie, value); }
         }
 
+        /// <summary>
+        /// Mois de paie (« yyyy-MM ») auquel l'absence est imputée EN ENTIER, quelles que
+        /// soient ses dates. Renseigné par la Gestion des temps (RH-08) quand la période
+        /// de pointage ne suit pas le mois civil : une absence du 25 septembre relevée sur
+        /// la période du 21 septembre au 20 octobre se retient sur la paie d'octobre.
+        /// Vide pour une absence saisie dans l'écran des congés : elle reste répartie sur
+        /// les mois civils qu'elle touche, comme avant.
+        /// </summary>
+        public string PeriodeImputation
+        {
+            get { return _periodeImputation; }
+            set { Definir(ref _periodeImputation, string.IsNullOrWhiteSpace(value) ? null : value.Trim()); }
+        }
+
+        /// <summary>Vrai si l'absence est imputée à un mois de paie précis (RH-08).</summary>
+        public bool EstImputee
+        {
+            get { return !string.IsNullOrEmpty(_periodeImputation); }
+        }
+
+        /// <summary>Premier jour du mois d'imputation, ou null.</summary>
+        public DateTime? MoisImputation
+        {
+            get
+            {
+                DateTime mois;
+                if (EstImputee && DateTime.TryParseExact(_periodeImputation + "-01", "yyyy-MM-dd",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out mois))
+                    return mois;
+                return null;
+            }
+        }
+
+        /// <summary>Clé d'imputation d'un mois : 2026-10.</summary>
+        public static string CleImputation(int annee, int mois)
+        {
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:D4}-{1:D2}", annee, mois);
+        }
+
         /// <summary>Le salarié est-il payé pendant cette absence ?</summary>
         public bool EstRemuneree
         {
@@ -177,6 +218,26 @@ namespace IUTSCalculator.Models
         public bool ImputeSurConges
         {
             get { return Type == TypeAbsence.CongePaye; }
+        }
+
+        /// <summary>
+        /// Équivalence heures / jour retenue par le client (19 octobre 2026) : 8 heures valent
+        /// une journée. Elle sert dans les deux sens — une absence saisie en heures seulement
+        /// se compte en jours (4 h = 0,5 j) ; au taux horaire, une absence saisie en jours
+        /// seulement se compte en heures (1 j = 8 h).
+        /// </summary>
+        public const decimal HeuresParJour = 8m;
+
+        /// <summary>Jours de l'absence : les jours saisis, à défaut les heures converties.</summary>
+        public decimal JoursEquivalents
+        {
+            get { return NombreJours > 0m ? NombreJours : (NombreHeures > 0m ? NombreHeures / HeuresParJour : 0m); }
+        }
+
+        /// <summary>Heures de l'absence : les heures saisies, à défaut les jours convertis.</summary>
+        public decimal HeuresEquivalentes
+        {
+            get { return NombreHeures > 0m ? NombreHeures : NombreJours * HeuresParJour; }
         }
 
         /// <summary>Vrai si l'absence donne lieu à une retenue sur le salaire.</summary>
@@ -277,7 +338,8 @@ namespace IUTSCalculator.Models
                 NombreJours = NombreJours,
                 NombreHeures = NombreHeures,
                 Commentaire = Commentaire,
-                DateSaisie = DateSaisie
+                DateSaisie = DateSaisie,
+                PeriodeImputation = PeriodeImputation
             };
         }
 
@@ -322,10 +384,16 @@ namespace IUTSCalculator.Models
         /// <summary>Jours d'absence non rémunérée sur la période de paie en cours.</summary>
         public decimal JoursNonRemuneresPeriode { get; set; }
 
-        /// <summary>Reliquat : acquis moins pris. Peut être négatif si l'entreprise a avancé des congés.</summary>
+        /// <summary>Solde repris à l'ouverture du dossier (fiche salarié), 0 sans reprise.</summary>
+        public decimal JoursRepris { get; set; }
+
+        /// <summary>Date du solde repris, ou null si le compteur part de l'entrée.</summary>
+        public DateTime? DateReprise { get; set; }
+
+        /// <summary>Reliquat : repris + acquis − pris. Peut être négatif si l'entreprise a avancé des congés.</summary>
         public decimal Solde
         {
-            get { return JoursAcquis - JoursPris; }
+            get { return JoursRepris + JoursAcquis - JoursPris; }
         }
 
         /// <summary>Vrai si le salarié a pris plus de congés qu'il n'en a acquis.</summary>

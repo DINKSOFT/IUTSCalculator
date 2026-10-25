@@ -1,0 +1,891 @@
+<UserControl x:Class="IUTSCalculator.Views.RecrutementView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:models="clr-namespace:IUTSCalculator.Models"
+             xmlns:viewmodels="clr-namespace:IUTSCalculator.ViewModels"
+             mc:Ignorable="d" 
+             d:DesignHeight="850" d:DesignWidth="1200"
+             Background="{StaticResource GroundBrush}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- Style bouton icône Segoe -->
+        <Style x:Key="IconButtonStyle" TargetType="Button">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
+        </Style>
+
+        <!-- Style carte KPI -->
+        <Style x:Key="KpiCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="4"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Bandeau supérieur Titre & KPIs -->
+                <RowDefinition Height="Auto"/> <!-- Barre d'actions globales & exports -->
+                <RowDefinition Height="*"/>    <!-- Contenu des onglets -->
+            </Grid.RowDefinitions>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 1. BANDEAU SUPÉRIEUR : TITRE & CARTOUCHES KPIS
+                 ═══════════════════════════════════════════════════════════════ -->
+            <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="14,10" Margin="0,0,0,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Titre -->
+                        <ColumnDefinition Width="*"/>    <!-- Cartouches KPIs -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Titre & Description -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{StaticResource IconPeople}" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBlock Text="Recrutement &amp; Candidatures (RH-05)" FontSize="17" FontWeight="Bold" Foreground="{StaticResource InkBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="Besoins de recrutement, vivier de talents, pipeline de sélection et intégration en fiche salarié (SAL-01)" FontSize="11" Foreground="{StaticResource InkMutedBrush}" Margin="32,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- KPIs Consolidés -->
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Border Style="{StaticResource KpiCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="BESOINS OUVERTS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource InkMutedBrush}"/>
+                                <TextBlock FontSize="15" FontWeight="Bold" Foreground="{StaticResource AccentBrush}">
+                                    <Run Text="{Binding TableauBord.BesoinsOuverts, Mode=OneWay}"/>
+                                    <Run Text="/" FontSize="11" Foreground="{StaticResource InkMutedBrush}"/>
+                                    <Run Text="{Binding TableauBord.TotalBesoins, Mode=OneWay}" FontSize="11" Foreground="{StaticResource InkMutedBrush}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource KpiCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="POSTES À POURVOIR" FontSize="9" FontWeight="Bold" Foreground="{StaticResource InkMutedBrush}"/>
+                                <TextBlock FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBlueDarkBrush}">
+                                    <Run Text="{Binding TableauBord.PostesAPourvoir, Mode=OneWay}"/>
+                                    <Run Text="postes" FontSize="10" FontWeight="Normal" Foreground="{StaticResource InkMutedBrush}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource KpiCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="EN ÉVALUATION" FontSize="9" FontWeight="Bold" Foreground="{StaticResource InkMutedBrush}"/>
+                                <TextBlock Text="{Binding TableauBord.CandidaturesEnEvaluation, Mode=OneWay}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource WarningBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource KpiCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="EMBAUCHES SAL-01" FontSize="9" FontWeight="Bold" Foreground="{StaticResource InkMutedBrush}"/>
+                                <TextBlock Text="{Binding TableauBord.CandidaturesEmbauchees, Mode=OneWay}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource KpiCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="VIVIER ACTIF" FontSize="9" FontWeight="Bold" Foreground="{StaticResource InkMutedBrush}"/>
+                                <TextBlock Text="{Binding TableauBord.TotalVivier, Mode=OneWay}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource InkBrush}"/>
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
+                </Grid>
+            </Border>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 2. BARRE D'ACTIONS GLOBALES & EXPORTS
+                 ═══════════════════════════════════════════════════════════════ -->
+            <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,10">
+                <DockPanel LastChildFill="False">
+                    <!-- Actions à gauche -->
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                        <Button Content="+ Nouveau Besoin" Command="{Binding NouveauBesoinCommand}"
+                                Background="{StaticResource AccentBrush}" Foreground="{StaticResource WhiteBrush}"
+                                FontWeight="SemiBold" Height="28" Padding="10,0" Margin="0,0,8,0" Cursor="Hand"/>
+
+                        <Button Content="+ Nouveau Candidat (Vivier)" Command="{Binding NouveauCandidatCommand}"
+                                Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource InkBrush}"
+                                BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                FontWeight="SemiBold" Height="28" Padding="10,0" Margin="0,0,8,0" Cursor="Hand"/>
+
+                        <Button Content="Postuler au Besoin Sélectionné" Command="{Binding PostulerCandidatSelectionneCommand}"
+                                Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource PrimaryBlueDarkBrush}"
+                                BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                FontWeight="SemiBold" Height="28" Padding="10,0" Margin="0,0,8,0" Cursor="Hand"/>
+                    </StackPanel>
+
+                    <!-- Exports à droite -->
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                        <Button ToolTip="Exporter le bilan complet du recrutement en Excel (4 feuilles)"
+                                Command="{Binding ExporterBilanExcelCommand}"
+                                Style="{StaticResource IconButtonStyle}" Height="28" Width="34" Margin="0,0,6,0">
+                            <TextBlock Text="{StaticResource IconExcel}" FontFamily="Segoe MDL2 Assets" Foreground="#1F7A4D" FontSize="14"/>
+                        </Button>
+
+                        <Button ToolTip="Rafraîchir les données"
+                                Command="{Binding RafraichirCommand}"
+                                Style="{StaticResource IconButtonStyle}" Height="28" Width="34">
+                            <TextBlock Text="{StaticResource IconRefresh}" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource InkMutedBrush}" FontSize="14"/>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 3. CONTENU DES 4 ONGLETS
+                 ═══════════════════════════════════════════════════════════════ -->
+            <TabControl Grid.Row="2" SelectedIndex="{Binding OngletActifIndex, Mode=TwoWay}"
+                        Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}"
+                        BorderThickness="1">
+
+                <!-- ───────────────────────────────────────────────────────────
+                     ONGLET 1 : BESOINS & POSTES DE RECRUTEMENT
+                     ─────────────────────────────────────────────────────────── -->
+                <TabItem Header="Besoins &amp; Postes">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Filtres -->
+                            <RowDefinition Height="*"/>    <!-- Master-Detail -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Filtres Besoins -->
+                        <Border Grid.Row="0" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,0,0,10">
+                            <WrapPanel VerticalAlignment="Center">
+                                <TextBlock Text="Statut :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <ComboBox SelectedValue="{Binding FiltreStatutBesoin, Mode=TwoWay}" SelectedValuePath="Content" Width="120" Height="24" Margin="0,0,15,0" FontSize="11">
+                                    <ComboBoxItem Content="Tous"/>
+                                    <ComboBoxItem Content="Brouillon"/>
+                                    <ComboBoxItem Content="Ouvert"/>
+                                    <ComboBoxItem Content="EnCours"/>
+                                    <ComboBoxItem Content="Pourvu"/>
+                                    <ComboBoxItem Content="Annule"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Recherche :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <TextBox Text="{Binding RechercheBesoin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="200" Height="24" Margin="0,0,15,0" FontSize="11" VerticalContentAlignment="Center"/>
+                            </WrapPanel>
+                        </Border>
+
+                        <!-- Master-Detail Besoins -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="6*"/> <!-- Liste Besoins -->
+                                <ColumnDefinition Width="4*"/> <!-- Détail & Édition -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Grille des Besoins -->
+                            <Border Grid.Column="0" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Margin="0,0,8,0">
+                                <DataGrid ItemsSource="{Binding BesoinsFiltres}"
+                                          SelectedItem="{Binding BesoinSelectionne, Mode=TwoWay}"
+                                          AutoGenerateColumns="False" IsReadOnly="True"
+                                          SelectionMode="Single" HeadersVisibility="Column"
+                                          RowHeaderWidth="0" GridLinesVisibility="Horizontal">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Réf." Binding="{Binding Reference}" Width="95"/>
+                                        <DataGridTextColumn Header="Intitulé du Poste" Binding="{Binding IntitulePoste}" Width="160"/>
+                                        <DataGridTextColumn Header="Département" Binding="{Binding Departement}" Width="110"/>
+                                        <DataGridTextColumn Header="Motif" Binding="{Binding MotifLibelle}" Width="100"/>
+                                        <DataGridTextColumn Header="Postes" Binding="{Binding NombrePostes}" Width="50"/>
+                                        <DataGridTextColumn Header="Recrutés" Binding="{Binding NombreRecrutes}" Width="60"/>
+                                        <DataGridTextColumn Header="Contrat" Binding="{Binding TypeContratVise}" Width="55"/>
+                                        <DataGridTextColumn Header="Statut" Binding="{Binding StatutLibelle}" Width="80"/>
+                                        <DataGridTextColumn Header="Candidats" Binding="{Binding NombreCandidatures}" Width="65"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Border>
+
+                            <!-- Panneau Détail Besoin -->
+                            <Border Grid.Column="1" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="12">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="Détails de l'expression de besoin" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10"/>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Référence :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.Reference, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Statut :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.StatutLibelle, Mode=OneWay}" IsReadOnly="True" Background="#EAEAEA" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Intitulé du poste :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBox Text="{Binding BesoinSelectionne.IntitulePoste, Mode=TwoWay}" Height="24" FontSize="11" Margin="0,2,0,6"/>
+
+                                        <!-- Motif : aucun champ ne permettait de le choisir (tout besoin restait « Création de poste ») -->
+                                        <TextBlock Text="Motif du recrutement :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <ComboBox ItemsSource="{Binding MotifsRecrutement}"
+                                                  SelectedValue="{Binding BesoinSelectionne.Motif, Mode=TwoWay}"
+                                                  SelectedValuePath="Key" DisplayMemberPath="Value"
+                                                  Height="24" FontSize="11" Margin="0,2,0,6"/>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Poste rattaché (Organigramme) :" FontSize="11" FontWeight="SemiBold"/>
+                                                <ComboBox ItemsSource="{Binding PostesDisponibles}"
+                                                          SelectedValue="{Binding BesoinSelectionne.PosteId, Mode=TwoWay}"
+                                                          SelectedValuePath="Id" DisplayMemberPath="Intitule"
+                                                          Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Département :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.Departement, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,3,0">
+                                                <TextBlock Text="Nb Postes :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.NombrePostes, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="3,0,3,0">
+                                                <TextBlock Text="Recrutés :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.NombreRecrutes, Mode=OneWay}" IsReadOnly="True" Background="#EAEAEA" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Margin="3,0,0,0">
+                                                <TextBlock Text="Contrat :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.TypeContratVise, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Rémun. Min (FCFA) :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.RemunerationProposeeMin, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Rémun. Max (FCFA) :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.RemunerationProposeeMax, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Indemnités de l'offre : reprises sur la fiche salarié à l'embauche -->
+                                        <TextBlock Text="Indemnités mensuelles proposées (FCFA) :" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,2"/>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,3,0">
+                                                <TextBlock Text="Logement :" FontSize="11"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.IndemniteLogement, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="3,0,3,0">
+                                                <TextBlock Text="Transport :" FontSize="11"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.IndemniteTransport, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Margin="3,0,3,0">
+                                                <TextBlock Text="Fonction :" FontSize="11"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.IndemniteFonction, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3" Margin="3,0,0,0">
+                                                <TextBlock Text="Sujétion :" FontSize="11"/>
+                                                <TextBox Text="{Binding BesoinSelectionne.IndemniteSujetion, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Date Expression :" FontSize="11" FontWeight="SemiBold"/>
+                                                <DatePicker SelectedDate="{Binding BesoinSelectionne.DateExpression, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Date Échéance :" FontSize="11" FontWeight="SemiBold"/>
+                                                <DatePicker SelectedDate="{Binding BesoinSelectionne.DateEcheanceSouhaitee, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Responsable du recrutement :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBox Text="{Binding BesoinSelectionne.ResponsableRecrutement, Mode=TwoWay}" Height="24" FontSize="11" Margin="0,2,0,6"/>
+
+                                        <TextBlock Text="Description du profil recherché :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBox Text="{Binding BesoinSelectionne.DescriptionProfil, Mode=TwoWay}" Height="60" TextWrapping="Wrap" AcceptsReturn="True" FontSize="11" Margin="0,2,0,10"/>
+
+                                        <!-- Boutons Action Besoin -->
+                                        <WrapPanel Margin="0,5,0,0">
+                                            <Button Content="Enregistrer" Command="{Binding EnregistrerBesoinCommand}"
+                                                    Background="{StaticResource AccentBrush}" Foreground="{StaticResource WhiteBrush}"
+                                                    FontWeight="SemiBold" Height="26" Padding="10,0" Margin="0,0,6,4" Cursor="Hand"/>
+
+                                            <Button Content="Ouvrir le besoin" Command="{Binding OuvrirBesoinCommand}"
+                                                    Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource SuccessBrush}"
+                                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                    Height="26" Padding="8,0" Margin="0,0,6,4" Cursor="Hand"/>
+
+                                            <Button Content="Pourvoir" Command="{Binding CloturerBesoinCommand}"
+                                                    Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource WarningBrush}"
+                                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                    Height="26" Padding="8,0" Margin="0,0,6,4" Cursor="Hand"/>
+
+                                            <Button Content="Supprimer" Command="{Binding SupprimerBesoinCommand}"
+                                                    Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource DangerBrush}"
+                                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                    Height="26" Padding="8,0" Margin="0,0,0,4" Cursor="Hand"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ───────────────────────────────────────────────────────────
+                     ONGLET 2 : PIPELINE DE SÉLECTION & CANDIDATURES
+                     ─────────────────────────────────────────────────────────── -->
+                <TabItem Header="Pipeline &amp; Candidatures">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Filtres Pipeline -->
+                            <RowDefinition Height="*"/>    <!-- DataGrid Pipeline -->
+                            <RowDefinition Height="Auto"/> <!-- Barre de pilotage & actions candidature -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Filtres Pipeline -->
+                        <Border Grid.Row="0" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,0,0,10">
+                            <WrapPanel VerticalAlignment="Center">
+                                <TextBlock Text="Étape :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <ComboBox SelectedValue="{Binding FiltreEtapeCandidature, Mode=TwoWay}" SelectedValuePath="Content" Width="150" Height="24" Margin="0,0,15,0" FontSize="11">
+                                    <ComboBoxItem Content="Toutes"/>
+                                    <ComboBoxItem Content="ReceptionCandidature"/>
+                                    <ComboBoxItem Content="TriEtPreselection"/>
+                                    <ComboBoxItem Content="TestTechniqueOuEcrit"/>
+                                    <ComboBoxItem Content="EntretienRH"/>
+                                    <ComboBoxItem Content="EntretienManagerN1"/>
+                                    <ComboBoxItem Content="EntretienDirection"/>
+                                    <ComboBoxItem Content="DecisionEtOffre"/>
+                                    <ComboBoxItem Content="Finalisee"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Statut :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <ComboBox SelectedValue="{Binding FiltreStatutCandidature, Mode=TwoWay}" SelectedValuePath="Content" Width="120" Height="24" Margin="0,0,15,0" FontSize="11">
+                                    <ComboBoxItem Content="Toutes"/>
+                                    <ComboBoxItem Content="Nouvelle"/>
+                                    <ComboBoxItem Content="EnEvaluation"/>
+                                    <ComboBoxItem Content="Retenue"/>
+                                    <ComboBoxItem Content="Rejetee"/>
+                                    <ComboBoxItem Content="Embauchee"/>
+                                    <ComboBoxItem Content="Desistee"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Recherche :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <TextBox Text="{Binding RechercheCandidature, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="200" Height="24" FontSize="11" VerticalContentAlignment="Center"/>
+                            </WrapPanel>
+                        </Border>
+
+                        <!-- DataGrid Pipeline -->
+                        <Border Grid.Row="1" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3">
+                            <DataGrid ItemsSource="{Binding CandidaturesFiltrees}"
+                                      SelectedItem="{Binding CandidatureSelectionnee, Mode=TwoWay}"
+                                      AutoGenerateColumns="False" IsReadOnly="True"
+                                      SelectionMode="Single" HeadersVisibility="Column"
+                                      RowHeaderWidth="0" GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Réf. Besoin" Binding="{Binding BesoinReference}" Width="95"/>
+                                    <DataGridTextColumn Header="Poste Visé" Binding="{Binding BesoinIntitulePoste}" Width="150"/>
+                                    <DataGridTextColumn Header="Candidat" Binding="{Binding CandidatNomComplet}" Width="150"/>
+                                    <DataGridTextColumn Header="Email" Binding="{Binding CandidatEmail}" Width="150"/>
+                                    <DataGridTextColumn Header="Téléphone" Binding="{Binding CandidatTelephone}" Width="110"/>
+                                    <DataGridTextColumn Header="Postulation" Binding="{Binding DatePostulation, StringFormat=dd/MM/yyyy}" Width="85"/>
+                                    <DataGridTextColumn Header="Canal" Binding="{Binding CanalSourceLibelle}" Width="110"/>
+                                    <DataGridTextColumn Header="Étape Actuelle" Binding="{Binding EtapeActuelleLibelle}" Width="160"/>
+                                    <DataGridTextColumn Header="Statut" Binding="{Binding StatutLibelle}" Width="90"/>
+                                    <DataGridTextColumn Header="Score" Binding="{Binding ScoreEvaluation, StringFormat={}{0:F1}/20}" Width="65"/>
+                                    <DataGridTextColumn Header="Avis Global" Binding="{Binding AvisGlobalLibelle}" Width="100"/>
+                                    <DataGridTextColumn Header="Salarié Créé" Binding="{Binding SalarieCreeMatricule}" Width="95"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+
+                        <!-- Barre de pilotage & actions d'étape -->
+                        <Border Grid.Row="2" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="10" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/> <!-- Avancement étape -->
+                                    <ColumnDefinition Width="*"/>    <!-- Statut et Embauche -->
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Boutons d'avancement d'étape -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Progression :" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <Button Content="→ Étape Suivante" Command="{Binding AvancerEtapeCommand}"
+                                            Background="{StaticResource AccentBrush}" Foreground="{StaticResource WhiteBrush}"
+                                            FontWeight="SemiBold" Height="26" Padding="10,0" Margin="0,0,6,0" Cursor="Hand"/>
+
+                                    <Button Content="Retenir" Command="{Binding RetenirCandidatureCommand}"
+                                            Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource SuccessBrush}"
+                                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                            FontWeight="SemiBold" Height="26" Padding="10,0" Margin="0,0,6,0" Cursor="Hand"/>
+
+                                    <Button Content="Rejeter" Command="{Binding RejeterCandidatureCommand}"
+                                            Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource DangerBrush}"
+                                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                            Height="26" Padding="8,0" Margin="0,0,6,0" Cursor="Hand"/>
+
+                                    <Button Content="Supprimer" Command="{Binding SupprimerCandidatureCommand}"
+                                            Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource DangerBrush}"
+                                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                            Height="26" Padding="8,0" Cursor="Hand"/>
+                                </StackPanel>
+
+                                <!-- Passerelle directe vers l'onglet Embauche -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding CandidatureSelectionnee.CandidatNomComplet, StringFormat='Sélection : {0}'}" FontSize="11" FontStyle="Italic" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <Button Content="Gérer l'Embauche (SAL-01) &gt;&gt;" Click="BasculerVersOngletEmbauche_Click"
+                                            Background="{StaticResource PrimaryBlueDarkBrush}" Foreground="{StaticResource WhiteBrush}"
+                                            FontWeight="Bold" Height="28" Padding="12,0" Cursor="Hand"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- ───────────────────────────────────────────────────────────
+                     ONGLET 3 : VIVIER DE TALENTS (CANDIDATS)
+                     ─────────────────────────────────────────────────────────── -->
+                <TabItem Header="Vivier des Candidats">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Filtres Vivier -->
+                            <RowDefinition Height="*"/>    <!-- Master-Detail Vivier -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Filtres Vivier -->
+                        <Border Grid.Row="0" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="8" Margin="0,0,0,10">
+                            <WrapPanel VerticalAlignment="Center">
+                                <TextBlock Text="Statut Vivier :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <ComboBox SelectedValue="{Binding FiltreVivierActif, Mode=TwoWay}" SelectedValuePath="Content" Width="100" Height="24" Margin="0,0,15,0" FontSize="11">
+                                    <ComboBoxItem Content="Tous"/>
+                                    <ComboBoxItem Content="Actifs"/>
+                                    <ComboBoxItem Content="Archivés"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Recherche :" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold" FontSize="11"/>
+                                <TextBox Text="{Binding RechercheCandidat, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="220" Height="24" FontSize="11" VerticalContentAlignment="Center"/>
+                            </WrapPanel>
+                        </Border>
+
+                        <!-- Master-Detail Vivier -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="6*"/> <!-- Liste Candidats -->
+                                <ColumnDefinition Width="4*"/> <!-- Détail Profil -->
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Margin="0,0,8,0">
+                                <DataGrid ItemsSource="{Binding CandidatsFiltres}"
+                                          SelectedItem="{Binding CandidatSelectionne, Mode=TwoWay}"
+                                          AutoGenerateColumns="False" IsReadOnly="True"
+                                          SelectionMode="Single" HeadersVisibility="Column"
+                                          RowHeaderWidth="0" GridLinesVisibility="Horizontal">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Nom &amp; Prénoms" Binding="{Binding NomComplet}" Width="160"/>
+                                        <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="150"/>
+                                        <DataGridTextColumn Header="Téléphone" Binding="{Binding Telephone}" Width="110"/>
+                                        <DataGridTextColumn Header="Diplôme le plus élevé" Binding="{Binding DiplomeLePlusEleve}" Width="150"/>
+                                        <DataGridTextColumn Header="Exp. (ans)" Binding="{Binding AnneesExperience}" Width="65"/>
+                                        <DataGridTextColumn Header="Dernière Fonction" Binding="{Binding DerniereFonction}" Width="140"/>
+                                        <DataGridTextColumn Header="Vivier" Binding="{Binding VivierActifLibelle}" Width="90"/>
+                                        <DataGridTextColumn Header="Candidatures" Binding="{Binding NombreCandidatures}" Width="80"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Border>
+
+                            <!-- Détail Profil Candidat -->
+                            <Border Grid.Column="1" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="12">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="Profil du candidat (Vivier de talents)" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10"/>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Nom de famille :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding CandidatSelectionne.Nom, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Prénoms :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding CandidatSelectionne.Prenoms, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Email :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding CandidatSelectionne.Email, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Téléphone :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding CandidatSelectionne.Telephone, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="7*"/>
+                                                <ColumnDefinition Width="3*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Diplôme le plus élevé :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding CandidatSelectionne.DiplomeLePlusEleve, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="Expérience :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding CandidatSelectionne.AnneesExperience, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Dernière fonction occupée :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBox Text="{Binding CandidatSelectionne.DerniereFonction, Mode=TwoWay}" Height="24" FontSize="11" Margin="0,2,0,6"/>
+
+                                        <TextBlock Text="Compétences clés &amp; Maîtrises techniques :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBox Text="{Binding CandidatSelectionne.CompetencesCles, Mode=TwoWay}" Height="50" TextWrapping="Wrap" AcceptsReturn="True" FontSize="11" Margin="0,2,0,6"/>
+
+                                        <TextBlock Text="Commentaires d'évaluation &amp; Notes :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                        <TextBox Text="{Binding CandidatSelectionne.Commentaires, Mode=TwoWay}" Height="50" TextWrapping="Wrap" AcceptsReturn="True" FontSize="11" Margin="0,2,0,10"/>
+
+                                        <TextBlock Text="Curriculum Vitae (CV) :" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,2"/>
+                                        <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                            <TextBlock Text="{Binding CandidatSelectionne.CvNomFichier}" FontSize="11" FontStyle="Italic"
+                                                       Foreground="{StaticResource InkMutedBrush}" VerticalAlignment="Center" DockPanel.Dock="Left"
+                                                       TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                <Button Content="Ouvrir" Command="{Binding OuvrirCvCommand}"
+                                                        Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource InkBrush}"
+                                                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                        Height="24" Padding="8,0" Margin="0,0,6,0" Cursor="Hand"/>
+                                                <Button Content="Importer un CV…" Command="{Binding ImporterCvCommand}"
+                                                        Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource PrimaryBlueDarkBrush}"
+                                                        BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                        Height="24" Padding="8,0" Cursor="Hand"/>
+                                            </StackPanel>
+                                        </DockPanel>
+
+                                        <CheckBox Content="Profil actif dans le vivier (disponible)" IsChecked="{Binding CandidatSelectionne.VivierActif, Mode=TwoWay}" FontWeight="SemiBold" Margin="0,0,0,12"/>
+
+                                        <!-- Boutons Actions Candidat -->
+                                        <WrapPanel>
+                                            <Button Content="Enregistrer Profil" Command="{Binding EnregistrerCandidatCommand}"
+                                                    Background="{StaticResource AccentBrush}" Foreground="{StaticResource WhiteBrush}"
+                                                    FontWeight="SemiBold" Height="26" Padding="10,0" Margin="0,0,6,4" Cursor="Hand"/>
+
+                                            <Button Content="Postuler à un Besoin" Command="{Binding PostulerCandidatSelectionneCommand}"
+                                                    Background="{StaticResource PrimaryBlueDarkBrush}" Foreground="{StaticResource WhiteBrush}"
+                                                    FontWeight="SemiBold" Height="26" Padding="10,0" Margin="0,0,6,4" Cursor="Hand"/>
+
+                                            <Button Content="Archiver / Réactiver" Command="{Binding BasculerStatutVivierCommand}"
+                                                    Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource InkBrush}"
+                                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                    Height="26" Padding="8,0" Margin="0,0,6,4" Cursor="Hand"/>
+
+                                            <Button Content="Supprimer" Command="{Binding SupprimerCandidatCommand}"
+                                                    Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource DangerBrush}"
+                                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                    Height="26" Padding="8,0" Margin="0,0,0,4" Cursor="Hand"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ───────────────────────────────────────────────────────────
+                     ONGLET 4 : ENTRETIENS & INTÉGRATION SALARIÉ (SAL-01)
+                     ─────────────────────────────────────────────────────────── -->
+                <TabItem Header="Entretiens &amp; Embauche">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="5*"/> <!-- Entretiens & Évaluations -->
+                            <RowDefinition Height="Auto"/> <!-- Séparateur -->
+                            <RowDefinition Height="5*"/> <!-- Intégration en Fiche Salarié -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Section 1 : Entretiens conduits pour la candidature sélectionnée -->
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="6*"/> <!-- Liste Entretiens -->
+                                <ColumnDefinition Width="4*"/> <!-- Fiche Entretien -->
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Margin="0,0,8,0">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Grid.Row="0" Background="{StaticResource GroundBrush}" Padding="8,4" BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock Text="{Binding CandidatureSelectionnee.CandidatNomComplet, StringFormat='Entretiens : {0}'}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                            <Button Content="+ Nouvel Entretien" Command="{Binding NouvelEntretienCommand}"
+                                                    Background="{StaticResource AccentBrush}" Foreground="{StaticResource WhiteBrush}"
+                                                    FontWeight="SemiBold" Height="22" Padding="8,0" DockPanel.Dock="Right" Cursor="Hand"/>
+                                        </DockPanel>
+                                    </Border>
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding Entretiens}"
+                                              SelectedItem="{Binding EntretienSelectionne, Mode=TwoWay}"
+                                              AutoGenerateColumns="False" IsReadOnly="True"
+                                              SelectionMode="Single" HeadersVisibility="Column"
+                                              RowHeaderWidth="0" GridLinesVisibility="Horizontal">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Étape" Binding="{Binding EtapeLibelle}" Width="130"/>
+                                            <DataGridTextColumn Header="Date" Binding="{Binding DateEntretien, StringFormat=dd/MM/yyyy}" Width="85"/>
+                                            <DataGridTextColumn Header="Évaluateur" Binding="{Binding EvaluateurNom}" Width="130"/>
+                                            <DataGridTextColumn Header="Note (/20)" Binding="{Binding NoteGlobale, StringFormat={}{0:F1}}" Width="65"/>
+                                            <DataGridTextColumn Header="Avis" Binding="{Binding AvisLibelle}" Width="95"/>
+                                            <DataGridTextColumn Header="Synthèse" Binding="{Binding Synthese}" Width="*"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Fiche Entretien en édition -->
+                            <Border Grid.Column="1" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="3" Padding="10">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="Compte rendu d'évaluation" FontWeight="Bold" FontSize="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8"/>
+
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,3,0">
+                                                <TextBlock Text="Date :" FontSize="11" FontWeight="SemiBold"/>
+                                                <DatePicker SelectedDate="{Binding EntretienSelectionne.DateEntretien, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="3,0,0,0">
+                                                <TextBlock Text="Note (/20) :" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBox Text="{Binding EntretienSelectionne.NoteGlobale, Mode=TwoWay, StringFormat={}{0:F1}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Nom de l'évaluateur :" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                                        <TextBox Text="{Binding EntretienSelectionne.EvaluateurNom, Mode=TwoWay}" Height="24" FontSize="11" Margin="0,2,0,4"/>
+
+                                        <TextBlock Text="Points forts du candidat :" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                                        <TextBox Text="{Binding EntretienSelectionne.PointsForts, Mode=TwoWay}" Height="40" TextWrapping="Wrap" AcceptsReturn="True" FontSize="11" Margin="0,2,0,4"/>
+
+                                        <TextBlock Text="Axes d'amélioration / Réserves :" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                                        <TextBox Text="{Binding EntretienSelectionne.AxesAmelioration, Mode=TwoWay}" Height="40" TextWrapping="Wrap" AcceptsReturn="True" FontSize="11" Margin="0,2,0,4"/>
+
+                                        <TextBlock Text="Synthèse &amp; Recommandation :" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                                        <TextBox Text="{Binding EntretienSelectionne.Synthese, Mode=TwoWay}" Height="40" TextWrapping="Wrap" AcceptsReturn="True" FontSize="11" Margin="0,2,0,8"/>
+
+                                        <WrapPanel>
+                                            <Button Content="Enregistrer l'Entretien" Command="{Binding EnregistrerEntretienCommand}"
+                                                    Background="{StaticResource AccentBrush}" Foreground="{StaticResource WhiteBrush}"
+                                                    FontWeight="SemiBold" Height="24" Padding="8,0" Margin="0,0,6,0" Cursor="Hand"/>
+
+                                            <Button Content="Supprimer" Command="{Binding SupprimerEntretienCommand}"
+                                                    Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource DangerBrush}"
+                                                    BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                                    Height="24" Padding="6,0" Cursor="Hand"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+
+                        <!-- Séparateur -->
+                        <Separator Grid.Row="1" Margin="0,4,0,10"/>
+
+                        <!-- Section 2 : Passerelle d'Embauche & Fiche Salarié (SAL-01) -->
+                        <Border Grid.Row="2" Background="{StaticResource GroundBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1.5" CornerRadius="4" Padding="14">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/> <!-- En-tête -->
+                                    <RowDefinition Height="*"/>    <!-- Paramètres & Confirmation -->
+                                </Grid.RowDefinitions>
+
+                                <!-- En-tête Embauche -->
+                                <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{StaticResource IconCheck}" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <StackPanel>
+                                            <TextBlock Text="Passerelle d'Intégration Directe en Fiche Salarié (SAL-01)" FontSize="14" FontWeight="Bold" Foreground="{StaticResource InkBrush}"/>
+                                            <TextBlock Text="Création automatique de la fiche salarié dans la paie, affectation du poste et production de la lettre d'embauche A4" FontSize="11" Foreground="{StaticResource InkMutedBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Bouton Lettre d'Embauche PDF -->
+                                    <Button ToolTip="Imprimer la Lettre d'Embauche Officielle (PDF iTextSharp A4)"
+                                            Command="{Binding ExporterLettreEmbauchePdfCommand}"
+                                            Background="{StaticResource SurfaceBrush}" Foreground="{StaticResource InkBrush}"
+                                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="1"
+                                            FontWeight="SemiBold" Height="30" Padding="10,0" DockPanel.Dock="Right" Cursor="Hand">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{StaticResource IconPdf}" FontFamily="Segoe MDL2 Assets" Foreground="#C62828" FontSize="14" Margin="0,0,6,0"/>
+                                            <TextBlock Text="Éditer la Lettre d'Embauche A4" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DockPanel>
+
+                                <!-- Formulaire d'embauche -->
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="6*"/> <!-- Champs de saisie -->
+                                        <ColumnDefinition Width="4*"/> <!-- Résumé & Bouton validation -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Champs de saisie -->
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                                <TextBlock Text="Salaire Brut Négocié (FCFA) :" FontWeight="Bold" FontSize="11"/>
+                                                <TextBox Text="{Binding SalaireEmbaucheSaisi, Mode=TwoWay, StringFormat={}{0:N0}}" Height="26" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                                <TextBlock Text="Date de Prise de Fonction :" FontWeight="Bold" FontSize="11"/>
+                                                <DatePicker SelectedDate="{Binding DateEmbaucheSaisie, Mode=TwoWay}" Height="26" FontSize="12"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Type de Contrat :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding TypeContratEmbaucheSaisi, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                                <TextBlock Text="Catégorie :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding CategorieEmbaucheSaisie, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                                <TextBlock Text="Service / Département :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding ServiceEmbaucheSaisi, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Matricule (schéma du dossier), échelon et convention repris du poste RH-02 -->
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="Matricule à attribuer :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding MatriculeEmbaucheSaisi, Mode=TwoWay}" Height="24" FontSize="11" FontWeight="Bold"
+                                                         ToolTip="Prochain matricule libre selon le schéma du dossier (préfixe + numéro) ; modifiable, l'unicité est contrôlée à l'embauche"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                                <TextBlock Text="Échelon :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding EchelonEmbaucheSaisi, Mode=TwoWay}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                                <TextBlock Text="Convention collective (poste) :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding ConventionEmbaucheLibelle, Mode=OneWay}" IsReadOnly="True" Background="#EAEAEA" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Indemnités : reprises de l'offre, modifiables avant validation -->
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,3,0">
+                                                <TextBlock Text="Ind. Logement (FCFA) :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding IndemniteLogementSaisie, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="3,0,3,0">
+                                                <TextBlock Text="Ind. Transport (FCFA) :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding IndemniteTransportSaisie, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Margin="3,0,3,0">
+                                                <TextBlock Text="Ind. Fonction (FCFA) :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding IndemniteFonctionSaisie, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3" Margin="3,0,0,0">
+                                                <TextBlock Text="Ind. Sujétion (FCFA) :" FontWeight="SemiBold" FontSize="11"/>
+                                                <TextBox Text="{Binding IndemniteSujetionSaisie, Mode=TwoWay, StringFormat={}{0:N0}}" Height="24" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="Mentions légales de la période d'essai (Code du travail burkinabè, Articles 38-43) :" FontSize="10" FontStyle="Italic" Foreground="{StaticResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    </StackPanel>
+
+                                    <!-- Bloc Confirmation -->
+                                    <Border Grid.Column="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource RuleBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
+                                        <StackPanel VerticalAlignment="Top">
+                                            <TextBlock Text="Statut de la Candidature :" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource InkMutedBrush}"/>
+                                            <TextBlock Text="{Binding CandidatureSelectionnee.StatutLibelle, Mode=OneWay, FallbackValue='Aucune candidature'}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBlueDarkBrush}" Margin="0,2,0,8"/>
+
+                                            <TextBlock Text="{Binding CandidatureSelectionnee.SalarieCreeMatricule, StringFormat='Matricule créé : {0}', Mode=OneWay}"
+                                                       FontSize="11" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                                            <Button Content="Valider l'Embauche &amp; Créer le Salarié"
+                                                    Command="{Binding IntegrerEnSalarieCommand}"
+                                                    Background="{StaticResource SuccessBrush}" Foreground="{StaticResource WhiteBrush}"
+                                                    FontWeight="Bold" FontSize="12" Height="36" Padding="14,0" Cursor="Hand"
+                                                    HorizontalContentAlignment="Center" Margin="0,0,0,4"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+</UserControl>

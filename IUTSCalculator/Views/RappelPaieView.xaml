@@ -379,6 +379,9 @@
                                 <DataGridTextColumn Header="TPA (3%)"
                                                     Binding="{Binding DeltaTpa, StringFormat=N0, ConverterCulture=fr-FR, Mode=OneWay}"
                                                     Width="90" ElementStyle="{StaticResource MoneyTextStyle}"/>
+                                <DataGridTextColumn Header="Δ IUTS"
+                                                    Binding="{Binding DeltaIuts, StringFormat=N0, ConverterCulture=fr-FR, Mode=OneWay}"
+                                                    Width="90" ElementStyle="{StaticResource MoneyTextStyle}"/>
                                 <DataGridTextColumn Header="Net Différentiel"
                                                     Binding="{Binding DeltaNet, StringFormat=N0, ConverterCulture=fr-FR, Mode=OneWay}"
                                                     Width="110" ElementStyle="{StaticResource MoneyTextStyle}"/>
@@ -411,6 +414,14 @@
                                     <TextBlock Text="CNSS PATRONALE (16%)" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
                                     <TextBlock Text="{Binding SimuTotalCnssPatronal, StringFormat={}{0:N0} FCFA, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}"/>
                                 </StackPanel>
+                                <StackPanel Margin="0,0,24,0"
+                                            ToolTip="Écart d'IUTS mois par mois (comme si la hausse avait été payée à temps) ; entre parenthèses, l'IUTS supplémentaire estimé si tout le rappel est payé sur un seul bulletin, ce que fait l'imputation.">
+                                    <TextBlock Text="Δ IUTS CUMULÉ (EN UNE FOIS)" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}">
+                                        <Run Text="{Binding SimuTotalIuts, StringFormat={}{0:N0}, Mode=OneWay}"/>
+                                        <Run Text=" ("/><Run Text="{Binding SimuIutsImputation, StringFormat={}{0:N0}, Mode=OneWay}"/><Run Text=") FCFA"/>
+                                    </TextBlock>
+                                </StackPanel>
                                 <StackPanel>
                                     <TextBlock Text="NET DIFFÉRENTIEL" FontSize="11" Foreground="{StaticResource InkSubtleBrush}"/>
                                     <TextBlock Text="{Binding SimuTotalNet, StringFormat={}{0:N0} FCFA, Mode=OneWay}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"/>
@@ -421,7 +432,8 @@
                                 <Button Content="Exporter la simulation Excel" Tag="{StaticResource IconExport}"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Command="{Binding ExporterSimulationExcelCommand}" Margin="0,0,8,0"/>
-                                <Button Content="Créer le rappel pour le mois courant" Tag="{StaticResource IconCheck}"
+                                <Button Content="Créer le rappel sur la période ouverte" Tag="{StaticResource IconCheck}"
+                                        ToolTip="Le rappel est imputé sur la période de paie ouverte la plus récente (écran « Périodes de paie »)."
                                         Style="{StaticResource MenuButtonStyle}"
                                         Command="{Binding ValiderEtCreerRappelSimulationCommand}"/>
                             </StackPanel>

@@ -361,3 +361,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Claude outputs/RH-06_sauvegarde_2026-10-19/IUTSCalculator/Licensing/LicenceModules.cs
+/Claude outputs/RH-08_sauvegarde_2026-10-19/IUTSCalculator/Licensing
+/Claude outputs/Guide_Module_Licence.md
+/Claude outputs/RH-07_sauvegarde_2026-10-19/IUTSCalculator/Licensing
+/IUTSCalculator/Licensing
+/Outils/SigmaLicenceGenerateur/Guide_Module_Licence.md
+/Outils/SigmaLicenceGenerateur
