@@ -444,23 +444,24 @@ namespace IUTSCalculator.Services
         /// </summary>
         private void RemplacerParCopie(string copie)
         {
-            for (int essai = 1; ; essai++)
+            for (int essai = 1; essai <= 20; essai++)
             {
                 try
                 {
                     File.Replace(copie, _dbPath, null);
                     return;
                 }
-                catch (IOException) when (essai < 10)
+                catch (IOException) when (essai < 20)
                 {
                 }
-                catch (UnauthorizedAccessException) when (essai < 10)
+                catch (UnauthorizedAccessException) when (essai < 20)
                 {
                 }
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 System.Threading.Thread.Sleep(200);
             }
+            throw new IOException($"Impossible de remplacer le fichier de base de données après 20 tentatives ({_dbPath}). Le fichier est peut-être verrouillé par un autre processus.");
         }
 
         private static void SupprimerSiPresent(string chemin)
