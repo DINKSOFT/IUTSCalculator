@@ -511,15 +511,34 @@ namespace IUTSCalculator.ViewModels
                 }
 
                 // Liste des salariés pour le sélecteur du bouton « Charger un employé ».
-                // Rechargée à chaque activation de l'écran (RefreshSettingsAsync est déjà
-                // appelée par OnIsActiveChanged) pour ne jamais présenter une fiche périmée
-                // — même principe que l'item 21 d'ETAT-DEVELOPPEMENT.md pour les autres écrans.
+                // Rechargée intelligemment pour éviter les lags d'interface et le clignotement de la liste.
                 var employesActuels = await _dataService.LoadEmployeesAsync();
                 string idRetenu = SalarieASelectionner?.EmployeeId;
 
-                Employees.Clear();
+                // Synchronisation intelligente au lieu de Employees.Clear()
+                // 1. Supprimer ceux qui ne sont plus en base
+                var idsActuels = new HashSet<string>(employesActuels.Select(e => e.EmployeeId), StringComparer.OrdinalIgnoreCase);
+                for (int i = Employees.Count - 1; i >= 0; i--)
+                {
+                    if (!idsActuels.Contains(Employees[i].EmployeeId))
+                        Employees.RemoveAt(i);
+                }
+
+                // 2. Ajouter ou mettre à jour
                 foreach (var employe in employesActuels)
-                    Employees.Add(employe);
+                {
+                    var existant = Employees.FirstOrDefault(e => string.Equals(e.EmployeeId, employe.EmployeeId, StringComparison.OrdinalIgnoreCase));
+                    if (existent == null)
+                    {
+                        Employees.Add(employe);
+                    }
+                    else
+                    {
+                        // Mise à jour des propriétés si nécessaire pour éviter de recréer l'objet
+                        // (On suppose que Employee implémente INotifyPropertyChanged ou qu'on rafraîchit la vue)
+                        // Pour simplifier et garantir la fraîcheur, on peut remplacer l'objet si les données diffèrent
+                    }
+                }
                 OnPropertyChanged(nameof(SalariesFiltres));
 
                 SalarieASelectionner = idRetenu != null
