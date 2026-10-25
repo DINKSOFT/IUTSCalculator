@@ -209,49 +209,24 @@ namespace IUTSCalculator.ViewModels
         // (ETAT-DEVELOPPEMENT.md item 18/20 : un vrai sélecteur manquait). Même schéma de
         // recherche rapide que sur les écrans Absences/Prêts/Profils.
 
-        public ObservableCollection<Employee> Employees { get; } = new ObservableCollection<Employee>();
+        public EmployeeSelectionViewModel EmployeeSelection { get; }
 
         private string _filtreSalarie;
         public string FiltreSalarie
         {
-            get => _filtreSalarie;
-            set
-            {
-                if (SetProperty(ref _filtreSalarie, value))
-                {
-                    OnPropertyChanged(nameof(HasFiltreSalarie));
-                    OnPropertyChanged(nameof(SalariesFiltres));
-                }
-            }
+            get => EmployeeSelection?.FiltreSalarie;
+            set { if (EmployeeSelection != null) EmployeeSelection.FiltreSalarie = value; }
         }
 
-        public bool HasFiltreSalarie => !string.IsNullOrWhiteSpace(FiltreSalarie);
+        public bool HasFiltreSalarie => EmployeeSelection != null && EmployeeSelection.HasFiltreSalarie;
 
-        public IList<Employee> SalariesFiltres
-        {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(FiltreSalarie)) return Employees;
-
-                string q = FiltreSalarie.Trim();
-                return Employees.Where(s =>
-                    (s.LastName != null && s.LastName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
-                    || (s.FirstName != null && s.FirstName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
-                    || (s.Matricule != null && s.Matricule.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
-                    || (s.Fonction != null && s.Fonction.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0))
-                    .ToList();
-            }
-        }
+        public IList<Employee> SalariesFiltres => EmployeeSelection?.SalariesFiltres;
 
         private Employee _salarieASelectionner;
         public Employee SalarieASelectionner
         {
-            get => _salarieASelectionner;
-            set
-            {
-                if (SetProperty(ref _salarieASelectionner, value))
-                    (LoadEmployeeCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            }
+            get => EmployeeSelection?.SalarieASelectionner;
+            set { if (EmployeeSelection != null) EmployeeSelection.SalarieASelectionner = value; }
         }
 
         // Commandes
@@ -297,6 +272,8 @@ namespace IUTSCalculator.ViewModels
             _rappelPaieService = rappelPaieService;
             _avantageNatureService = avantageNatureService;
             _periodePaieService = periodePaieService;
+
+            EmployeeSelection = new EmployeeSelectionViewModel(_dataService);
 
             // Chaîne commune avec « Bulletin de paie » (défaut n° 4 du guide) : saisies sur
             // salaire comprises, et un enregistrement mensuel qui archive un vrai bulletin.
@@ -511,39 +488,9 @@ namespace IUTSCalculator.ViewModels
                 }
 
                 // Liste des salariés pour le sélecteur du bouton « Charger un employé ».
-                // Rechargée intelligemment pour éviter les lags d'interface et le clignotement de la liste.
-                var employesActuels = await _dataService.LoadEmployeesAsync();
-                string idRetenu = SalarieASelectionner?.EmployeeId;
-
-                // Synchronisation intelligente au lieu de Employees.Clear()
-                // 1. Supprimer ceux qui ne sont plus en base
-                var idsActuels = new HashSet<string>(employesActuels.Select(e => e.EmployeeId), StringComparer.OrdinalIgnoreCase);
-                for (int i = Employees.Count - 1; i >= 0; i--)
-                {
-                    if (!idsActuels.Contains(Employees[i].EmployeeId))
-                        Employees.RemoveAt(i);
-                }
-
-                // 2. Ajouter ou mettre à jour
-                foreach (var employe in employesActuels)
-                {
-                    var existant = Employees.FirstOrDefault(e => string.Equals(e.EmployeeId, employe.EmployeeId, StringComparison.OrdinalIgnoreCase));
-                    if (existent == null)
-                    {
-                        Employees.Add(employe);
-                    }
-                    else
-                    {
-                        // Mise à jour des propriétés si nécessaire pour éviter de recréer l'objet
-                        // (On suppose que Employee implémente INotifyPropertyChanged ou qu'on rafraîchit la vue)
-                        // Pour simplifier et garantir la fraîcheur, on peut remplacer l'objet si les données diffèrent
-                    }
-                }
+                // Désormais déléguée au EmployeeSelectionViewModel pour éviter les lags d'interface.
+                await EmployeeSelection.RefreshEmployeesAsync();
                 OnPropertyChanged(nameof(SalariesFiltres));
-
-                SalarieASelectionner = idRetenu != null
-                    ? Employees.FirstOrDefault(e => string.Equals(e.EmployeeId, idRetenu, StringComparison.OrdinalIgnoreCase))
-                    : null;
             }
             catch (Exception ex)
             {
