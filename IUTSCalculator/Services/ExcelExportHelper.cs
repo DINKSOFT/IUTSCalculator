@@ -40,6 +40,23 @@ namespace IUTSCalculator.Services
 
         
         /// <summary>
+        /// Assainit une valeur pour empêcher l'injection de formules Excel (CSV Injection).
+        /// </summary>
+        private static string SanitizeForExcel(object value)
+        {
+            if (value == null) return string.Empty;
+            string str = value.ToString();
+            if (string.IsNullOrEmpty(str)) return str;
+
+            char firstChar = str[0];
+            if (firstChar == '=' || firstChar == '+' || firstChar == '-' || firstChar == '@')
+            {
+                return "'" + str;
+            }
+            return str;
+        }
+
+        /// <summary>
         /// Génère un fichier Excel avec les éléments de salaire pour plusieurs employés
         /// </summary>
         /// <param name="employees">Liste des employés</param>
@@ -143,7 +160,7 @@ namespace IUTSCalculator.Services
 
                 worksheet.Cell(row, 1).Value = row - 1;
                 worksheet.Cell(row, 2).Value = employee.FamilyCharges;
-                worksheet.Cell(row, 3).Value = $"{employee.LastName} {employee.FirstName}";
+                worksheet.Cell(row, 3).Value = SanitizeForExcel($"{employee.LastName} {employee.FirstName}");
                 worksheet.Cell(row, 4).Value = employee.BaseSalary;
                 worksheet.Cell(row, 5).Value = employee.HousingAllowance;
                 worksheet.Cell(row, 6).Value = employee.TransportAllowance;

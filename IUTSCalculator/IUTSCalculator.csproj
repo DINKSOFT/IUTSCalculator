@@ -298,6 +298,7 @@
     <Compile Include="Services\TaxParametersUpdatedEventArgs.cs" />
     <Compile Include="Services\UserAccountService.cs" />
     <Compile Include="Services\UserSession.cs" />
+    <Compile Include="Services\NotificationService.cs" />
     <Compile Include="ViewModels\BaseSalaryEstimatorViewModel.cs" />
     <Compile Include="ViewModels\BaseViewModel.cs" />
     <Compile Include="ViewModels\BatchSalaryCalculationViewModel.cs" />
@@ -345,6 +346,7 @@
     <Compile Include="ViewModels\DisciplineViewModel.cs" />
     <Compile Include="ViewModels\SanteSecuriteViewModel.cs" />
     <Compile Include="ViewModels\SettingsViewModel.cs" />
+    <Compile Include="ViewModels\EmployeeSelectionViewModel.cs" />
     <Compile Include="Views\BaseSalaryEstimatorView.xaml.cs">
       <DependentUpon>BaseSalaryEstimatorView.xaml</DependentUpon>
     </Compile>
