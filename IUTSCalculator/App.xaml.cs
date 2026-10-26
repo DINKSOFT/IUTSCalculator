@@ -113,6 +113,25 @@ namespace IUTSCalculator
             var comptes = userService.LoadUsersAsync().GetAwaiter().GetResult();
             if (comptes == null || comptes.Count == 0)
             {
+                // Un fichier de comptes qui EXISTE mais ne se lit pas n'est pas un premier lancement :
+                // créer un administrateur réécrirait le fichier. On prévient, copie à l'appui.
+                if (userService.FichierIllisible)
+                {
+                    string copie = userService.SauvegardeFichierIllisible;
+                    var choix = MessageBox.Show(
+                        "Le fichier des comptes utilisateurs existe mais ne peut pas être lu par ce profil Windows " +
+                        "(fichier abîmé, ou créé sous un autre profil ou une autre machine).\n\n" +
+                        (copie != null ? "Une copie a été conservée : " + copie + "\n\n" : "") +
+                        "Créer maintenant un nouvel administrateur remplacerait ce fichier. " +
+                        "Voulez-vous quand même continuer ?",
+                        "Comptes utilisateurs illisibles", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                    if (choix != MessageBoxResult.Yes)
+                    {
+                        Shutdown();
+                        return;
+                    }
+                }
+
                 var creation = new Views.CreerAdminWindow(userService);
                 if (creation.ShowDialog() != true)
                 {

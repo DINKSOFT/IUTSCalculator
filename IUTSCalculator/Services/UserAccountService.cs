@@ -27,24 +27,80 @@ namespace IUTSCalculator.Services
             //LoadUsersAsync().Wait();
         }
 
+        /// <summary>
+        /// Vrai si <c>users.json</c> existe mais n'a pu être lu (ni chiffré pour ce profil Windows, ni
+        /// JSON valide). Le programme ne doit alors PAS présenter l'écran comme un premier lancement
+        /// sans prévenir : créer un compte réécrirait le fichier.
+        /// </summary>
+        public bool FichierIllisible { get; private set; }
+
+        /// <summary>Copie conservée du fichier illisible (renseignée avec <see cref="FichierIllisible"/>).</summary>
+        public string SauvegardeFichierIllisible { get; private set; }
+
         public async Task<List<UserAccount>> LoadUsersAsync()
         {
-            if (File.Exists(_usersFilePath))
+            FichierIllisible = false;
+            SauvegardeFichierIllisible = null;
+
+            if (!File.Exists(_usersFilePath)) return _cachedUsers;
+
+            byte[] data = await Task.Run(() => File.ReadAllBytes(_usersFilePath)).ConfigureAwait(false);
+
+            // 1. Format courant : JSON chiffré par DPAPI pour le profil Windows courant.
+            List<UserAccount> comptes = null;
+            try
             {
-                try
-                {
-                    byte[] encryptedData = await Task.Run(() => File.ReadAllBytes(_usersFilePath)).ConfigureAwait(false);
-                    byte[] decryptedData = ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser);
-                    string json = Encoding.UTF8.GetString(decryptedData);
-                    _cachedUsers = JsonSerializer.Deserialize<List<UserAccount>>(json, _jsonOptions) ?? new List<UserAccount>();
-                }
-                catch (Exception)
-                {
-                    // Si le déchiffrement échoue (ex: fichier non chiffré ou profil utilisateur différent), on repart de zéro
-                    _cachedUsers = new List<UserAccount>();
-                }
+                byte[] clair = ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser);
+                comptes = JsonSerializer.Deserialize<List<UserAccount>>(Encoding.UTF8.GetString(clair), _jsonOptions);
             }
+            catch (Exception) { /* pas (ou plus) lisible avec DPAPI : on essaie l'ancien format */ }
+
+            if (comptes != null)
+            {
+                _cachedUsers = comptes;
+                return _cachedUsers;
+            }
+
+            // 2. Ancien format : JSON en clair, écrit avant l'ajout du chiffrement. On le lit,
+            //    puis on le re-chiffre aussitôt (migration unique) ; la copie en clair est
+            //    d'abord conservée à côté.
+            try
+            {
+                string texte = Encoding.UTF8.GetString(data).TrimStart('﻿');
+                comptes = JsonSerializer.Deserialize<List<UserAccount>>(texte, _jsonOptions);
+            }
+            catch (Exception) { comptes = null; }
+
+            if (comptes != null)
+            {
+                SauvegarderCopie(".avant-chiffrement");
+                _cachedUsers = comptes;
+                await SaveUsersAsync(_cachedUsers).ConfigureAwait(false);
+                return _cachedUsers;
+            }
+
+            // 3. Illisible (autre profil Windows, autre machine, fichier abîmé) : rien n'est effacé,
+            //    une copie est gardée et l'appelant est prévenu.
+            SauvegardeFichierIllisible = SauvegarderCopie(".illisible");
+            FichierIllisible = true;
+            _cachedUsers = new List<UserAccount>();
             return _cachedUsers;
+        }
+
+        /// <summary>Copie <c>users.json</c> en <c>users.json&lt;suffixe&gt;</c> (puis suffixe2, suffixe3…) sans jamais écraser une copie.</summary>
+        private string SauvegarderCopie(string suffixe)
+        {
+            try
+            {
+                string cible = _usersFilePath + suffixe;
+                for (int i = 2; File.Exists(cible); i++) cible = _usersFilePath + suffixe + i;
+                File.Copy(_usersFilePath, cible);
+                return cible;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         public async Task SaveUsersAsync(List<UserAccount> users)

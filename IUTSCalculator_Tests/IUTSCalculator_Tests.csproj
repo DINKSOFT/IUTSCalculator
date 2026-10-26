@@ -104,6 +104,7 @@
   <ItemGroup>
     <Compile Include="MainViewModelTests.cs" />
     <Compile Include="SoldeToutCompteTests.cs" />
+    <Compile Include="CompteUtilisateursTests.cs" />
     <Compile Include="CorrectionsPaieTests.cs" />
     <Compile Include="SaisieOppositionTests.cs" />
     <Compile Include="RappelPaieTests.cs" />

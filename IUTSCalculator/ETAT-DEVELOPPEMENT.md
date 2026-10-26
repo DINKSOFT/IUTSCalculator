@@ -1846,6 +1846,20 @@ la feuille de route à partir d'ici — après avoir confirmé le prochain modul
          autre obstacle. Non testés en conditions réelles : le bouton d'annulation, la suppression d'un solde et la case du
          13ᵉ mois (seuls les calculs sont couverts par des tests).
 
+    - **26 octobre 2026 (suite) — création de l'administrateur redemandée au lancement alors qu'un compte existait.**
+    *Cause* : le chiffrement DPAPI de `users.json` (commit `6f53840`) n'avait prévu aucune migration. Un `users.json` écrit
+    avant, en JSON clair, faisait échouer `ProtectedData.Unprotect` ; le `catch` de `UserAccountService.LoadUsersAsync` avalait
+    l'erreur et renvoyait une liste vide, et `App.OnStartup` y voyait un premier lancement. *Piège évité* : créer le nouvel
+    administrateur aurait réécrit le fichier et écrasé les anciens comptes. — *Correction* : `LoadUsersAsync` lit d'abord le
+    format chiffré, puis, à défaut, l'ancien JSON en clair, qu'il re-chiffre aussitôt (migration unique, copie conservée dans
+    `users.json.avant-chiffrement`). Un fichier qui n'est ni l'un ni l'autre (autre profil Windows, autre machine, fichier
+    abîmé) n'est plus pris pour un premier lancement : copie dans `users.json.illisible`, propriétés `FichierIllisible` et
+    `SauvegardeFichierIllisible`, et `App.xaml.cs` demande confirmation (défaut : non) avant de proposer d'en créer un nouveau.
+    — *Vérification* : 4 tests (`CompteUtilisateursTests` : chiffré relu, clair migré, illisible signalé sans être effacé,
+    aucun fichier = premier lancement), tous réussis. — *Dette* : une sauvegarde `users.json` d'un autre poste n'est lisible
+    que sur le profil Windows qui l'a créée (propriété de DPAPI `CurrentUser`) ; pour déplacer les comptes d'un poste à
+    l'autre, recréer les comptes ou prévoir un export.
+
 ---
 
 ## 8. Pour reprendre dans une nouvelle conversation
