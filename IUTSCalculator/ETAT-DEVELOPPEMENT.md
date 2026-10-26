@@ -4,7 +4,10 @@ Ce fichier sert à **reprendre le travail dans une nouvelle conversation** sans 
 zéro. Il dit où en est le projet, quelles décisions ont été prises et pourquoi, et ce qui
 reste en dette. Il se met à jour à chaque module livré.
 
-Dernière mise à jour : 19 octobre 2026 — livraison du module **RH-07** (« Santé & sécurité au travail »), qui **achève la
+Dernière mise à jour : 26 octobre 2026 (version **1.4.38.2**) — apurement des défauts métier restants, ergonomie et
+sécurité : annulation de la retenue d'une mise à pied après recours favorable, prorata du 13ᵉ mois au solde de tout compte,
+suppression d'un solde qui rétablit le salarié, anti-doublon des rappels, notifications non bloquantes (détail à la fin du §7).
+Précédemment, 19 octobre 2026 — livraison du module **RH-07** (« Santé & sécurité au travail »), qui **achève la
 Phase 4**. Trois registres : visites médicales (embauche, périodiques, reprise, à la demande) et leurs échéances, avec une
 périodicité de 12 mois ajustable par poste (RH-02) ; équipements de protection individuelle remis à chaque salarié (catalogue
 avec durée de vie, renouvellements, fiche de dotation à signer) ; accidents du travail, de trajet et maladies
@@ -161,7 +164,7 @@ dossier neuf par `RubriqueService.RubriquesDeSaisie()` (même principe que la mi
 - **Numéro de version** (`Properties/AssemblyInfo.cs`, seul endroit à changer) : `1.<dernière phase livrée>.<SchemaCible>.<révision>`,
   et `AssemblyInformationalVersion` = « numéro du JJ/MM/AAAA », libellé affiché (titre de la fenêtre, barre d'état, À propos,
   écran de sélection du dossier, manifeste des sauvegardes) via `Helpers/VersionApplication`. **À chaque livraison** : nouvelle
-  révision (ou nouveau niveau de schéma) et nouvelle date. 19/10/2026 : `1.4.37.1`.
+  révision (ou nouveau niveau de schéma) et nouvelle date. 26/10/2026 : `1.4.38.2`.
 
 ## 5. Méthode de travail
 
@@ -1778,10 +1781,11 @@ la feuille de route à partir d'ici — après avoir confirmé le prochain modul
     secondaire incohérente — à confirmer sur la convention CCI-BF et le Code du travail ; 8 jours des horaires à saisir à la main.
     (2) Pour une absence ordinaire (non rémunérée), l'abattement forfaitaire reste calculé sur le salaire de base complet
     (comportement validé antérieurement) ; seul le prorata d'entrée/sortie le réduit.
-    (3) Supprimer un STC ne supprime pas son bulletin de sortie.
+    (3) ~~Supprimer un STC ne supprime pas son bulletin de sortie.~~ **Résolu le 26 octobre 2026** (voir l'entrée de cette date).
     (4) Fêtes musulmanes 2027 et suivantes à saisir à la main ; Tabaski 2026 sourcée par la FAIB seulement.
     (5) La garde « Lecture seule » affiche un message traduit dans la barre d'état ; une boîte de dialogue qui affiche
-    `ex.Message` brut peut encore montrer « not authorized ».
+    `ex.Message` brut peut encore montrer « not authorized ». Depuis le 26 octobre, le message traduit s'affiche aussi en
+    notification (`BaseViewModel.StatusMessage`), mais les boîtes de dialogue qui affichent `ex.Message` brut restent à reprendre.
     (6) Limites Sage supposées (journal 6, pièce 13, référence 17, compte 13) : à confirmer sur le poste du client.
 
     - **22 octobre 2026 — gestion des utilisateurs : la sélection remplit enfin la fiche (version 1.4.38.1).** Signalé
@@ -1798,6 +1802,49 @@ la feuille de route à partir d'ici — après avoir confirmé le prochain modul
     session et le menu « Connecté : … » (`MainWindow.xaml.cs`). — *Vérification* : compilation complète 0 erreur ; 13
     contrôles du service sous Mono (modification, doublon, dernier administrateur, mot de passe conservé / changé / trop
     court, identifiant vide).
+
+    - **26 octobre 2026 — défauts métier restants, ergonomie et sécurité (version 1.4.38.2).** Aucun changement de schéma
+    (`SchemaCible` reste à 38).
+      1. *Recours favorable — annulation de la retenue* (RH-06). Nouveau bouton « Recours favorable : annuler la retenue »
+         (section 9 de l'écran Discipline, `DisciplineViewModel.AnnulerRetenueCommand`) ; actif seulement pour une mise à pied
+         NOTIFIÉE dont la date de recours est enregistrée et dont la retenue n'est pas déjà annulée. Il appelle
+         `DisciplineService.AnnulerPenalitesRecoursAsync`, en une transaction : l'absence « Mise à pied » liée est retirée de
+         PAI-04 par `AppliquerAbsenceAsync` (refus si le mois de paie est clôturé, comme pour toute correction), le lien
+         `AbsenceMiseAPiedId` est vidé, les jours retenus passent à 0 (les dates restent au registre, et une procédure
+         notifiée ne recrée donc plus d'absence), et l'issue du recours reçoit la mention « Recours favorable : retenue
+         annulée le … » ; journal d'audit. La sanction reste au registre, le statut « Notifiée » ne change pas. La mise à pied
+         conservatoire d'un licenciement pour faute lourde n'est pas concernée. *Limite* : l'issue du recours est un texte
+         libre, rien n'indique encore « favorable » de façon structurée — c'est l'utilisateur qui déclenche l'annulation.
+         Une fois les jours à 0, l'écran signale la règle « indiquez le nombre de jours » comme alerte déjà présente sur la
+         version notifiée, ce qui n'empêche pas d'enregistrer un accusé de réception ou un commentaire.
+      2. *Prorata du 13ᵉ mois au solde de tout compte* (SAL-05). `SoldeToutCompteService.MoisPresence13emeMois` (mois de
+         30 jours, du 1er janvier — ou de l'entrée si elle est la même année — à la sortie incluse, plafonné à 12 :
+         du 1er janvier au 15 mars = 2,5) et `Calculer13emeMoisProrata` (salaire de référence ÷ 12 × mois de présence).
+         **Optionnel** : case « Prorata de l'année si vide » à côté de « Gratification 13e » ; une gratification saisie
+         l'emporte ; sans la case, le comportement d'avant est inchangé (0) — tous les employeurs ne versent pas de 13ᵉ mois.
+         Le bulletin de sortie reprend ce montant par la rubrique `GRATIF`. 5 tests ajoutés (`SoldeToutCompteTests`).
+      3. *Suppression d'un solde de tout compte* : supprime aussi le bulletin de sortie du mois de sortie et remet le
+         salarié « Actif » (date et motif de sortie effacés) — dette (3) du §7 levée. *Limite* : le bulletin est retrouvé
+         par mois de calcul et salarié ; non rejoué sur un dossier réel.
+      4. *Rappels* : `RappelPaieService.ObtenirRappelDoublonAsync` refuse la création d'un rappel identique (même salarié,
+         type, montant brut et mois d'origine, hors statut 2).
+      5. *Ergonomie / sécurité* : confirmation avant de supprimer un calcul de l'historique ; `NotificationService` (non
+         bloquant) remplace plusieurs `MessageBox` (menu, sauvegarde / restauration) ; message « lecture seule » traduit aussi
+         en notification ; `users.json` chiffré par DPAPI et injection de formules Excel neutralisée (déjà commités).
+      6. *Abattement professionnel — modification TENTÉE PUIS RETIRÉE.* Calculer l'abattement sur la rémunération permanente
+         (après absences) au lieu du salaire de base a été essayé : il appliquait le prorata d'entrée/sortie deux fois
+         (8 333 au lieu de 25 000 pour une entrée à mi-mois) et contredisait le comportement validé par le client et couvert par
+         `CorrectionsPaieTests.AbsenceOrdinaire_AbattementInchange` (75 000 → 62 500). Le moteur est revenu à l'état commité.
+         *À trancher avec le client* : si la règle voulue est bien l'abattement sur la rémunération permanente, il faudra
+         changer ce test et la dette (2) ci-dessus, et ne prorater qu'une fois.
+      7. *Vérification* : compilation complète du projet et des tests par MSBuild (Visual Studio 2022), 0 erreur — elle a
+         révélé quatre erreurs de modifications jamais compilées (méthode `EnregistrerRappelAsync` dupliquée dans
+         `RappelPaieService.cs`, `using` et appel de `MessageBox` dans `HistoryViewModel`, deux membres inexistants dans
+         `SoldeToutCompteViewModel`), corrigées. Suite complète : **196 / 197** tests réussis. Seul échec :
+         `ProtectionDonneesTests.MiseANiveauEnEchec_LaisseLeFichierIntact`, **antérieur à ces changements** (le test pose son
+         obstacle sur la table `AccidentsTravail`, que la migration 38 idempotente ne bloque plus) — à réécrire avec un
+         autre obstacle. Non testés en conditions réelles : le bouton d'annulation, la suppression d'un solde et la case du
+         13ᵉ mois (seuls les calculs sont couverts par des tests).
 
 ---
 

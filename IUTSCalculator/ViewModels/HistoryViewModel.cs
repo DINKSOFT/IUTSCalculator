@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -384,10 +385,16 @@ namespace IUTSCalculator.ViewModels
         {
             if (SelectedCalculation != null)
             {
+                var confirmation = MessageBox.Show(
+                    $"Supprimer définitivement le calcul de {SelectedCalculation.Employee.LastName} {SelectedCalculation.Employee.FirstName} du {SelectedCalculation.CalculationDate:dd/MM/yyyy} ?",
+                    "Confirmation de suppression", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (confirmation != MessageBoxResult.Yes) return;
+
                 try
                 {
                     IsBusy = true;
                     StatusMessage = "Suppression du calcul...";
+
 
                     // Supprimer le calcul via le service de données
                     await _dataService.DeleteCalculationFromHistoryAsync(SelectedCalculation.Id);

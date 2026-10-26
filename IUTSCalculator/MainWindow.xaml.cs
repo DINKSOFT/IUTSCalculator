@@ -167,8 +167,7 @@ namespace IUTSCalculator
         /// </summary>
         private void DisplayPreferences_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Fonctionnalité à implémenter", "Information",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            NotificationService.Instance.Info("Fonctionnalité à implémenter");
         }
 
         /// <summary>
@@ -176,8 +175,7 @@ namespace IUTSCalculator
         /// </summary>
         private void OpenDocumentation_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("La documentation sera ouverte dans une version future.",
-                "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            NotificationService.Instance.Info("La documentation sera ouverte dans une version future.");
         }
 
         /// <summary>
@@ -190,8 +188,7 @@ namespace IUTSCalculator
                                "Données de ce poste : " + IUTSCalculator.Helpers.Constants.AppDataFolder + "\n\n" +
                                "© 2025-2026 — Tous droits réservés.";
 
-            MessageBox.Show(aboutMessage, "À propos",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            NotificationService.Instance.Info(aboutMessage);
         }
 
         /// <summary>

@@ -51,6 +51,6 @@ using System.Windows;
 // Règle de Sigma Paie & RH (voir ETAT-DEVELOPPEMENT.md, §4) : 1.<dernière phase livrée>.<SchemaCible>.<révision>.
 // À CHAQUE livraison : changer la révision (ou le niveau de schéma s'il a changé) ET la date
 // de AssemblyInformationalVersion, qui est le libellé affiché dans le programme.
-[assembly: AssemblyVersion("1.4.38.1")]
-[assembly: AssemblyFileVersion("1.4.38.1")]
-[assembly: AssemblyInformationalVersion("1.4.38.1 du 22/10/2026")]
+[assembly: AssemblyVersion("1.4.38.2")]
+[assembly: AssemblyFileVersion("1.4.38.2")]
+[assembly: AssemblyInformationalVersion("1.4.38.2 du 26/10/2026")]

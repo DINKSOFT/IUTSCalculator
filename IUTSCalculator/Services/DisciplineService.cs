@@ -1137,6 +1137,76 @@ namespace IUTSCalculator.Services
         }
 
         // ═══════════════════════════════════════════════════════════════════
+        //  Recours & Annulations
+        // ═══════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Annule les pénalités financières (mise à pied) d'une procédure après un recours favorable.
+        /// Si une absence de mise à pied était liée, elle est supprimée.
+        /// </summary>
+        public async Task<string> AnnulerPenalitesRecoursAsync(ProcedureDisciplinaire p)
+        {
+            if (p == null || p.Id <= 0) throw new InvalidOperationException("Aucune procédure enregistrée à annuler.");
+
+            var messages = new List<string>();
+            ProcedureDisciplinaire enBase;
+            using (var conn = _sqlite.CreateConnection())
+            {
+                var types = await ChargerTypesAsync(conn, null);
+                enBase = (await ChargerProceduresAsync(conn, null, types, p.EmployeeId ?? "")).FirstOrDefault(x => x.Id == p.Id);
+                if (enBase == null) throw new InvalidOperationException("Cette procédure a été supprimée entre-temps.");
+                if (enBase.Statut != StatutProcedure.Notifiee)
+                    throw new InvalidOperationException("Seule une sanction notifiée peut être annulée à la suite d'un recours.");
+                if (!enBase.DateRecours.HasValue)
+                    throw new InvalidOperationException("Saisissez d'abord la date du recours du salarié, puis enregistrez.");
+                if (enBase.TypeSanction == null || !enBase.TypeSanction.EstMiseAPied)
+                    throw new InvalidOperationException("Cette sanction n'a pas d'effet financier : il n'y a aucune retenue à annuler.");
+                if (!enBase.AbsenceMiseAPiedId.HasValue && enBase.MiseAPiedJours <= 0m)
+                    throw new InvalidOperationException("La retenue de cette mise à pied est déjà annulée.");
+
+                using (var tx = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // Retire l'absence « Mise à pied » ; refuse si le mois de paie est clôturé.
+                        await AppliquerAbsenceAsync(conn, tx, enBase.AbsenceMiseAPiedId, null,
+                            new[] { enBase.AbsenceMiseAPiedId, enBase.AbsenceConservatoireId },
+                            "mise à pied disciplinaire", messages);
+
+                        string issue = "Recours favorable : retenue annulée le " + DateTime.Today.ToString("dd/MM/yyyy", LibellesDiscipline.Fr);
+                        if (!string.IsNullOrWhiteSpace(enBase.IssueRecours)) issue += " (" + enBase.IssueRecours.Trim() + ")";
+
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            cmd.Transaction = tx;
+                            // Les dates restent au registre ; sans jours retenus, plus aucune absence ne sera recréée.
+                            cmd.CommandText =
+                                "UPDATE ProceduresDisciplinaires SET MiseAPiedJours = @j, AbsenceMiseAPiedId = NULL, " +
+                                "IssueRecours = @issue, DateModification = @maj WHERE Id = @id;";
+                            cmd.Parameters.AddWithValue("@j", DbValue.DecimalToDb(0m));
+                            cmd.Parameters.AddWithValue("@issue", issue);
+                            cmd.Parameters.AddWithValue("@maj", DbValue.DateToDb(DateTime.Now));
+                            cmd.Parameters.AddWithValue("@id", p.Id);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                        tx.Commit();
+                    }
+                    catch
+                    {
+                        tx.Rollback();
+                        throw;
+                    }
+                }
+            }
+
+            await _audit.EnregistrerAsync("Annulation de la retenue (recours favorable)", EntiteAudit, enBase.Reference,
+                details: string.Format(LibellesDiscipline.Fr, "Salarié {0} : mise à pied de {1:0.##} j retirée de la paie",
+                    enBase.EmployeeId, enBase.MiseAPiedJours));
+
+            return messages.Count == 0 ? "Retenue annulée." : "Retenue annulée. " + string.Join(" ", messages);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
         //  Utilitaires
         // ═══════════════════════════════════════════════════════════════════
 

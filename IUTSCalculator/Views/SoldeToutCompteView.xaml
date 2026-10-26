@@ -170,6 +170,8 @@
                                         <TextBlock Text="Gratification 13e" Style="{StaticResource FieldLabel}"/>
                                         <TextBox Text="{Binding Gratification, UpdateSourceTrigger=PropertyChanged}"
                                                  Height="28" Padding="6,2" VerticalContentAlignment="Center"/>
+                                        <CheckBox Content="Prorata de l'année si vide" IsChecked="{Binding Calculer13emeProrata}" Margin="0,4,0,0"
+                                                  ToolTip="Salaire de référence / 12 × mois de présence de l'année de sortie."/>
                                     </StackPanel>
                                 </Grid>
 

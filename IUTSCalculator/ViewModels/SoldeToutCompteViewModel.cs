@@ -233,6 +233,21 @@ namespace IUTSCalculator.ViewModels
             }
         }
 
+        private bool _calculer13emeProrata;
+
+        /// <summary>Calcule le 13e mois au prorata du temps de présence de l'année (sans effet si une gratification est saisie).</summary>
+        public bool Calculer13emeProrata
+        {
+            get => _calculer13emeProrata;
+            set
+            {
+                if (SetProperty(ref _calculer13emeProrata, value))
+                {
+                    _ = CalculerSoldeAutomatiqueAsync();
+                }
+            }
+        }
+
         public decimal Gratification
         {
             get => _gratification;
@@ -513,7 +528,8 @@ namespace IUTSCalculator.ViewModels
                     LibelleIndemnitesDiverses,
                     AutresDeductions,
                     LibelleAutresDeductions,
-                    DureePreavisManuelle);
+                    DureePreavisManuelle,
+                    Calculer13emeProrata);
 
                 // Bulletin de sortie calculé par le moteur de paie : le décompte s'aligne sur
                 // lui (IUTS au barème, CNSS plafonnée, net = net du bulletin).
@@ -701,10 +717,43 @@ namespace IUTSCalculator.ViewModels
             try
             {
                 IsBusy = true;
+
+                // Correction : Supprimer le bulletin de sortie associé si présent
+                // pour éviter qu'un bulletin de sortie persiste sans décompte.
+                if (_dataService != null)
+                {
+                    // On récupère le bulletin enregistré pour le mois de sortie
+                    var periodeSortie = new DateTime(SelectedSoldeHistorique.DateSortie.Year, SelectedSoldeHistorique.DateSortie.Month, 1);
+                    if (await _dataService.BulletinEnregistreAsync(SelectedSoldeHistorique.EmployeeId, periodeSortie))
+                    {
+                        // On cherche le bulletin pour obtenir son ID de calcul
+                        var bulletins = await _dataService.LoadCalculationsHistoryAsync();
+                        var bulletinSortie = bulletins.FirstOrDefault(c =>
+                            c.Employee != null && c.Employee.EmployeeId == SelectedSoldeHistorique.EmployeeId &&
+                            c.CalculationDate.Year == periodeSortie.Year &&
+                            c.CalculationDate.Month == periodeSortie.Month);
+
+                        if (bulletinSortie != null)
+                        {
+                            await _dataService.DeleteCalculationFromHistoryAsync(bulletinSortie.Id);
+                        }
+                    }
+                }
+
                 bool ok = await _stcService.SupprimerSoldeAsync(SelectedSoldeHistorique.Id);
                 if (ok)
                 {
-                    StatusMessage = "Solde supprimé de l'historique.";
+                    // Correction : Rétablir le statut du salarié à 'Actif'
+                    var employee = await _dataService.GetEmployeeByIdAsync(SelectedSoldeHistorique.EmployeeId);
+                    if (employee != null)
+                    {
+                        employee.StatutSalarie = (int)StatutEmploye.Actif;
+                        employee.DateSortie = null;
+                        employee.MotifDepart = null;
+                        await _dataService.UpdateEmployeeAsync(employee);
+                    }
+
+                    StatusMessage = "Solde supprimé et salarié rétabli comme actif.";
                     await ChargerSoldesHistoriqueAsync();
                 }
             }

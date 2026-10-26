@@ -152,10 +152,25 @@ namespace IUTSCalculator.Views
             UserRole role = RoleDepuisIndex(FicheRole.SelectedIndex);
 
             if (identifiant.Length == 0) { Info("L'identifiant est obligatoire.", true); return; }
-            if (!string.Equals(mdp, FicheMdpConfirmation.Password ?? string.Empty, StringComparison.Ordinal))
+
+            // Validation du mot de passe uniquement pour la création ou si un nouveau MDP est saisi
+            if (_enModification == null || mdp.Length > 0)
             {
-                Info("Les deux mots de passe saisis ne sont pas identiques.", true);
-                return;
+                if (string.IsNullOrEmpty(mdp) && _enModification == null)
+                {
+                    Info("Le mot de passe est obligatoire pour un nouvel utilisateur.", true);
+                    return;
+                }
+                if (!string.Equals(mdp, FicheMdpConfirmation.Password ?? string.Empty, StringComparison.Ordinal))
+                {
+                    Info("Les deux mots de passe saisis ne sont pas identiques.", true);
+                    return;
+                }
+                if (mdp.Length > 0 && mdp.Length < 6)
+                {
+                    Info("Le mot de passe doit comporter au moins 6 caractères.", true);
+                    return;
+                }
             }
 
             try

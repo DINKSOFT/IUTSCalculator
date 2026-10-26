@@ -424,6 +424,7 @@ namespace IUTSCalculator.ViewModels
         public ICommand EnregistrerCommand { get; }
         public ICommand AnnulerCommand { get; }
         public ICommand SupprimerCommand { get; }
+        public ICommand AnnulerRetenueCommand { get; }
         public ICommand ProposerJoursCommand { get; }
         public ICommand AujourdhuiExplicationCommand { get; }
         public ICommand AjouterPieceCommand { get; }
@@ -467,6 +468,12 @@ namespace IUTSCalculator.ViewModels
             AnnulerCommand = new RelayCommand(Annuler, () => !IsBusy && _procedureEnCours != null && _modifiee);
             SupprimerCommand = new RelayCommand(async () => await SupprimerAsync(),
                 () => enregistree() && _procedureSelectionnee != null && _procedureSelectionnee.Statut != StatutProcedure.Notifiee);
+            AnnulerRetenueCommand = new RelayCommand(async () => await AnnulerRetenueAsync(),
+                () => enregistree() && !_modifiee && _procedureSelectionnee != null
+                      && _procedureSelectionnee.Statut == StatutProcedure.Notifiee
+                      && _procedureSelectionnee.DateRecours.HasValue
+                      && _procedureSelectionnee.TypeSanction != null && _procedureSelectionnee.TypeSanction.EstMiseAPied
+                      && _procedureSelectionnee.MiseAPiedJours > 0m);
             ProposerJoursCommand = new RelayCommand(ProposerJours, () => ouverte() && EstMiseAPied && ChampsFondateursModifiables);
             AujourdhuiExplicationCommand = new RelayCommand(() => { if (_procedureEnCours != null) _procedureEnCours.DateDemandeExplication = DateTime.Today; },
                 () => ouverte() && ChampsFondateursModifiables);
@@ -839,6 +846,35 @@ namespace IUTSCalculator.ViewModels
                 StatusMessage = "Enregistrement impossible : " + ex.Message;
                 MessageBox.Show(ex.Message, "Procédure disciplinaire", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task AnnulerRetenueAsync()
+        {
+            var p = _procedureSelectionnee;
+            if (p == null) return;
+            var ok = MessageBox.Show(
+                string.Format(LibellesDiscipline.Fr,
+                    "Le recours de {0} a-t-il abouti ?\n\nLa mise à pied de {1:0.##} jour(s) sera retirée des congés et absences : la retenue disparaît de la paie. " +
+                    "La sanction reste au registre, avec la mention du recours favorable.\n\nAnnuler la retenue ?",
+                    p.NomSalarie, p.MiseAPiedJours),
+                "Recours favorable", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (ok != MessageBoxResult.Yes) return;
+
+            try
+            {
+                IsBusy = true;
+                StatusMessage = await _service.AnnulerPenalitesRecoursAsync(p);
+                await RechargerProceduresAsync(p.Id);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Annulation impossible : " + ex.Message;
+                MessageBox.Show(ex.Message, "Recours favorable", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             finally
             {

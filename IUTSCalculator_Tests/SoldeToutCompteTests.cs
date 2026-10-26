@@ -243,5 +243,50 @@ namespace IUTSCalculator.Tests
                 try { if (System.IO.File.Exists(tempExcel)) System.IO.File.Delete(tempExcel); } catch { }
             }
         }
+
+        // ── Prorata du 13e mois ──────────────────────────────────────────
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void MoisPresence13emeMois_Du1erJanvierAu15Mars_DeuxMoisEtDemi()
+        {
+            decimal mois = SoldeToutCompteService.MoisPresence13emeMois(new DateTime(2020, 5, 1), new DateTime(2026, 3, 15));
+            Assert.That(mois, Is.EqualTo(2.5m));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void MoisPresence13emeMois_SortieFinDAnnee_DouzeMois()
+        {
+            decimal mois = SoldeToutCompteService.MoisPresence13emeMois(new DateTime(2020, 5, 1), new DateTime(2026, 12, 31));
+            Assert.That(mois, Is.EqualTo(12m));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void MoisPresence13emeMois_EntreeEtSortieMemeAnnee_CompteDepuisLEntree()
+        {
+            // Du 21 mars au 30 juin : 3 mois et 10 jours = 3,33 mois
+            decimal mois = SoldeToutCompteService.MoisPresence13emeMois(new DateTime(2026, 3, 21), new DateTime(2026, 6, 30));
+            Assert.That(mois, Is.EqualTo(3.33m));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void MoisPresence13emeMois_EntreeApresLaSortie_Zero()
+        {
+            decimal mois = SoldeToutCompteService.MoisPresence13emeMois(new DateTime(2026, 8, 1), new DateTime(2026, 3, 15));
+            Assert.That(mois, Is.EqualTo(0m));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void Calculer13emeMoisProrata_SalaireEtMois_DouzieamesProportionnels()
+        {
+            // 300 000 / 12 × 2,5 = 62 500
+            Assert.That(SoldeToutCompteService.Calculer13emeMoisProrata(300_000m, 2.5m), Is.EqualTo(62_500m));
+            Assert.That(SoldeToutCompteService.Calculer13emeMoisProrata(300_000m, 0m), Is.EqualTo(0m));
+            Assert.That(SoldeToutCompteService.Calculer13emeMoisProrata(0m, 6m), Is.EqualTo(0m));
+        }
     }
 }

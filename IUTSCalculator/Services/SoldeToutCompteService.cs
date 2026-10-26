@@ -61,7 +61,8 @@ namespace IUTSCalculator.Services
             string libelleDivers = null,
             decimal autresDeductions = 0m,
             string libelleDeductions = null,
-            int? dureePreavisManuelle = null)
+            int? dureePreavisManuelle = null,
+            bool calculer13emeProrata = false)
         {
             if (salarie == null)
                 throw new ArgumentNullException(nameof(salarie));
@@ -169,11 +170,18 @@ namespace IUTSCalculator.Services
                 stc.IndemniteLicenciement = 0m;
             }
 
-            // 7. Prorata de 13ème mois
+            // 7. Prorata de 13ème mois. Une gratification saisie l'emporte ; sinon le prorata
+            // n'est calculé que si le dossier le demande (tous les employeurs ne versent pas
+            // de 13e mois : le calcul automatique ne doit pas en créer un à leur place).
             if (gratification > 0m)
             {
                 stc.Mois13emeMois = dateSortie.Month;
                 stc.Indemnite13emeMois = gratification;
+            }
+            else if (calculer13emeProrata)
+            {
+                stc.Mois13emeMois = MoisPresence13emeMois(stc.DateEntree, dateSortie);
+                stc.Indemnite13emeMois = Calculer13emeMoisProrata(stc.SalaireReference, stc.Mois13emeMois);
             }
             else
             {
@@ -208,6 +216,30 @@ namespace IUTSCalculator.Services
             }
 
             return stc;
+        }
+
+        /// <summary>
+        /// Mois de présence dans l'année civile de la sortie, en mois de 30 jours : du 1er janvier
+        /// (ou de la date d'entrée si elle est la même année) jusqu'à la date de sortie incluse.
+        /// Du 1er janvier au 15 mars : 2,5 mois. Plafonné à 12.
+        /// </summary>
+        public static decimal MoisPresence13emeMois(DateTime dateEntree, DateTime dateSortie)
+        {
+            DateTime debutAnnee = new DateTime(dateSortie.Year, 1, 1);
+            DateTime debut = dateEntree.Date > debutAnnee ? dateEntree.Date : debutAnnee;
+            if (debut > dateSortie.Date) return 0m;
+
+            int mois = dateSortie.Month - debut.Month;
+            int jours = Math.Min(dateSortie.Day, 30) - Math.Min(debut.Day, 30) + 1;
+            decimal total = mois + jours / 30m;
+            return Math.Min(12m, Math.Max(0m, Math.Round(total, 2)));
+        }
+
+        /// <summary>13e mois au prorata : salaire de référence / 12 × mois de présence.</summary>
+        public static decimal Calculer13emeMoisProrata(decimal salaireReference, decimal moisPresence)
+        {
+            if (salaireReference <= 0m || moisPresence <= 0m) return 0m;
+            return Math.Round(salaireReference / 12m * moisPresence, 0);
         }
 
         /// <summary>

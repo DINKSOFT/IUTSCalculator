@@ -55,7 +55,7 @@ namespace IUTSCalculator.Helpers
             }
             catch (Exception ex)
             {
-                MessageBox.Show("La sauvegarde a échoué : " + ex.Message, TitreFenetre, MessageBoxButton.OK, MessageBoxImage.Error);
+                NotificationService.Instance.Error("La sauvegarde a échoué : " + ex.Message);
                 return "Sauvegarde non faite : " + ex.Message;
             }
         }
@@ -68,9 +68,8 @@ namespace IUTSCalculator.Helpers
         {
             if (DossierSession.Instance.HasOpenDossier)
             {
-                MessageBox.Show("Un dossier est ouvert. Pour restaurer une sauvegarde, quittez le programme, relancez-le, " +
-                                "puis choisissez « Restaurer une sauvegarde » avant d'ouvrir un dossier.",
-                    "Restauration", MessageBoxButton.OK, MessageBoxImage.Information);
+                NotificationService.Instance.Info("Un dossier est ouvert. Pour restaurer une sauvegarde, quittez le programme, relancez-le, " +
+                                "puis choisissez « Restaurer une sauvegarde » avant d'ouvrir un dossier.");
                 return null;
             }
 
@@ -92,14 +91,14 @@ namespace IUTSCalculator.Helpers
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Restauration", MessageBoxButton.OK, MessageBoxImage.Warning);
+                NotificationService.Instance.Warning(ex.Message);
                 return "Restauration impossible : " + ex.Message;
             }
 
             var obstacle = SauvegardeService.Obstacle(contenu);
             if (obstacle != null)
             {
-                MessageBox.Show(obstacle, "Restauration refusée", MessageBoxButton.OK, MessageBoxImage.Warning);
+                NotificationService.Instance.Warning(obstacle);
                 return "Restauration refusée : " + obstacle;
             }
 

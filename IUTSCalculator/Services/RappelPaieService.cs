@@ -132,6 +132,18 @@ namespace IUTSCalculator.Services
             if (rappel.MoisImputation < 1 || rappel.MoisImputation > 12 || rappel.AnneeImputation < 2000)
                 throw new ArgumentException("Le mois et l'année d'imputation sont obligatoires (mois de 1 à 12).");
 
+            // Correction : Contrôle anti-doublon.
+            // On refuse d'enregistrer un rappel si un autre rappel identique (même employé, même type,
+            // même montant et même période d'origine) existe déjà et est toujours en attente ou imputé.
+            if (rappel.Id == 0)
+            {
+                var doublon = await ObtenirRappelDoublonAsync(rappel);
+                if (doublon != null)
+                {
+                    throw new InvalidOperationException($"Un rappel identique existe déjà pour cet employé sur la même période d'origine : {doublon.Libelle}.");
+                }
+            }
+
             return await Task.Run(async () =>
             {
                 int id = rappel.Id;
@@ -148,7 +160,6 @@ namespace IUTSCalculator.Services
                             "Le mois d'imputation {0:00}/{1} est clôturé : un rappel s'impute sur la paie d'un mois ouvert. " +
                             "Choisissez le mois de paie en cours.", rappel.MoisImputation, rappel.AnneeImputation));
                     }
-
                     using (var cmd = connection.CreateCommand())
                     {
                         if (id == 0)
@@ -199,7 +210,6 @@ namespace IUTSCalculator.Services
                                 WHERE Id = @id;";
                             cmd.Parameters.AddWithValue("@id", id);
                         }
-
                         cmd.Parameters.AddWithValue("@emp", rappel.EmployeeId);
                         cmd.Parameters.AddWithValue("@type", (int)rappel.TypeRappel);
                         cmd.Parameters.AddWithValue("@libelle", rappel.Libelle ?? string.Empty);
@@ -223,7 +233,6 @@ namespace IUTSCalculator.Services
                         cmd.Parameters.AddWithValue("@dc", DbValue.DateToDb(rappel.DateCreation));
                         cmd.Parameters.AddWithValue("@di", rappel.DateImputation.HasValue ? DbValue.DateToDb(rappel.DateImputation.Value) : (object)DBNull.Value);
                         cmd.Parameters.AddWithValue("@creepar", rappel.CreePar ?? (object)DBNull.Value);
-
                         if (id == 0)
                         {
                             id = Convert.ToInt32(cmd.ExecuteScalar());
@@ -235,7 +244,6 @@ namespace IUTSCalculator.Services
                         }
                     }
                 }
-
                 if (_auditService != null)
                 {
                     try
@@ -248,8 +256,47 @@ namespace IUTSCalculator.Services
                     }
                     catch { }
                 }
-
                 return id;
+            });
+        }
+
+        private async Task<RappelPaie> ObtenirRappelDoublonAsync(RappelPaie rappel)
+        {
+            return await Task.Run(() =>
+            {
+                using (var connection = _sqliteService.CreateConnection())
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            SELECT r.Id, r.EmployeeId, r.TypeRappel, r.Libelle, r.Sens,
+                                   r.MoisOrigineDebut, r.MoisOrigineFin, r.AnneeImputation, r.MoisImputation,
+                                   r.MontantBrut, r.MontantCnssSalarial, r.MontantCnssPatronal,
+                                   r.MontantTPA, r.MontantIUTS, r.MontantNet,
+                                   r.SoumisIUTS, r.SoumisCNSS, r.SoumisTPA, r.Statut,
+                                   r.Motif, r.DetailsCalculJson, r.DateCreation, r.DateImputation, r.CreePar,
+                                   e.FirstName, e.LastName
+                            FROM RappelsPaie r
+                            LEFT JOIN Employees e ON e.EmployeeId = r.EmployeeId
+                            WHERE r.EmployeeId = @emp
+                              AND r.TypeRappel = @type
+                              AND r.MontantBrut = @brut
+                              AND r.MoisOrigineDebut = @mod
+                              AND r.MoisOrigineFin = @mof
+                              AND r.Statut != 2
+                            LIMIT 1;";
+                        cmd.Parameters.AddWithValue("@emp", rappel.EmployeeId);
+                        cmd.Parameters.AddWithValue("@type", (int)rappel.TypeRappel);
+                        cmd.Parameters.AddWithValue("@brut", DbValue.MoneyToDb(rappel.MontantBrut));
+                        cmd.Parameters.AddWithValue("@mod", rappel.MoisOrigineDebut.HasValue ? DbValue.DateToDb(rappel.MoisOrigineDebut.Value) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@mof", rappel.MoisOrigineFin.HasValue ? DbValue.DateToDb(rappel.MoisOrigineFin.Value) : (object)DBNull.Value);
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read()) return LireRappel(reader);
+                        }
+                    }
+                }
+                return null;
             });
         }
 
