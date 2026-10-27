@@ -364,7 +364,7 @@ namespace IUTSCalculator.Tests
             _dbName = Path.Combine(dir, "test_temps_" + Guid.NewGuid().ToString("N") + ".db");
             _sqlite = new SQLiteService(_dbName);
 
-            using (var c = _sqlite.CreateConnection())
+            using (var c = _sqlite.CreerConnexion())
             using (var cmd = c.CreateCommand())
             {
                 cmd.CommandText =
@@ -380,7 +380,7 @@ namespace IUTSCalculator.Tests
         {
             try
             {
-                System.Data.SQLite.SQLiteConnection.ClearAllPools();
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (File.Exists(_dbName)) File.Delete(_dbName);
             }
             catch

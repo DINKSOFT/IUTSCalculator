@@ -48,10 +48,9 @@ namespace IUTSCalculator.Services
         /// Fournit la clé de chiffrement des bases (voir <see cref="CleDonnees"/>) ; null : bases
         /// en clair. Lue une fois par instance, à sa construction.
         ///
-        /// TRANSITION : tant que des services utilisent encore <see cref="CreateConnection"/>
-        /// (System.Data.SQLite, qui ne sait pas lire une base chiffrée), l'application ne branche
-        /// pas ce fournisseur. Il est branché une fois tous les services passés à
-        /// <see cref="CreerConnexion"/>.
+        /// L'application ne le branche pas encore : les bases existantes doivent d'abord être
+        /// chiffrées au premier lancement, et les sauvegardes protégées par le mot de passe de
+        /// sauvegarde (étapes suivantes du chiffrement).
         /// </summary>
         public static Func<string> FournisseurCle;
 
@@ -108,34 +107,11 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
-        /// TRANSITION — connexion System.Data.SQLite, pour les services pas encore passés à
-        /// <see cref="CreerConnexion"/>. Refusée quand le chiffrement est actif : ce fournisseur
-        /// ne sait pas lire une base chiffrée. À supprimer avec la référence System.Data.SQLite.
-        /// </summary>
-        public System.Data.SQLite.SQLiteConnection CreateConnection()
-        {
-            if (_cle != null)
-                throw new InvalidOperationException("Accès System.Data.SQLite impossible : les bases sont chiffrées. Ce service doit utiliser CreerConnexion().");
-
-            var connection = new System.Data.SQLite.SQLiteConnection(ChaineConnexionHeritee(_dbPath));
-
-            var garde = GardeConnexion;
-            if (_schemaPret && garde != null)
-                garde(connection);
-
-            connection.Open();
-            return connection;
-        }
-
-        /// <summary>
         /// Contrôle appliqué à chaque connexion ouverte par <see cref="CreerConnexion"/> une fois
         /// le schéma du dossier prêt. L'application WPF y branche la garde du profil
         /// « Lecture seule » (GardeLectureSeule) ; nul dans les outils et les tests.
         /// </summary>
         public static Action<SqliteConnection> GardeConnexionSqlite;
-
-        /// <summary>TRANSITION — même garde, pour les connexions de <see cref="CreateConnection"/>.</summary>
-        public static Action<System.Data.SQLite.SQLiteConnection> GardeConnexion;
 
         /// <summary>Vrai une fois la vérification / mise à niveau du schéma terminée.</summary>
         private bool _schemaPret;
@@ -485,11 +461,6 @@ namespace IUTSCalculator.Services
             return builder.ToString();
         }
 
-        private static string ChaineConnexionHeritee(string chemin)
-        {
-            return string.Format(CultureInfo.InvariantCulture, "Data Source={0};Version=3;BusyTimeout=5000;", chemin);
-        }
-
         /// <summary>
         /// Ouvre une connexion et, si <paramref name="cle"/> est fournie, la déverrouille : format
         /// SQLCipher 4 (« legacy=4 ») pour rester lisible par les outils SQLCipher standard.
@@ -654,8 +625,8 @@ namespace IUTSCalculator.Services
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = "INSERT INTO SchemaVersion (Version, AppliedOn) VALUES (@v, @d);";
-                cmd.Parameters.AddWithValue("@v", version);
-                cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(DateTime.Now));
+                cmd.Parameters.AjouterValeur("@v", version);
+                cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(DateTime.Now));
                 cmd.ExecuteNonQuery();
             }
         }
@@ -1490,7 +1461,7 @@ namespace IUTSCalculator.Services
                             'Convention collective interprofessionnelle régissant les rapports de travail entre employeurs et travailleurs du Burkina Faso.',
                             0, 1, @now, @now
                         );";
-                    cmd.Parameters.AddWithValue("@now", now);
+                    cmd.Parameters.AjouterValeur("@now", now);
                     cmd.ExecuteNonQuery();
                     convId = SQLitePCL.raw.sqlite3_last_insert_rowid(connection.Handle);
                 }
@@ -1547,11 +1518,11 @@ namespace IUTSCalculator.Services
                         ) VALUES (
                             @conv, @cat, @ech, @sal, @ord, ''
                         );";
-                    cmd.Parameters.AddWithValue("@conv", convId);
-                    cmd.Parameters.AddWithValue("@cat", item.Cat);
-                    cmd.Parameters.AddWithValue("@ech", item.Ech);
-                    cmd.Parameters.AddWithValue("@sal", DbValue.MoneyToDb(item.SalMin));
-                    cmd.Parameters.AddWithValue("@ord", item.Ordre);
+                    cmd.Parameters.AjouterValeur("@conv", convId);
+                    cmd.Parameters.AjouterValeur("@cat", item.Cat);
+                    cmd.Parameters.AjouterValeur("@ech", item.Ech);
+                    cmd.Parameters.AjouterValeur("@sal", DbValue.MoneyToDb(item.SalMin));
+                    cmd.Parameters.AjouterValeur("@ord", item.Ordre);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -1574,11 +1545,11 @@ namespace IUTSCalculator.Services
                         ) VALUES (
                             @conv, @min, @max, @taux, @ord
                         );";
-                    cmd.Parameters.AddWithValue("@conv", convId);
-                    cmd.Parameters.AddWithValue("@min", min);
-                    cmd.Parameters.AddWithValue("@max", max.HasValue ? (object)max.Value : DBNull.Value);
-                    cmd.Parameters.AddWithValue("@taux", DbValue.DecimalToDb(taux));
-                    cmd.Parameters.AddWithValue("@ord", annee);
+                    cmd.Parameters.AjouterValeur("@conv", convId);
+                    cmd.Parameters.AjouterValeur("@min", min);
+                    cmd.Parameters.AjouterValeur("@max", max.HasValue ? (object)max.Value : DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@taux", DbValue.DecimalToDb(taux));
+                    cmd.Parameters.AjouterValeur("@ord", annee);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -2174,11 +2145,11 @@ namespace IUTSCalculator.Services
                 cmd.CommandText = @"
                     INSERT OR IGNORE INTO Competences (Code, Libelle, Domaine, Description, DateCreation)
                     VALUES (@code, @libelle, @domaine, @desc, @date);";
-                cmd.Parameters.AddWithValue("@code", code);
-                cmd.Parameters.AddWithValue("@libelle", libelle);
-                cmd.Parameters.AddWithValue("@domaine", domaine);
-                cmd.Parameters.AddWithValue("@desc", description);
-                cmd.Parameters.AddWithValue("@date", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters.AjouterValeur("@code", code);
+                cmd.Parameters.AjouterValeur("@libelle", libelle);
+                cmd.Parameters.AjouterValeur("@domaine", domaine);
+                cmd.Parameters.AjouterValeur("@desc", description);
+                cmd.Parameters.AjouterValeur("@date", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 cmd.ExecuteNonQuery();
             }
         }
@@ -2684,16 +2655,16 @@ namespace IUTSCalculator.Services
                             "INSERT INTO BaremesHeuresSup (DateEffet, Libelle, Reference, EstSysteme, TauxTranche1, " +
                             "TauxTranche2, TauxNuit, TauxFerieJour, TauxFerieNuit, SeuilTranche1, DureeHebdoLegale) " +
                             "VALUES (@d, @l, @r, 1, @t1, @t2, @tn, @tfj, @tfn, @s1, @dh);";
-                        cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(b.DateEffet));
-                        cmd.Parameters.AddWithValue("@l", b.Libelle);
-                        cmd.Parameters.AddWithValue("@r", b.Reference);
-                        cmd.Parameters.AddWithValue("@t1", DbValue.DecimalToDb(b.TauxTranche1));
-                        cmd.Parameters.AddWithValue("@t2", DbValue.DecimalToDb(b.TauxTranche2));
-                        cmd.Parameters.AddWithValue("@tn", DbValue.DecimalToDb(b.TauxNuit));
-                        cmd.Parameters.AddWithValue("@tfj", DbValue.DecimalToDb(b.TauxFerieJour));
-                        cmd.Parameters.AddWithValue("@tfn", DbValue.DecimalToDb(b.TauxFerieNuit));
-                        cmd.Parameters.AddWithValue("@s1", DbValue.DecimalToDb(b.SeuilTranche1));
-                        cmd.Parameters.AddWithValue("@dh", DbValue.DecimalToDb(b.DureeHebdoLegale));
+                        cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(b.DateEffet));
+                        cmd.Parameters.AjouterValeur("@l", b.Libelle);
+                        cmd.Parameters.AjouterValeur("@r", b.Reference);
+                        cmd.Parameters.AjouterValeur("@t1", DbValue.DecimalToDb(b.TauxTranche1));
+                        cmd.Parameters.AjouterValeur("@t2", DbValue.DecimalToDb(b.TauxTranche2));
+                        cmd.Parameters.AjouterValeur("@tn", DbValue.DecimalToDb(b.TauxNuit));
+                        cmd.Parameters.AjouterValeur("@tfj", DbValue.DecimalToDb(b.TauxFerieJour));
+                        cmd.Parameters.AjouterValeur("@tfn", DbValue.DecimalToDb(b.TauxFerieNuit));
+                        cmd.Parameters.AjouterValeur("@s1", DbValue.DecimalToDb(b.SeuilTranche1));
+                        cmd.Parameters.AjouterValeur("@dh", DbValue.DecimalToDb(b.DureeHebdoLegale));
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -2856,15 +2827,15 @@ namespace IUTSCalculator.Services
                             "INSERT OR IGNORE INTO TypesSanction (Code, Libelle, Nature, Ordre, ExigeExplication, " +
                             "ExigeEntretien, DureeMaxJours, FauteLourde, EffacementMois, Actif, EstSysteme) " +
                             "VALUES (@c, @l, @n, @o, @ex, @en, @d, @fl, @ef, 1, 1);";
-                        cmd.Parameters.AddWithValue("@c", t.Code);
-                        cmd.Parameters.AddWithValue("@l", t.Libelle);
-                        cmd.Parameters.AddWithValue("@n", (int)t.Nature);
-                        cmd.Parameters.AddWithValue("@o", t.Ordre);
-                        cmd.Parameters.AddWithValue("@ex", t.ExigeExplication ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@en", t.ExigeEntretien ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@d", t.DureeMaxJours);
-                        cmd.Parameters.AddWithValue("@fl", t.FauteLourde ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@ef", t.EffacementMois);
+                        cmd.Parameters.AjouterValeur("@c", t.Code);
+                        cmd.Parameters.AjouterValeur("@l", t.Libelle);
+                        cmd.Parameters.AjouterValeur("@n", (int)t.Nature);
+                        cmd.Parameters.AjouterValeur("@o", t.Ordre);
+                        cmd.Parameters.AjouterValeur("@ex", t.ExigeExplication ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@en", t.ExigeEntretien ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@d", t.DureeMaxJours);
+                        cmd.Parameters.AjouterValeur("@fl", t.FauteLourde ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@ef", t.EffacementMois);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -2963,7 +2934,7 @@ namespace IUTSCalculator.Services
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM Rubriques WHERE Code = @c;";
-                cmd.Parameters.AddWithValue("@c", RubriqueService.CodeSalaireBase);
+                cmd.Parameters.AjouterValeur("@c", RubriqueService.CodeSalaireBase);
                 if (DbValue.IntFromDb(cmd.ExecuteScalar()) > 0)
                     return;
             }
@@ -2995,26 +2966,26 @@ namespace IUTSCalculator.Services
                             (@Code, @Libelle, @Sens, @ModeCalcul, @MontantFixe, @TauxSalarial, @TauxPatronal, @CodeBase,
                              @SoumisIUTS, @SoumisCNSS, @SoumisTPA, @Plafonne, @Plafond, @PourcentagePlafond, @Ordre, @Active,
                              @EstSysteme, @CompteComptable, @CompteContrepartie, @Commentaire);";
-                        cmd.Parameters.AddWithValue("@Code", (r.Code ?? "").Trim().ToUpperInvariant());
-                        cmd.Parameters.AddWithValue("@Libelle", r.Libelle ?? "");
-                        cmd.Parameters.AddWithValue("@Sens", (int)r.Sens);
-                        cmd.Parameters.AddWithValue("@ModeCalcul", (int)r.ModeCalcul);
-                        cmd.Parameters.AddWithValue("@MontantFixe", DbValue.MoneyToDb(r.MontantFixe));
-                        cmd.Parameters.AddWithValue("@TauxSalarial", DbValue.DecimalToDb(r.TauxSalarial));
-                        cmd.Parameters.AddWithValue("@TauxPatronal", DbValue.DecimalToDb(r.TauxPatronal));
-                        cmd.Parameters.AddWithValue("@CodeBase", r.CodeBase ?? "");
-                        cmd.Parameters.AddWithValue("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@SoumisTPA", r.SoumisTPA ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@Plafonne", r.Plafonne ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@Plafond", DbValue.MoneyToDb(r.Plafond));
-                        cmd.Parameters.AddWithValue("@PourcentagePlafond", DbValue.DecimalToDb(r.PourcentagePlafond));
-                        cmd.Parameters.AddWithValue("@Ordre", r.Ordre);
-                        cmd.Parameters.AddWithValue("@Active", r.Active ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@EstSysteme", r.EstSysteme ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@CompteComptable", r.CompteComptable ?? "");
-                        cmd.Parameters.AddWithValue("@CompteContrepartie", r.CompteContrepartie ?? "");
-                        cmd.Parameters.AddWithValue("@Commentaire", r.Commentaire ?? "");
+                        cmd.Parameters.AjouterValeur("@Code", (r.Code ?? "").Trim().ToUpperInvariant());
+                        cmd.Parameters.AjouterValeur("@Libelle", r.Libelle ?? "");
+                        cmd.Parameters.AjouterValeur("@Sens", (int)r.Sens);
+                        cmd.Parameters.AjouterValeur("@ModeCalcul", (int)r.ModeCalcul);
+                        cmd.Parameters.AjouterValeur("@MontantFixe", DbValue.MoneyToDb(r.MontantFixe));
+                        cmd.Parameters.AjouterValeur("@TauxSalarial", DbValue.DecimalToDb(r.TauxSalarial));
+                        cmd.Parameters.AjouterValeur("@TauxPatronal", DbValue.DecimalToDb(r.TauxPatronal));
+                        cmd.Parameters.AjouterValeur("@CodeBase", r.CodeBase ?? "");
+                        cmd.Parameters.AjouterValeur("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@SoumisTPA", r.SoumisTPA ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Plafonne", r.Plafonne ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Plafond", DbValue.MoneyToDb(r.Plafond));
+                        cmd.Parameters.AjouterValeur("@PourcentagePlafond", DbValue.DecimalToDb(r.PourcentagePlafond));
+                        cmd.Parameters.AjouterValeur("@Ordre", r.Ordre);
+                        cmd.Parameters.AjouterValeur("@Active", r.Active ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@EstSysteme", r.EstSysteme ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@CompteComptable", r.CompteComptable ?? "");
+                        cmd.Parameters.AjouterValeur("@CompteContrepartie", r.CompteContrepartie ?? "");
+                        cmd.Parameters.AjouterValeur("@Commentaire", r.Commentaire ?? "");
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -3113,7 +3084,7 @@ namespace IUTSCalculator.Services
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "INSERT OR IGNORE INTO TypesEPI (Libelle, DureeVieMois, Actif) VALUES (@l, 12, 1);";
-                        cmd.Parameters.AddWithValue("@l", libelle);
+                        cmd.Parameters.AjouterValeur("@l", libelle);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -3222,17 +3193,17 @@ namespace IUTSCalculator.Services
                                     (@Code, @Libelle, @Sens, @ModeCalcul, 0, '0', '0', '',
                                      @SoumisIUTS, @SoumisCNSS, @SoumisTPA, 0, 0, '0', @Ordre, 1,
                                      0, @CompteComptable, @CompteContrepartie, @Commentaire);";
-                                cmd.Parameters.AddWithValue("@Code", r.Code.Trim().ToUpperInvariant());
-                                cmd.Parameters.AddWithValue("@Libelle", r.Libelle ?? "");
-                                cmd.Parameters.AddWithValue("@Sens", (int)r.Sens);
-                                cmd.Parameters.AddWithValue("@ModeCalcul", (int)r.ModeCalcul);
-                                cmd.Parameters.AddWithValue("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
-                                cmd.Parameters.AddWithValue("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
-                                cmd.Parameters.AddWithValue("@SoumisTPA", r.SoumisTPA ? 1 : 0);
-                                cmd.Parameters.AddWithValue("@Ordre", r.Ordre);
-                                cmd.Parameters.AddWithValue("@CompteComptable", r.CompteComptable ?? "");
-                                cmd.Parameters.AddWithValue("@CompteContrepartie", r.CompteContrepartie ?? "");
-                                cmd.Parameters.AddWithValue("@Commentaire", r.Commentaire ?? "");
+                                cmd.Parameters.AjouterValeur("@Code", r.Code.Trim().ToUpperInvariant());
+                                cmd.Parameters.AjouterValeur("@Libelle", r.Libelle ?? "");
+                                cmd.Parameters.AjouterValeur("@Sens", (int)r.Sens);
+                                cmd.Parameters.AjouterValeur("@ModeCalcul", (int)r.ModeCalcul);
+                                cmd.Parameters.AjouterValeur("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
+                                cmd.Parameters.AjouterValeur("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
+                                cmd.Parameters.AjouterValeur("@SoumisTPA", r.SoumisTPA ? 1 : 0);
+                                cmd.Parameters.AjouterValeur("@Ordre", r.Ordre);
+                                cmd.Parameters.AjouterValeur("@CompteComptable", r.CompteComptable ?? "");
+                                cmd.Parameters.AjouterValeur("@CompteContrepartie", r.CompteContrepartie ?? "");
+                                cmd.Parameters.AjouterValeur("@Commentaire", r.Commentaire ?? "");
                                 cmd.ExecuteNonQuery();
                             }
                         }
@@ -3586,8 +3557,8 @@ namespace IUTSCalculator.Services
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = "INSERT OR IGNORE INTO ParametresComptables (Cle, Valeur) VALUES (@cle, @valeur);";
-                    cmd.Parameters.AddWithValue("@cle", valeur.Key);
-                    cmd.Parameters.AddWithValue("@valeur", valeur.Value);
+                    cmd.Parameters.AjouterValeur("@cle", valeur.Key);
+                    cmd.Parameters.AjouterValeur("@valeur", valeur.Value);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -3658,7 +3629,7 @@ namespace IUTSCalculator.Services
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @n;";
-                cmd.Parameters.AddWithValue("@n", nomTable);
+                cmd.Parameters.AjouterValeur("@n", nomTable);
                 return DbValue.IntFromDb(cmd.ExecuteScalar()) > 0;
             }
         }

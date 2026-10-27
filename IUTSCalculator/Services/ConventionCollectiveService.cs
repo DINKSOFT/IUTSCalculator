@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -29,7 +29,7 @@ namespace IUTSCalculator.Services
         {
             var conventions = new List<ConventionCollective>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -37,7 +37,7 @@ namespace IUTSCalculator.Services
                     FROM ConventionsCollectives
                     ORDER BY Code;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -56,7 +56,7 @@ namespace IUTSCalculator.Services
         {
             ConventionCollective conv = null;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
@@ -64,9 +64,9 @@ namespace IUTSCalculator.Services
                         SELECT Id, Code, Libelle, Description, BaseCalculAnciennete, EstActive, DateCreation, DateModification
                         FROM ConventionsCollectives
                         WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AjouterValeur("@id", id);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
@@ -85,9 +85,9 @@ namespace IUTSCalculator.Services
                         FROM GrillesSalaires
                         WHERE ConventionId = @id
                         ORDER BY Ordre, Categorie, Echelon;";
-                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AjouterValeur("@id", id);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -104,9 +104,9 @@ namespace IUTSCalculator.Services
                         FROM TranchesAnciennete
                         WHERE ConventionId = @id
                         ORDER BY AnneesMin, Ordre;";
-                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AjouterValeur("@id", id);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -130,7 +130,7 @@ namespace IUTSCalculator.Services
 
             string now = DbValue.DateToDb(DateTime.Now);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -146,16 +146,16 @@ namespace IUTSCalculator.Services
                                 ) VALUES (
                                     @code, @lib, @desc, @base, @active, @dc, @dm
                                 );";
-                            cmd.Parameters.AddWithValue("@code", conv.Code.Trim().ToUpperInvariant());
-                            cmd.Parameters.AddWithValue("@lib", conv.Libelle.Trim());
-                            cmd.Parameters.AddWithValue("@desc", conv.Description ?? string.Empty);
-                            cmd.Parameters.AddWithValue("@base", (int)conv.BaseCalculAnciennete);
-                            cmd.Parameters.AddWithValue("@active", conv.EstActive ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@dc", now);
-                            cmd.Parameters.AddWithValue("@dm", now);
+                            cmd.Parameters.AjouterValeur("@code", conv.Code.Trim().ToUpperInvariant());
+                            cmd.Parameters.AjouterValeur("@lib", conv.Libelle.Trim());
+                            cmd.Parameters.AjouterValeur("@desc", conv.Description ?? string.Empty);
+                            cmd.Parameters.AjouterValeur("@base", (int)conv.BaseCalculAnciennete);
+                            cmd.Parameters.AjouterValeur("@active", conv.EstActive ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@dc", now);
+                            cmd.Parameters.AjouterValeur("@dm", now);
 
                             await cmd.ExecuteNonQueryAsync();
-                            conv.Id = (int)conn.LastInsertRowId;
+                            conv.Id = (int)conn.DernierIdInsere();
                         }
                         else
                         {
@@ -164,13 +164,13 @@ namespace IUTSCalculator.Services
                                     Code = @code, Libelle = @lib, Description = @desc,
                                     BaseCalculAnciennete = @base, EstActive = @active, DateModification = @dm
                                 WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", conv.Id);
-                            cmd.Parameters.AddWithValue("@code", conv.Code.Trim().ToUpperInvariant());
-                            cmd.Parameters.AddWithValue("@lib", conv.Libelle.Trim());
-                            cmd.Parameters.AddWithValue("@desc", conv.Description ?? string.Empty);
-                            cmd.Parameters.AddWithValue("@base", (int)conv.BaseCalculAnciennete);
-                            cmd.Parameters.AddWithValue("@active", conv.EstActive ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@dm", now);
+                            cmd.Parameters.AjouterValeur("@id", conv.Id);
+                            cmd.Parameters.AjouterValeur("@code", conv.Code.Trim().ToUpperInvariant());
+                            cmd.Parameters.AjouterValeur("@lib", conv.Libelle.Trim());
+                            cmd.Parameters.AjouterValeur("@desc", conv.Description ?? string.Empty);
+                            cmd.Parameters.AjouterValeur("@base", (int)conv.BaseCalculAnciennete);
+                            cmd.Parameters.AjouterValeur("@active", conv.EstActive ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@dm", now);
 
                             await cmd.ExecuteNonQueryAsync();
                         }
@@ -181,7 +181,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdDel.Transaction = tx;
                         cmdDel.CommandText = "DELETE FROM GrillesSalaires WHERE ConventionId = @id;";
-                        cmdDel.Parameters.AddWithValue("@id", conv.Id);
+                        cmdDel.Parameters.AjouterValeur("@id", conv.Id);
                         await cmdDel.ExecuteNonQueryAsync();
                     }
 
@@ -198,12 +198,12 @@ namespace IUTSCalculator.Services
                                     ) VALUES (
                                         @conv, @cat, @ech, @sal, @ord, @desc
                                     );";
-                                cmdIns.Parameters.AddWithValue("@conv", conv.Id);
-                                cmdIns.Parameters.AddWithValue("@cat", g.Categorie?.Trim() ?? string.Empty);
-                                cmdIns.Parameters.AddWithValue("@ech", g.Echelon?.Trim() ?? string.Empty);
-                                cmdIns.Parameters.AddWithValue("@sal", DbValue.MoneyToDb(g.SalaireMinimum));
-                                cmdIns.Parameters.AddWithValue("@ord", g.Ordre);
-                                cmdIns.Parameters.AddWithValue("@desc", g.Description ?? string.Empty);
+                                cmdIns.Parameters.AjouterValeur("@conv", conv.Id);
+                                cmdIns.Parameters.AjouterValeur("@cat", g.Categorie?.Trim() ?? string.Empty);
+                                cmdIns.Parameters.AjouterValeur("@ech", g.Echelon?.Trim() ?? string.Empty);
+                                cmdIns.Parameters.AjouterValeur("@sal", DbValue.MoneyToDb(g.SalaireMinimum));
+                                cmdIns.Parameters.AjouterValeur("@ord", g.Ordre);
+                                cmdIns.Parameters.AjouterValeur("@desc", g.Description ?? string.Empty);
                                 await cmdIns.ExecuteNonQueryAsync();
                             }
                         }
@@ -214,7 +214,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdDelTr.Transaction = tx;
                         cmdDelTr.CommandText = "DELETE FROM TranchesAnciennete WHERE ConventionId = @id;";
-                        cmdDelTr.Parameters.AddWithValue("@id", conv.Id);
+                        cmdDelTr.Parameters.AjouterValeur("@id", conv.Id);
                         await cmdDelTr.ExecuteNonQueryAsync();
                     }
 
@@ -231,11 +231,11 @@ namespace IUTSCalculator.Services
                                     ) VALUES (
                                         @conv, @min, @max, @taux, @ord
                                     );";
-                                cmdIns.Parameters.AddWithValue("@conv", conv.Id);
-                                cmdIns.Parameters.AddWithValue("@min", tr.AnneesMin);
-                                cmdIns.Parameters.AddWithValue("@max", tr.AnneesMax.HasValue ? (object)tr.AnneesMax.Value : DBNull.Value);
-                                cmdIns.Parameters.AddWithValue("@taux", DbValue.DecimalToDb(tr.TauxPourcentage));
-                                cmdIns.Parameters.AddWithValue("@ord", tr.Ordre);
+                                cmdIns.Parameters.AjouterValeur("@conv", conv.Id);
+                                cmdIns.Parameters.AjouterValeur("@min", tr.AnneesMin);
+                                cmdIns.Parameters.AjouterValeur("@max", tr.AnneesMax.HasValue ? (object)tr.AnneesMax.Value : DBNull.Value);
+                                cmdIns.Parameters.AjouterValeur("@taux", DbValue.DecimalToDb(tr.TauxPourcentage));
+                                cmdIns.Parameters.AjouterValeur("@ord", tr.Ordre);
                                 await cmdIns.ExecuteNonQueryAsync();
                             }
                         }
@@ -278,7 +278,7 @@ namespace IUTSCalculator.Services
         {
             if (id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -287,7 +287,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdEmp.Transaction = tx;
                         cmdEmp.CommandText = "UPDATE Employees SET ConventionId = NULL WHERE ConventionId = @id;";
-                        cmdEmp.Parameters.AddWithValue("@id", id);
+                        cmdEmp.Parameters.AjouterValeur("@id", id);
                         await cmdEmp.ExecuteNonQueryAsync();
                     }
 
@@ -295,7 +295,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdTr.Transaction = tx;
                         cmdTr.CommandText = "DELETE FROM TranchesAnciennete WHERE ConventionId = @id;";
-                        cmdTr.Parameters.AddWithValue("@id", id);
+                        cmdTr.Parameters.AjouterValeur("@id", id);
                         await cmdTr.ExecuteNonQueryAsync();
                     }
 
@@ -303,7 +303,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdGr.Transaction = tx;
                         cmdGr.CommandText = "DELETE FROM GrillesSalaires WHERE ConventionId = @id;";
-                        cmdGr.Parameters.AddWithValue("@id", id);
+                        cmdGr.Parameters.AjouterValeur("@id", id);
                         await cmdGr.ExecuteNonQueryAsync();
                     }
 
@@ -311,7 +311,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdConv.Transaction = tx;
                         cmdConv.CommandText = "DELETE FROM ConventionsCollectives WHERE Id = @id;";
-                        cmdConv.Parameters.AddWithValue("@id", id);
+                        cmdConv.Parameters.AjouterValeur("@id", id);
                         await cmdConv.ExecuteNonQueryAsync();
                     }
 
@@ -346,7 +346,7 @@ namespace IUTSCalculator.Services
         {
             if (grille == null || grille.ConventionId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 if (grille.Id <= 0)
@@ -364,15 +364,15 @@ namespace IUTSCalculator.Services
                         UPDATE GrillesSalaires SET
                             Categorie = @cat, Echelon = @ech, SalaireMinimum = @sal, Ordre = @ord, Description = @desc
                         WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", grille.Id);
+                    cmd.Parameters.AjouterValeur("@id", grille.Id);
                 }
 
-                cmd.Parameters.AddWithValue("@conv", grille.ConventionId);
-                cmd.Parameters.AddWithValue("@cat", grille.Categorie?.Trim() ?? string.Empty);
-                cmd.Parameters.AddWithValue("@ech", string.IsNullOrWhiteSpace(grille.Echelon) ? "A" : grille.Echelon.Trim());
-                cmd.Parameters.AddWithValue("@sal", DbValue.MoneyToDb(grille.SalaireMinimum));
-                cmd.Parameters.AddWithValue("@ord", grille.Ordre);
-                cmd.Parameters.AddWithValue("@desc", grille.Description ?? string.Empty);
+                cmd.Parameters.AjouterValeur("@conv", grille.ConventionId);
+                cmd.Parameters.AjouterValeur("@cat", grille.Categorie?.Trim() ?? string.Empty);
+                cmd.Parameters.AjouterValeur("@ech", string.IsNullOrWhiteSpace(grille.Echelon) ? "A" : grille.Echelon.Trim());
+                cmd.Parameters.AjouterValeur("@sal", DbValue.MoneyToDb(grille.SalaireMinimum));
+                cmd.Parameters.AjouterValeur("@ord", grille.Ordre);
+                cmd.Parameters.AjouterValeur("@desc", grille.Description ?? string.Empty);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -385,11 +385,11 @@ namespace IUTSCalculator.Services
         {
             if (id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM GrillesSalaires WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AjouterValeur("@id", id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -401,7 +401,7 @@ namespace IUTSCalculator.Services
         {
             if (tranche == null || tranche.ConventionId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 if (tranche.Id <= 0)
@@ -419,14 +419,14 @@ namespace IUTSCalculator.Services
                         UPDATE TranchesAnciennete SET
                             AnneesMin = @min, AnneesMax = @max, TauxPourcentage = @taux, Ordre = @ord
                         WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", tranche.Id);
+                    cmd.Parameters.AjouterValeur("@id", tranche.Id);
                 }
 
-                cmd.Parameters.AddWithValue("@conv", tranche.ConventionId);
-                cmd.Parameters.AddWithValue("@min", tranche.AnneesMin);
-                cmd.Parameters.AddWithValue("@max", tranche.AnneesMax.HasValue ? (object)tranche.AnneesMax.Value : DBNull.Value);
-                cmd.Parameters.AddWithValue("@taux", DbValue.DecimalToDb(tranche.TauxPourcentage));
-                cmd.Parameters.AddWithValue("@ord", tranche.Ordre);
+                cmd.Parameters.AjouterValeur("@conv", tranche.ConventionId);
+                cmd.Parameters.AjouterValeur("@min", tranche.AnneesMin);
+                cmd.Parameters.AjouterValeur("@max", tranche.AnneesMax.HasValue ? (object)tranche.AnneesMax.Value : DBNull.Value);
+                cmd.Parameters.AjouterValeur("@taux", DbValue.DecimalToDb(tranche.TauxPourcentage));
+                cmd.Parameters.AjouterValeur("@ord", tranche.Ordre);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -439,11 +439,11 @@ namespace IUTSCalculator.Services
         {
             if (id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM TranchesAnciennete WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AjouterValeur("@id", id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -643,7 +643,7 @@ namespace IUTSCalculator.Services
             return resultat;
         }
 
-        private static ConventionCollective LireConvention(SQLiteDataReader reader)
+        private static ConventionCollective LireConvention(SqliteDataReader reader)
         {
             return new ConventionCollective
             {
@@ -658,7 +658,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static GrilleSalaire LireGrille(SQLiteDataReader reader)
+        private static GrilleSalaire LireGrille(SqliteDataReader reader)
         {
             return new GrilleSalaire
             {
@@ -672,7 +672,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static TrancheAnciennete LireTranche(SQLiteDataReader reader)
+        private static TrancheAnciennete LireTranche(SqliteDataReader reader)
         {
             return new TrancheAnciennete
             {

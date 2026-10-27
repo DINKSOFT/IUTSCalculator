@@ -1,6 +1,5 @@
 // Fichier : Services/GardeLectureSeule.cs
 using System;
-using System.Data.SQLite;
 
 namespace IUTSCalculator.Services
 {
@@ -9,7 +8,7 @@ namespace IUTSCalculator.Services
     /// formation) : jusqu'ici, le rôle ne grisait que quelques boutons, et un utilisateur en
     /// lecture seule pouvait enregistrer depuis la plupart des écrans.
     ///
-    /// Chaque connexion ouverte par <see cref="SQLiteService.CreateConnection"/> (une fois le
+    /// Chaque connexion ouverte par <see cref="SQLiteService.CreerConnexion"/> (une fois le
     /// schéma du dossier prêt) reçoit, si l'utilisateur connecté est en lecture seule, un
     /// « autorisateur » SQLite qui refuse toute écriture : INSERT, UPDATE, DELETE, création,
     /// modification ou suppression de table, d'index, de vue ou de déclencheur. Un seul point
@@ -32,7 +31,6 @@ namespace IUTSCalculator.Services
         /// <summary>Branche la garde sur toutes les connexions de dossier. À appeler au démarrage.</summary>
         public static void Activer()
         {
-            SQLiteService.GardeConnexion = Appliquer;
             SQLiteService.GardeConnexionSqlite = AppliquerSqlite;
         }
 
@@ -44,9 +42,6 @@ namespace IUTSCalculator.Services
         {
             for (var e = ex; e != null; e = e.InnerException)
             {
-                var sqlite = e as SQLiteException;
-                if (sqlite != null && sqlite.ResultCode == SQLiteErrorCode.Auth)
-                    return true;
                 var sqliteMds = e as Microsoft.Data.Sqlite.SqliteException;
                 if (sqliteMds != null && sqliteMds.SqliteErrorCode == SQLitePCL.raw.SQLITE_AUTH)
                     return true;
@@ -67,47 +62,6 @@ namespace IUTSCalculator.Services
                 message.IndexOf("authorization denied", StringComparison.OrdinalIgnoreCase) < 0)
                 return message;
             return Message;
-        }
-
-        private static void Appliquer(SQLiteConnection connexion)
-        {
-            // Le profil est lu à l'ouverture de chaque connexion : une déconnexion suivie
-            // d'une connexion sous un autre profil est prise en compte immédiatement.
-            if (connexion == null || !UserSession.Instance.IsReadOnly) return;
-            connexion.Authorize += Autoriser;
-        }
-
-        private static void Autoriser(object sender, AuthorizerEventArgs e)
-        {
-            switch (e.ActionCode)
-            {
-                case SQLiteAuthorizerActionCode.Insert:
-                case SQLiteAuthorizerActionCode.Update:
-                case SQLiteAuthorizerActionCode.Delete:
-                    if (EstTemporaire(e.Database) || EstTableAutorisee(e.Argument1)) return;
-                    e.ReturnCode = SQLiteAuthorizerReturnCode.Deny;
-                    return;
-
-                case SQLiteAuthorizerActionCode.CreateTable:
-                case SQLiteAuthorizerActionCode.CreateIndex:
-                case SQLiteAuthorizerActionCode.CreateTrigger:
-                case SQLiteAuthorizerActionCode.CreateView:
-                case SQLiteAuthorizerActionCode.CreateVtable:
-                case SQLiteAuthorizerActionCode.DropTable:
-                case SQLiteAuthorizerActionCode.DropIndex:
-                case SQLiteAuthorizerActionCode.DropTrigger:
-                case SQLiteAuthorizerActionCode.DropView:
-                case SQLiteAuthorizerActionCode.DropVtable:
-                case SQLiteAuthorizerActionCode.AlterTable:
-                case SQLiteAuthorizerActionCode.Reindex:
-                case SQLiteAuthorizerActionCode.Attach:
-                    e.ReturnCode = SQLiteAuthorizerReturnCode.Deny;
-                    return;
-
-                default:
-                    // Lecture, transactions, PRAGMA, fonctions, objets temporaires.
-                    return;
-            }
         }
 
         // Microsoft.Data.Sqlite n'expose pas l'autorisateur : il est posé directement sur la

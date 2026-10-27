@@ -33,7 +33,7 @@ namespace IUTSCalculator.Tests
             _exportService = new RecrutementExportService();
 
             // Créer une direction et un poste dans l'organigramme pour les tests d'affectation
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -500,7 +500,7 @@ namespace IUTSCalculator.Tests
 
             // Poste RH-02 avec classification conventionnelle
             int conventionId;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -512,7 +512,7 @@ namespace IUTSCalculator.Tests
                 cmd.CommandText = @"
                     UPDATE Postes SET ConventionId = @conv, CategorieConventionnelle = 'Agents de Maîtrise', EchelonConventionnel = 'B'
                     WHERE Id = 1;";
-                cmd.Parameters.AddWithValue("@conv", conventionId);
+                cmd.Parameters.AjouterValeur("@conv", conventionId);
                 cmd.ExecuteNonQuery();
             }
 
@@ -558,7 +558,7 @@ namespace IUTSCalculator.Tests
             Assert.That(enBase.FunctionAllowance, Is.EqualTo(0m));
             Assert.That(enBase.SujetionAllowance, Is.EqualTo(15000m));
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT TypeContrat FROM Employees WHERE EmployeeId = 'STI036';";

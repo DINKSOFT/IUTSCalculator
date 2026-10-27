@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -48,7 +48,7 @@ namespace IUTSCalculator.Services
             var resultat = new List<HeureSupplementaire>();
             var bareme = await _baremeService.ApplicableAsync(annee, mois);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 // 1. Charger tous les employés actifs.
                 //
@@ -68,8 +68,8 @@ namespace IUTSCalculator.Services
                     // date absente y est écrite comme chaîne vide, jamais comme NULL SQL (voir
                     // DbValue.DateNullableToDb) : les deux cas sont donc couverts ci-dessus, et la
                     // comparaison de chaînes ne reste correcte que parce que @today suit le même format.
-                    cmd.Parameters.AddWithValue("@today", DateTime.Today.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    cmd.Parameters.AjouterValeur("@today", DateTime.Today.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -87,10 +87,10 @@ namespace IUTSCalculator.Services
                 {
                     cmd.CommandText =
                         "SELECT " + Colonnes + " FROM HeuresSupplementaires h WHERE h.Annee = @a AND h.Mois = @m;";
-                    cmd.Parameters.AddWithValue("@a", annee);
-                    cmd.Parameters.AddWithValue("@m", mois);
+                    cmd.Parameters.AjouterValeur("@a", annee);
+                    cmd.Parameters.AjouterValeur("@m", mois);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -149,16 +149,16 @@ namespace IUTSCalculator.Services
         {
             if (string.IsNullOrWhiteSpace(employeeId)) return null;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "SELECT " + Colonnes + " FROM HeuresSupplementaires h WHERE h.EmployeeId = @emp AND h.Annee = @a AND h.Mois = @m;";
-                cmd.Parameters.AddWithValue("@emp", employeeId);
-                cmd.Parameters.AddWithValue("@a", annee);
-                cmd.Parameters.AddWithValue("@m", mois);
+                cmd.Parameters.AjouterValeur("@emp", employeeId);
+                cmd.Parameters.AjouterValeur("@a", annee);
+                cmd.Parameters.AjouterValeur("@m", mois);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                     {
@@ -198,7 +198,7 @@ namespace IUTSCalculator.Services
             DateTime now = DateTime.Now;
             var bareme = await _baremeService.ApplicableAsync(annee, mois);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var hs in lignes)
@@ -226,27 +226,27 @@ namespace IUTSCalculator.Services
                                     @th, @m15, @m30, @m50, @m60, @m100, @mtot,
                                     @comm, @dc, @dm
                                 );";
-                            cmd.Parameters.AddWithValue("@emp", hs.EmployeeId);
-                            cmd.Parameters.AddWithValue("@a", annee);
-                            cmd.Parameters.AddWithValue("@m", mois);
-                            cmd.Parameters.AddWithValue("@h15", DbValue.DecimalToDb(hs.Heures15));
-                            cmd.Parameters.AddWithValue("@h30", DbValue.DecimalToDb(hs.Heures30));
-                            cmd.Parameters.AddWithValue("@h50", DbValue.DecimalToDb(hs.Heures50));
-                            cmd.Parameters.AddWithValue("@h60", DbValue.DecimalToDb(hs.Heures60));
-                            cmd.Parameters.AddWithValue("@h100", DbValue.DecimalToDb(hs.Heures100));
-                            cmd.Parameters.AddWithValue("@th", DbValue.MoneyToDb(hs.TauxHoraireBase));
-                            cmd.Parameters.AddWithValue("@m15", DbValue.MoneyToDb(hs.Montant15));
-                            cmd.Parameters.AddWithValue("@m30", DbValue.MoneyToDb(hs.Montant30));
-                            cmd.Parameters.AddWithValue("@m50", DbValue.MoneyToDb(hs.Montant50));
-                            cmd.Parameters.AddWithValue("@m60", DbValue.MoneyToDb(hs.Montant60));
-                            cmd.Parameters.AddWithValue("@m100", DbValue.MoneyToDb(hs.Montant100));
-                            cmd.Parameters.AddWithValue("@mtot", DbValue.MoneyToDb(hs.MontantTotal));
-                            cmd.Parameters.AddWithValue("@comm", hs.Commentaire ?? string.Empty);
-                            cmd.Parameters.AddWithValue("@dc", DbValue.DateToDb(now));
-                            cmd.Parameters.AddWithValue("@dm", DbValue.DateToDb(now));
+                            cmd.Parameters.AjouterValeur("@emp", hs.EmployeeId);
+                            cmd.Parameters.AjouterValeur("@a", annee);
+                            cmd.Parameters.AjouterValeur("@m", mois);
+                            cmd.Parameters.AjouterValeur("@h15", DbValue.DecimalToDb(hs.Heures15));
+                            cmd.Parameters.AjouterValeur("@h30", DbValue.DecimalToDb(hs.Heures30));
+                            cmd.Parameters.AjouterValeur("@h50", DbValue.DecimalToDb(hs.Heures50));
+                            cmd.Parameters.AjouterValeur("@h60", DbValue.DecimalToDb(hs.Heures60));
+                            cmd.Parameters.AjouterValeur("@h100", DbValue.DecimalToDb(hs.Heures100));
+                            cmd.Parameters.AjouterValeur("@th", DbValue.MoneyToDb(hs.TauxHoraireBase));
+                            cmd.Parameters.AjouterValeur("@m15", DbValue.MoneyToDb(hs.Montant15));
+                            cmd.Parameters.AjouterValeur("@m30", DbValue.MoneyToDb(hs.Montant30));
+                            cmd.Parameters.AjouterValeur("@m50", DbValue.MoneyToDb(hs.Montant50));
+                            cmd.Parameters.AjouterValeur("@m60", DbValue.MoneyToDb(hs.Montant60));
+                            cmd.Parameters.AjouterValeur("@m100", DbValue.MoneyToDb(hs.Montant100));
+                            cmd.Parameters.AjouterValeur("@mtot", DbValue.MoneyToDb(hs.MontantTotal));
+                            cmd.Parameters.AjouterValeur("@comm", hs.Commentaire ?? string.Empty);
+                            cmd.Parameters.AjouterValeur("@dc", DbValue.DateToDb(now));
+                            cmd.Parameters.AjouterValeur("@dm", DbValue.DateToDb(now));
 
                             await cmd.ExecuteNonQueryAsync();
-                            hs.Id = conn.LastInsertRowId;
+                            hs.Id = conn.DernierIdInsere();
                         }
                         else
                         {
@@ -256,21 +256,21 @@ namespace IUTSCalculator.Services
                                     TauxHoraireBase = @th, Montant15 = @m15, Montant30 = @m30, Montant50 = @m50, Montant60 = @m60, Montant100 = @m100, MontantTotal = @mtot,
                                     Commentaire = @comm, DateModification = @dm
                                 WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", hs.Id);
-                            cmd.Parameters.AddWithValue("@h15", DbValue.DecimalToDb(hs.Heures15));
-                            cmd.Parameters.AddWithValue("@h30", DbValue.DecimalToDb(hs.Heures30));
-                            cmd.Parameters.AddWithValue("@h50", DbValue.DecimalToDb(hs.Heures50));
-                            cmd.Parameters.AddWithValue("@h60", DbValue.DecimalToDb(hs.Heures60));
-                            cmd.Parameters.AddWithValue("@h100", DbValue.DecimalToDb(hs.Heures100));
-                            cmd.Parameters.AddWithValue("@th", DbValue.MoneyToDb(hs.TauxHoraireBase));
-                            cmd.Parameters.AddWithValue("@m15", DbValue.MoneyToDb(hs.Montant15));
-                            cmd.Parameters.AddWithValue("@m30", DbValue.MoneyToDb(hs.Montant30));
-                            cmd.Parameters.AddWithValue("@m50", DbValue.MoneyToDb(hs.Montant50));
-                            cmd.Parameters.AddWithValue("@m60", DbValue.MoneyToDb(hs.Montant60));
-                            cmd.Parameters.AddWithValue("@m100", DbValue.MoneyToDb(hs.Montant100));
-                            cmd.Parameters.AddWithValue("@mtot", DbValue.MoneyToDb(hs.MontantTotal));
-                            cmd.Parameters.AddWithValue("@comm", hs.Commentaire ?? string.Empty);
-                            cmd.Parameters.AddWithValue("@dm", DbValue.DateToDb(now));
+                            cmd.Parameters.AjouterValeur("@id", hs.Id);
+                            cmd.Parameters.AjouterValeur("@h15", DbValue.DecimalToDb(hs.Heures15));
+                            cmd.Parameters.AjouterValeur("@h30", DbValue.DecimalToDb(hs.Heures30));
+                            cmd.Parameters.AjouterValeur("@h50", DbValue.DecimalToDb(hs.Heures50));
+                            cmd.Parameters.AjouterValeur("@h60", DbValue.DecimalToDb(hs.Heures60));
+                            cmd.Parameters.AjouterValeur("@h100", DbValue.DecimalToDb(hs.Heures100));
+                            cmd.Parameters.AjouterValeur("@th", DbValue.MoneyToDb(hs.TauxHoraireBase));
+                            cmd.Parameters.AjouterValeur("@m15", DbValue.MoneyToDb(hs.Montant15));
+                            cmd.Parameters.AjouterValeur("@m30", DbValue.MoneyToDb(hs.Montant30));
+                            cmd.Parameters.AjouterValeur("@m50", DbValue.MoneyToDb(hs.Montant50));
+                            cmd.Parameters.AjouterValeur("@m60", DbValue.MoneyToDb(hs.Montant60));
+                            cmd.Parameters.AjouterValeur("@m100", DbValue.MoneyToDb(hs.Montant100));
+                            cmd.Parameters.AjouterValeur("@mtot", DbValue.MoneyToDb(hs.MontantTotal));
+                            cmd.Parameters.AjouterValeur("@comm", hs.Commentaire ?? string.Empty);
+                            cmd.Parameters.AjouterValeur("@dm", DbValue.DateToDb(now));
 
                             await cmd.ExecuteNonQueryAsync();
                         }
@@ -374,7 +374,7 @@ namespace IUTSCalculator.Services
             if (salaries.Count == 0) return;
 
             var enDouble = new List<string>();
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
@@ -388,9 +388,9 @@ namespace IUTSCalculator.Services
                     {
                         cmd.CommandText = "SELECT COUNT(*) FROM VariablesPaie WHERE Annee = @a AND Mois = @m " +
                                           "AND EmployeeId = @e AND UPPER(TRIM(CodeRubrique)) = 'HSUP';";
-                        cmd.Parameters.AddWithValue("@a", annee);
-                        cmd.Parameters.AddWithValue("@m", mois);
-                        cmd.Parameters.AddWithValue("@e", employe);
+                        cmd.Parameters.AjouterValeur("@a", annee);
+                        cmd.Parameters.AjouterValeur("@m", mois);
+                        cmd.Parameters.AjouterValeur("@e", employe);
                         if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0)
                             enDouble.Add(employe);
                     }
@@ -443,14 +443,14 @@ namespace IUTSCalculator.Services
 
             var bareme = await _baremeService.ApplicableAsync(annee, mois);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT " + Colonnes + " FROM HeuresSupplementaires h WHERE h.Annee = @a AND h.Mois = @m;";
-                cmd.Parameters.AddWithValue("@a", annee);
-                cmd.Parameters.AddWithValue("@m", mois);
+                cmd.Parameters.AjouterValeur("@a", annee);
+                cmd.Parameters.AjouterValeur("@m", mois);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -472,7 +472,7 @@ namespace IUTSCalculator.Services
             return dico;
         }
 
-        private static HeureSupplementaire Lire(SQLiteDataReader reader)
+        private static HeureSupplementaire Lire(SqliteDataReader reader)
         {
             return new HeureSupplementaire
             {

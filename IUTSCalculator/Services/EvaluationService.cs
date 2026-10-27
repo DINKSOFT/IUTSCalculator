@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -47,7 +47,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<CampagneEvaluation>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -65,7 +65,7 @@ namespace IUTSCalculator.Services
                     GROUP BY c.Id
                     ORDER BY c.AnneeExercice DESC, c.DateDebut DESC, c.Id DESC;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -128,14 +128,14 @@ namespace IUTSCalculator.Services
             campagne.Code = campagne.Code.Trim().ToUpperInvariant();
             campagne.Titre = campagne.Titre.Trim();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 // Vérifier l'unicité du code
                 using (var cmdCheck = conn.CreateCommand())
                 {
                     cmdCheck.CommandText = "SELECT Id FROM CampagnesEvaluation WHERE Code = @Code AND Id <> @Id;";
-                    cmdCheck.Parameters.AddWithValue("@Code", campagne.Code);
-                    cmdCheck.Parameters.AddWithValue("@Id", campagne.Id);
+                    cmdCheck.Parameters.AjouterValeur("@Code", campagne.Code);
+                    cmdCheck.Parameters.AjouterValeur("@Id", campagne.Id);
                     var existant = await cmdCheck.ExecuteScalarAsync();
                     if (existant != null && existant != DBNull.Value)
                     {
@@ -151,7 +151,7 @@ namespace IUTSCalculator.Services
                             INSERT INTO CampagnesEvaluation (Code, Titre, AnneeExercice, DateDebut, DateFin, Statut, Description, DateCreation)
                             VALUES (@Code, @Titre, @Annee, @DateDebut, @DateFin, @Statut, @Desc, @DateCreation);
                             SELECT last_insert_rowid();";
-                        cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
                     }
                     else
                     {
@@ -160,16 +160,16 @@ namespace IUTSCalculator.Services
                             SET Code = @Code, Titre = @Titre, AnneeExercice = @Annee,
                                 DateDebut = @DateDebut, DateFin = @DateFin, Statut = @Statut, Description = @Desc
                             WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", campagne.Id);
+                        cmd.Parameters.AjouterValeur("@Id", campagne.Id);
                     }
 
-                    cmd.Parameters.AddWithValue("@Code", campagne.Code);
-                    cmd.Parameters.AddWithValue("@Titre", campagne.Titre);
-                    cmd.Parameters.AddWithValue("@Annee", campagne.AnneeExercice);
-                    cmd.Parameters.AddWithValue("@DateDebut", DbValue.DateToDb(campagne.DateDebut));
-                    cmd.Parameters.AddWithValue("@DateFin", DbValue.DateToDb(campagne.DateFin));
-                    cmd.Parameters.AddWithValue("@Statut", (int)campagne.Statut);
-                    cmd.Parameters.AddWithValue("@Desc", (object)campagne.Description ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@Code", campagne.Code);
+                    cmd.Parameters.AjouterValeur("@Titre", campagne.Titre);
+                    cmd.Parameters.AjouterValeur("@Annee", campagne.AnneeExercice);
+                    cmd.Parameters.AjouterValeur("@DateDebut", DbValue.DateToDb(campagne.DateDebut));
+                    cmd.Parameters.AjouterValeur("@DateFin", DbValue.DateToDb(campagne.DateFin));
+                    cmd.Parameters.AjouterValeur("@Statut", (int)campagne.Statut);
+                    cmd.Parameters.AjouterValeur("@Desc", (object)campagne.Description ?? DBNull.Value);
 
                     if (campagne.Id == 0)
                     {
@@ -191,13 +191,13 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task SupprimerCampagneAsync(int campagneId)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmdCheck = conn.CreateCommand())
                 {
                     cmdCheck.CommandText = "SELECT COUNT(*) FROM EntretiensEvaluation WHERE CampagneId = @Id AND Statut >= @StatutValide;";
-                    cmdCheck.Parameters.AddWithValue("@Id", campagneId);
-                    cmdCheck.Parameters.AddWithValue("@StatutValide", (int)StatutEntretien.Valide);
+                    cmdCheck.Parameters.AjouterValeur("@Id", campagneId);
+                    cmdCheck.Parameters.AjouterValeur("@StatutValide", (int)StatutEntretien.Valide);
                     int nbVerrouilles = DbValue.IntFromDb(await cmdCheck.ExecuteScalarAsync());
 
                     if (nbVerrouilles > 0)
@@ -211,7 +211,7 @@ namespace IUTSCalculator.Services
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "DELETE FROM CampagnesEvaluation WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", campagneId);
+                    cmd.Parameters.AjouterValeur("@Id", campagneId);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -222,12 +222,12 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task CloturerCampagneAsync(int campagneId)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "UPDATE CampagnesEvaluation SET Statut = @Statut WHERE Id = @Id;";
-                cmd.Parameters.AddWithValue("@Statut", (int)StatutCampagne.Cloturee);
-                cmd.Parameters.AddWithValue("@Id", campagneId);
+                cmd.Parameters.AjouterValeur("@Statut", (int)StatutCampagne.Cloturee);
+                cmd.Parameters.AjouterValeur("@Id", campagneId);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -262,7 +262,7 @@ namespace IUTSCalculator.Services
             var candidats = new List<SalarieCandidatInit>();
             string todayStr = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
@@ -275,9 +275,9 @@ namespace IUTSCalculator.Services
                         WHERE e.StatutSalarie = 0 
                           AND (e.DateSortie IS NULL OR TRIM(e.DateSortie) = '' OR SUBSTR(e.DateSortie, 1, 10) >= @Today)
                         ORDER BY e.LastName ASC, e.FirstName ASC;";
-                    cmd.Parameters.AddWithValue("@Today", todayStr);
+                    cmd.Parameters.AjouterValeur("@Today", todayStr);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -307,8 +307,8 @@ namespace IUTSCalculator.Services
                     using (var cmdCheck = conn.CreateCommand())
                     {
                         cmdCheck.CommandText = "SELECT COUNT(*) FROM EntretiensEvaluation WHERE CampagneId = @CampagneId AND EmployeeId = @EmpId;";
-                        cmdCheck.Parameters.AddWithValue("@CampagneId", campagneId);
-                        cmdCheck.Parameters.AddWithValue("@EmpId", cand.EmployeeId);
+                        cmdCheck.Parameters.AjouterValeur("@CampagneId", campagneId);
+                        cmdCheck.Parameters.AjouterValeur("@EmpId", cand.EmployeeId);
                         existeDeja = DbValue.IntFromDb(await cmdCheck.ExecuteScalarAsync()) > 0;
                     }
 
@@ -364,11 +364,11 @@ namespace IUTSCalculator.Services
                                     '0.00', '', '', @DateCreation
                                 );
                                 SELECT last_insert_rowid();";
-                            cmdInsert.Parameters.AddWithValue("@CampagneId", campagneId);
-                            cmdInsert.Parameters.AddWithValue("@EmployeeId", cand.EmployeeId);
-                            cmdInsert.Parameters.AddWithValue("@EvaluateurMatricule", (object)evaluateurMatricule ?? DBNull.Value);
-                            cmdInsert.Parameters.AddWithValue("@DateEntretien", DbValue.DateToDb(DateTime.Today));
-                            cmdInsert.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                            cmdInsert.Parameters.AjouterValeur("@CampagneId", campagneId);
+                            cmdInsert.Parameters.AjouterValeur("@EmployeeId", cand.EmployeeId);
+                            cmdInsert.Parameters.AjouterValeur("@EvaluateurMatricule", (object)evaluateurMatricule ?? DBNull.Value);
+                            cmdInsert.Parameters.AjouterValeur("@DateEntretien", DbValue.DateToDb(DateTime.Today));
+                            cmdInsert.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
                             var idObj = await cmdInsert.ExecuteScalarAsync();
                             entretienId = Convert.ToInt32(idObj);
@@ -392,11 +392,11 @@ namespace IUTSCalculator.Services
                                     cmdCrit.CommandText = @"
                                         INSERT INTO EntretienCriteres (EntretienId, CompetenceId, Categorie, Libelle, Note, Poids, Commentaire)
                                         VALUES (@EntretienId, @CompId, @Cat, @Lib, 3, @Poids, '');";
-                                    cmdCrit.Parameters.AddWithValue("@EntretienId", entretienId);
-                                    cmdCrit.Parameters.AddWithValue("@CompId", cp.CompetenceId);
-                                    cmdCrit.Parameters.AddWithValue("@Cat", cp.DomaineLibelle);
-                                    cmdCrit.Parameters.AddWithValue("@Lib", cp.CompetenceLibelle);
-                                    cmdCrit.Parameters.AddWithValue("@Poids", cp.EstObligatoire ? 2 : 1);
+                                    cmdCrit.Parameters.AjouterValeur("@EntretienId", entretienId);
+                                    cmdCrit.Parameters.AjouterValeur("@CompId", cp.CompetenceId);
+                                    cmdCrit.Parameters.AjouterValeur("@Cat", cp.DomaineLibelle);
+                                    cmdCrit.Parameters.AjouterValeur("@Lib", cp.CompetenceLibelle);
+                                    cmdCrit.Parameters.AjouterValeur("@Poids", cp.EstObligatoire ? 2 : 1);
                                     await cmdCrit.ExecuteNonQueryAsync();
                                 }
                             }
@@ -420,10 +420,10 @@ namespace IUTSCalculator.Services
                                     cmdCrit.CommandText = @"
                                         INSERT INTO EntretienCriteres (EntretienId, CompetenceId, Categorie, Libelle, Note, Poids, Commentaire)
                                         VALUES (@EntretienId, NULL, @Cat, @Lib, 3, @Poids, '');";
-                                    cmdCrit.Parameters.AddWithValue("@EntretienId", entretienId);
-                                    cmdCrit.Parameters.AddWithValue("@Cat", cd.Cat);
-                                    cmdCrit.Parameters.AddWithValue("@Lib", cd.Lib);
-                                    cmdCrit.Parameters.AddWithValue("@Poids", cd.Poids);
+                                    cmdCrit.Parameters.AjouterValeur("@EntretienId", entretienId);
+                                    cmdCrit.Parameters.AjouterValeur("@Cat", cd.Cat);
+                                    cmdCrit.Parameters.AjouterValeur("@Lib", cd.Lib);
+                                    cmdCrit.Parameters.AjouterValeur("@Poids", cd.Poids);
                                     await cmdCrit.ExecuteNonQueryAsync();
                                 }
                             }
@@ -444,9 +444,9 @@ namespace IUTSCalculator.Services
                                 cmdObj.CommandText = @"
                                     INSERT INTO EntretienObjectifs (EntretienId, TypeObjectif, Intitule, TauxAtteintePct, Poids)
                                     VALUES (@EntretienId, 1, @Intitule, 0, @Poids);";
-                                cmdObj.Parameters.AddWithValue("@EntretienId", entretienId);
-                                cmdObj.Parameters.AddWithValue("@Intitule", od.Intitule);
-                                cmdObj.Parameters.AddWithValue("@Poids", od.Poids);
+                                cmdObj.Parameters.AjouterValeur("@EntretienId", entretienId);
+                                cmdObj.Parameters.AjouterValeur("@Intitule", od.Intitule);
+                                cmdObj.Parameters.AjouterValeur("@Poids", od.Poids);
                                 await cmdObj.ExecuteNonQueryAsync();
                             }
                         }
@@ -471,7 +471,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<EntretienEvaluation>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -492,9 +492,9 @@ namespace IUTSCalculator.Services
                     LEFT JOIN Postes pos_mgr ON mgr.PosteId = pos_mgr.Id
                     WHERE e.CampagneId = @CampagneId
                     ORDER BY emp.LastName ASC, emp.FirstName ASC;";
-                cmd.Parameters.AddWithValue("@CampagneId", campagneId);
+                cmd.Parameters.AjouterValeur("@CampagneId", campagneId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -515,7 +515,7 @@ namespace IUTSCalculator.Services
         {
             EntretienEvaluation ent = null;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 // 1. En-tête de l'entretien
                 using (var cmd = conn.CreateCommand())
@@ -537,9 +537,9 @@ namespace IUTSCalculator.Services
                         LEFT JOIN Employees mgr ON e.EvaluateurMatricule = mgr.EmployeeId
                         LEFT JOIN Postes pos_mgr ON mgr.PosteId = pos_mgr.Id
                         WHERE e.Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", entretienId);
+                    cmd.Parameters.AjouterValeur("@Id", entretienId);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
@@ -558,9 +558,9 @@ namespace IUTSCalculator.Services
                         FROM EntretienCriteres
                         WHERE EntretienId = @EntretienId
                         ORDER BY Id ASC;";
-                    cmdCrit.Parameters.AddWithValue("@EntretienId", entretienId);
+                    cmdCrit.Parameters.AjouterValeur("@EntretienId", entretienId);
 
-                    using (var reader = (SQLiteDataReader)await cmdCrit.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmdCrit.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -587,9 +587,9 @@ namespace IUTSCalculator.Services
                         FROM EntretienObjectifs
                         WHERE EntretienId = @EntretienId
                         ORDER BY TypeObjectif ASC, Id ASC;";
-                    cmdObj.Parameters.AddWithValue("@EntretienId", entretienId);
+                    cmdObj.Parameters.AjouterValeur("@EntretienId", entretienId);
 
-                    using (var reader = (SQLiteDataReader)await cmdObj.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmdObj.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -629,9 +629,9 @@ namespace IUTSCalculator.Services
                         FROM EntretienBesoinsFormation
                         WHERE EntretienId = @EntretienId
                         ORDER BY Priorite DESC, Id ASC;";
-                    cmdForm.Parameters.AddWithValue("@EntretienId", entretienId);
+                    cmdForm.Parameters.AjouterValeur("@EntretienId", entretienId);
 
-                    using (var reader = (SQLiteDataReader)await cmdForm.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmdForm.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -664,13 +664,13 @@ namespace IUTSCalculator.Services
             if (entretien == null) throw new ArgumentNullException(nameof(entretien));
             if (entretien.Id <= 0) throw new InvalidOperationException("L'entretien doit d'abord exister.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 // Contrôle d'immutabilité côté service
                 using (var cmdStatut = conn.CreateCommand())
                 {
                     cmdStatut.CommandText = "SELECT Statut FROM EntretiensEvaluation WHERE Id = @Id;";
-                    cmdStatut.Parameters.AddWithValue("@Id", entretien.Id);
+                    cmdStatut.Parameters.AjouterValeur("@Id", entretien.Id);
                     var currentStatut = DbValue.IntFromDb(await cmdStatut.ExecuteScalarAsync());
 
                     if (currentStatut >= (int)StatutEntretien.Valide)
@@ -715,17 +715,17 @@ namespace IUTSCalculator.Services
                                 AvisDirectionRH = @AvisRH,
                                 SouhaitsEvolution = @Souhaits
                             WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", entretien.Id);
-                        cmd.Parameters.AddWithValue("@EvalMatricule", (object)entretien.EvaluateurMatricule ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DateEntretien", DbValue.DateNullableToDb(entretien.DateEntretien));
-                        cmd.Parameters.AddWithValue("@Statut", (int)entretien.Statut);
-                        cmd.Parameters.AddWithValue("@NoteGlobale", noteGlobaleTexte);
-                        cmd.Parameters.AddWithValue("@PointsForts", (object)entretien.PointsForts ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@AxesProgres", (object)entretien.AxesProgres ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ComSalarie", (object)entretien.CommentairesSalarie ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ComEvaluateur", (object)entretien.CommentairesEvaluateur ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@AvisRH", (object)entretien.AvisDirectionRH ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Souhaits", (object)entretien.SouhaitsEvolution ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Id", entretien.Id);
+                        cmd.Parameters.AjouterValeur("@EvalMatricule", (object)entretien.EvaluateurMatricule ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DateEntretien", DbValue.DateNullableToDb(entretien.DateEntretien));
+                        cmd.Parameters.AjouterValeur("@Statut", (int)entretien.Statut);
+                        cmd.Parameters.AjouterValeur("@NoteGlobale", noteGlobaleTexte);
+                        cmd.Parameters.AjouterValeur("@PointsForts", (object)entretien.PointsForts ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@AxesProgres", (object)entretien.AxesProgres ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ComSalarie", (object)entretien.CommentairesSalarie ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ComEvaluateur", (object)entretien.CommentairesEvaluateur ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@AvisRH", (object)entretien.AvisDirectionRH ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Souhaits", (object)entretien.SouhaitsEvolution ?? DBNull.Value);
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -734,7 +734,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdDelCrit.Transaction = tx;
                         cmdDelCrit.CommandText = "DELETE FROM EntretienCriteres WHERE EntretienId = @Id;";
-                        cmdDelCrit.Parameters.AddWithValue("@Id", entretien.Id);
+                        cmdDelCrit.Parameters.AjouterValeur("@Id", entretien.Id);
                         await cmdDelCrit.ExecuteNonQueryAsync();
                     }
 
@@ -746,13 +746,13 @@ namespace IUTSCalculator.Services
                             cmdCrit.CommandText = @"
                                 INSERT INTO EntretienCriteres (EntretienId, CompetenceId, Categorie, Libelle, Note, Poids, Commentaire)
                                 VALUES (@EntretienId, @CompId, @Cat, @Lib, @Note, @Poids, @Com);";
-                            cmdCrit.Parameters.AddWithValue("@EntretienId", entretien.Id);
-                            cmdCrit.Parameters.AddWithValue("@CompId", (object)crit.CompetenceId ?? DBNull.Value);
-                            cmdCrit.Parameters.AddWithValue("@Cat", crit.Categorie ?? "Générale");
-                            cmdCrit.Parameters.AddWithValue("@Lib", crit.Libelle ?? "");
-                            cmdCrit.Parameters.AddWithValue("@Note", crit.Note);
-                            cmdCrit.Parameters.AddWithValue("@Poids", crit.Poids);
-                            cmdCrit.Parameters.AddWithValue("@Com", (object)crit.Commentaire ?? DBNull.Value);
+                            cmdCrit.Parameters.AjouterValeur("@EntretienId", entretien.Id);
+                            cmdCrit.Parameters.AjouterValeur("@CompId", (object)crit.CompetenceId ?? DBNull.Value);
+                            cmdCrit.Parameters.AjouterValeur("@Cat", crit.Categorie ?? "Générale");
+                            cmdCrit.Parameters.AjouterValeur("@Lib", crit.Libelle ?? "");
+                            cmdCrit.Parameters.AjouterValeur("@Note", crit.Note);
+                            cmdCrit.Parameters.AjouterValeur("@Poids", crit.Poids);
+                            cmdCrit.Parameters.AjouterValeur("@Com", (object)crit.Commentaire ?? DBNull.Value);
                             await cmdCrit.ExecuteNonQueryAsync();
                         }
                     }
@@ -762,7 +762,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdDelObj.Transaction = tx;
                         cmdDelObj.CommandText = "DELETE FROM EntretienObjectifs WHERE EntretienId = @Id;";
-                        cmdDelObj.Parameters.AddWithValue("@Id", entretien.Id);
+                        cmdDelObj.Parameters.AjouterValeur("@Id", entretien.Id);
                         await cmdDelObj.ExecuteNonQueryAsync();
                     }
 
@@ -784,16 +784,16 @@ namespace IUTSCalculator.Services
                             cmdObj.CommandText = @"
                                 INSERT INTO EntretienObjectifs (EntretienId, TypeObjectif, Intitule, IndicateurMesure, CibleAttendue, ResultatObtenu, TauxAtteintePct, Appreciation, Echeance, Poids)
                                 VALUES (@EntretienId, @Type, @Intitule, @Indicateur, @Cible, @Resultat, @Taux, @Apprec, @Echeance, @Poids);";
-                            cmdObj.Parameters.AddWithValue("@EntretienId", entretien.Id);
-                            cmdObj.Parameters.AddWithValue("@Type", (int)obj.TypeObjectif);
-                            cmdObj.Parameters.AddWithValue("@Intitule", obj.Intitule ?? "");
-                            cmdObj.Parameters.AddWithValue("@Indicateur", (object)obj.IndicateurMesure ?? DBNull.Value);
-                            cmdObj.Parameters.AddWithValue("@Cible", (object)obj.CibleAttendue ?? DBNull.Value);
-                            cmdObj.Parameters.AddWithValue("@Resultat", (object)obj.ResultatObtenu ?? DBNull.Value);
-                            cmdObj.Parameters.AddWithValue("@Taux", obj.TauxAtteintePct);
-                            cmdObj.Parameters.AddWithValue("@Apprec", (object)obj.Appreciation ?? DBNull.Value);
-                            cmdObj.Parameters.AddWithValue("@Echeance", (object)obj.Echeance ?? DBNull.Value);
-                            cmdObj.Parameters.AddWithValue("@Poids", obj.Poids);
+                            cmdObj.Parameters.AjouterValeur("@EntretienId", entretien.Id);
+                            cmdObj.Parameters.AjouterValeur("@Type", (int)obj.TypeObjectif);
+                            cmdObj.Parameters.AjouterValeur("@Intitule", obj.Intitule ?? "");
+                            cmdObj.Parameters.AjouterValeur("@Indicateur", (object)obj.IndicateurMesure ?? DBNull.Value);
+                            cmdObj.Parameters.AjouterValeur("@Cible", (object)obj.CibleAttendue ?? DBNull.Value);
+                            cmdObj.Parameters.AjouterValeur("@Resultat", (object)obj.ResultatObtenu ?? DBNull.Value);
+                            cmdObj.Parameters.AjouterValeur("@Taux", obj.TauxAtteintePct);
+                            cmdObj.Parameters.AjouterValeur("@Apprec", (object)obj.Appreciation ?? DBNull.Value);
+                            cmdObj.Parameters.AjouterValeur("@Echeance", (object)obj.Echeance ?? DBNull.Value);
+                            cmdObj.Parameters.AjouterValeur("@Poids", obj.Poids);
                             await cmdObj.ExecuteNonQueryAsync();
                         }
                     }
@@ -803,7 +803,7 @@ namespace IUTSCalculator.Services
                     {
                         cmdDelForm.Transaction = tx;
                         cmdDelForm.CommandText = "DELETE FROM EntretienBesoinsFormation WHERE EntretienId = @Id;";
-                        cmdDelForm.Parameters.AddWithValue("@Id", entretien.Id);
+                        cmdDelForm.Parameters.AjouterValeur("@Id", entretien.Id);
                         await cmdDelForm.ExecuteNonQueryAsync();
                     }
 
@@ -815,13 +815,13 @@ namespace IUTSCalculator.Services
                             cmdForm.CommandText = @"
                                 INSERT INTO EntretienBesoinsFormation (EntretienId, CompetenceId, ThemeFormation, CompetenceVisee, Priorite, AvisEvaluateur, Statut)
                                 VALUES (@EntretienId, @CompId, @Theme, @CompVisee, @Priorite, @Avis, @Statut);";
-                            cmdForm.Parameters.AddWithValue("@EntretienId", entretien.Id);
-                            cmdForm.Parameters.AddWithValue("@CompId", (object)form.CompetenceId ?? DBNull.Value);
-                            cmdForm.Parameters.AddWithValue("@Theme", form.ThemeFormation ?? "");
-                            cmdForm.Parameters.AddWithValue("@CompVisee", (object)form.CompetenceVisee ?? DBNull.Value);
-                            cmdForm.Parameters.AddWithValue("@Priorite", (int)form.Priorite);
-                            cmdForm.Parameters.AddWithValue("@Avis", (object)form.AvisEvaluateur ?? DBNull.Value);
-                            cmdForm.Parameters.AddWithValue("@Statut", (int)form.Statut);
+                            cmdForm.Parameters.AjouterValeur("@EntretienId", entretien.Id);
+                            cmdForm.Parameters.AjouterValeur("@CompId", (object)form.CompetenceId ?? DBNull.Value);
+                            cmdForm.Parameters.AjouterValeur("@Theme", form.ThemeFormation ?? "");
+                            cmdForm.Parameters.AjouterValeur("@CompVisee", (object)form.CompetenceVisee ?? DBNull.Value);
+                            cmdForm.Parameters.AjouterValeur("@Priorite", (int)form.Priorite);
+                            cmdForm.Parameters.AjouterValeur("@Avis", (object)form.AvisEvaluateur ?? DBNull.Value);
+                            cmdForm.Parameters.AjouterValeur("@Statut", (int)form.Statut);
                             await cmdForm.ExecuteNonQueryAsync();
                         }
                     }
@@ -843,12 +843,12 @@ namespace IUTSCalculator.Services
         /// <param name="utilisateur">Auteur de la validation ; à défaut, l'utilisateur connecté (UserSession).</param>
         public async Task ChangerStatutEntretienAsync(int entretienId, StatutEntretien nouveauStatut, string utilisateur = null)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmdCheck = conn.CreateCommand())
                 {
                     cmdCheck.CommandText = "SELECT Statut FROM EntretiensEvaluation WHERE Id = @Id;";
-                    cmdCheck.Parameters.AddWithValue("@Id", entretienId);
+                    cmdCheck.Parameters.AjouterValeur("@Id", entretienId);
                     var currentStatut = DbValue.IntFromDb(await cmdCheck.ExecuteScalarAsync());
 
                     if (currentStatut >= (int)StatutEntretien.Valide)
@@ -866,17 +866,17 @@ namespace IUTSCalculator.Services
                         UPDATE EntretiensEvaluation
                         SET Statut = @Statut, DateValidation = @DateValidation, ValidePar = @ValidePar
                         WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@DateValidation", DbValue.DateToDb(DateTime.Now));
+                    cmd.Parameters.AjouterValeur("@DateValidation", DbValue.DateToDb(DateTime.Now));
                     string auteur = !string.IsNullOrWhiteSpace(utilisateur) ? utilisateur.Trim() : UtilisateurCourant();
-                    cmd.Parameters.AddWithValue("@ValidePar", (object)auteur ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@ValidePar", (object)auteur ?? DBNull.Value);
                 }
                 else
                 {
                     cmd.CommandText = "UPDATE EntretiensEvaluation SET Statut = @Statut WHERE Id = @Id;";
                 }
 
-                cmd.Parameters.AddWithValue("@Statut", (int)nouveauStatut);
-                cmd.Parameters.AddWithValue("@Id", entretienId);
+                cmd.Parameters.AjouterValeur("@Statut", (int)nouveauStatut);
+                cmd.Parameters.AjouterValeur("@Id", entretienId);
                 await cmd.ExecuteNonQueryAsync();
             }
             }
@@ -889,12 +889,12 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task AssignerEvaluateurAsync(int entretienId, string evaluateurMatricule)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmdCheck = conn.CreateCommand())
                 {
                     cmdCheck.CommandText = "SELECT Statut FROM EntretiensEvaluation WHERE Id = @Id;";
-                    cmdCheck.Parameters.AddWithValue("@Id", entretienId);
+                    cmdCheck.Parameters.AjouterValeur("@Id", entretienId);
                     var currentStatut = DbValue.IntFromDb(await cmdCheck.ExecuteScalarAsync());
 
                     if (currentStatut >= (int)StatutEntretien.Valide)
@@ -907,8 +907,8 @@ namespace IUTSCalculator.Services
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "UPDATE EntretiensEvaluation SET EvaluateurMatricule = @Matricule WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Matricule", (object)evaluateurMatricule?.Trim() ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Id", entretienId);
+                    cmd.Parameters.AjouterValeur("@Matricule", (object)evaluateurMatricule?.Trim() ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@Id", entretienId);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -919,12 +919,12 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task SupprimerEntretienAsync(int entretienId)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmdCheck = conn.CreateCommand())
                 {
                     cmdCheck.CommandText = "SELECT Statut FROM EntretiensEvaluation WHERE Id = @Id;";
-                    cmdCheck.Parameters.AddWithValue("@Id", entretienId);
+                    cmdCheck.Parameters.AjouterValeur("@Id", entretienId);
                     var statut = DbValue.IntFromDb(await cmdCheck.ExecuteScalarAsync());
                     if (statut >= (int)StatutEntretien.Valide)
                     {
@@ -935,7 +935,7 @@ namespace IUTSCalculator.Services
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "DELETE FROM EntretiensEvaluation WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", entretienId);
+                    cmd.Parameters.AjouterValeur("@Id", entretienId);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -953,7 +953,7 @@ namespace IUTSCalculator.Services
             var historique = new List<HistoriqueEntretienSalarie>();
             if (string.IsNullOrWhiteSpace(employeeId)) return historique;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -972,9 +972,9 @@ namespace IUTSCalculator.Services
                     LEFT JOIN Postes pos_mgr ON mgr.PosteId = pos_mgr.Id
                     WHERE e.EmployeeId = @EmpId
                     ORDER BY camp.AnneeExercice DESC, e.DateEntretien DESC, e.Id DESC;";
-                cmd.Parameters.AddWithValue("@EmpId", employeeId.Trim());
+                cmd.Parameters.AjouterValeur("@EmpId", employeeId.Trim());
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -1037,7 +1037,7 @@ namespace IUTSCalculator.Services
         {
             var stats = new StatistiquesCampagne();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -1047,12 +1047,12 @@ namespace IUTSCalculator.Services
                         EvaluateurMatricule
                     FROM EntretiensEvaluation
                     WHERE CampagneId = @CampagneId;";
-                cmd.Parameters.AddWithValue("@CampagneId", campagneId);
+                cmd.Parameters.AjouterValeur("@CampagneId", campagneId);
 
                 double sommeNotes = 0.0;
                 int countNotes = 0;
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -1105,7 +1105,7 @@ namespace IUTSCalculator.Services
 
         #region Helpers de Mapping
 
-        private static EntretienEvaluation MapperEntretienEntete(SQLiteDataReader reader)
+        private static EntretienEvaluation MapperEntretienEntete(SqliteDataReader reader)
         {
             var empPrenom = DbValue.TextFromDb(reader["EmpPrenom"]);
             var empNom = DbValue.TextFromDb(reader["EmpNom"]);

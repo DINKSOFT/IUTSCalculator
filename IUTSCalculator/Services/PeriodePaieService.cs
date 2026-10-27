@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
 
@@ -55,12 +55,12 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<PeriodePaie>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT " + Colonnes + " FROM PeriodesPaie ORDER BY Annee DESC, Mois DESC";
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                             liste.Add(Lire(reader));
@@ -79,7 +79,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static PeriodePaie Lire(SQLiteDataReader reader)
+        private static PeriodePaie Lire(SqliteDataReader reader)
         {
             object dateCloture = reader["DateCloture"];
 
@@ -113,14 +113,14 @@ namespace IUTSCalculator.Services
         /// <summary>La période correspondant à une date, ou null si elle n'a jamais été ouverte.</summary>
         public async Task<PeriodePaie> LirePeriodeAsync(int annee, int mois)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT " + Colonnes + " FROM PeriodesPaie WHERE Annee = @a AND Mois = @m";
-                cmd.Parameters.AddWithValue("@a", annee);
-                cmd.Parameters.AddWithValue("@m", mois);
+                cmd.Parameters.AjouterValeur("@a", annee);
+                cmd.Parameters.AjouterValeur("@m", mois);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                         return Lire(reader);
@@ -137,7 +137,7 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task<bool> EstClotureeAsync(DateTime date)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 return await EstClotureeAsync(conn, date);
             }
@@ -149,7 +149,7 @@ namespace IUTSCalculator.Services
         /// donc à l'intérieur de la transaction de celui-ci.
         /// </summary>
         public static async Task<bool> EstClotureeAsync(
-            SQLiteConnection conn, DateTime date, SQLiteTransaction tx = null)
+            SqliteConnection conn, DateTime date, SqliteTransaction tx = null)
         {
             // Un dossier dont le schéma n'a pas encore atteint la version 5 n'a pas la
             // table : rien n'y est clôturé, et le verrou ne doit pas faire échouer
@@ -162,19 +162,19 @@ namespace IUTSCalculator.Services
                 if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText =
                     "SELECT COUNT(*) FROM PeriodesPaie WHERE Annee = @a AND Mois = @m AND Statut = 1";
-                cmd.Parameters.AddWithValue("@a", date.Year);
-                cmd.Parameters.AddWithValue("@m", date.Month);
+                cmd.Parameters.AjouterValeur("@a", date.Year);
+                cmd.Parameters.AjouterValeur("@m", date.Month);
                 return DbValue.IntFromDb(await cmd.ExecuteScalarAsync()) > 0;
             }
         }
 
-        private static bool TableExiste(SQLiteConnection conn, string nom, SQLiteTransaction tx = null)
+        private static bool TableExiste(SqliteConnection conn, string nom, SqliteTransaction tx = null)
         {
             using (var cmd = conn.CreateCommand())
             {
                 if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=@n";
-                cmd.Parameters.AddWithValue("@n", nom);
+                cmd.Parameters.AjouterValeur("@n", nom);
                 return DbValue.IntFromDb(cmd.ExecuteScalar()) > 0;
             }
         }
@@ -202,7 +202,7 @@ namespace IUTSCalculator.Services
                 DateOuverture = DateTime.Now
             };
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -210,9 +210,9 @@ namespace IUTSCalculator.Services
                     "ClotureePar, Commentaire, NombreBulletins, TotalBrut, TotalNetAPayer, TotalIuts, " +
                     "TotalCnssSalarie, TotalCnssPatronal, TotalTaxePatronale, TotalMasseSalariale) " +
                     "VALUES (@a, @m, 0, @ouverture, NULL, '', '', 0, 0, 0, 0, 0, 0, 0, 0);";
-                cmd.Parameters.AddWithValue("@a", annee);
-                cmd.Parameters.AddWithValue("@m", mois);
-                cmd.Parameters.AddWithValue("@ouverture", DbValue.DateToDb(periode.DateOuverture));
+                cmd.Parameters.AjouterValeur("@a", annee);
+                cmd.Parameters.AjouterValeur("@m", mois);
+                cmd.Parameters.AjouterValeur("@ouverture", DbValue.DateToDb(periode.DateOuverture));
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -227,7 +227,7 @@ namespace IUTSCalculator.Services
         {
             if (periode == null) throw new ArgumentNullException("periode");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 await CalculerTotauxAsync(conn, null, periode);
                 await EnregistrerTotauxAsync(conn, null, periode);
@@ -248,7 +248,7 @@ namespace IUTSCalculator.Services
             if (periode.EstCloturee)
                 throw new InvalidOperationException("Cette période est déjà clôturée.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -303,14 +303,14 @@ namespace IUTSCalculator.Services
                 DateTime.Now,
                 string.IsNullOrWhiteSpace(motif) ? "motif non précisé" : motif.Trim());
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "UPDATE PeriodesPaie SET Statut = 0, DateCloture = NULL, ClotureePar = '', " +
                     "Commentaire = @commentaire WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@commentaire", trace);
-                cmd.Parameters.AddWithValue("@id", periode.Id);
+                cmd.Parameters.AjouterValeur("@commentaire", trace);
+                cmd.Parameters.AjouterValeur("@id", periode.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -327,12 +327,12 @@ namespace IUTSCalculator.Services
         {
             if (periode == null || periode.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "UPDATE PeriodesPaie SET Commentaire = @c WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@c", periode.Commentaire ?? "");
-                cmd.Parameters.AddWithValue("@id", periode.Id);
+                cmd.Parameters.AjouterValeur("@c", periode.Commentaire ?? "");
+                cmd.Parameters.AjouterValeur("@id", periode.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -352,11 +352,11 @@ namespace IUTSCalculator.Services
                     "déclarés. Rouvrez-la d'abord si vous devez vraiment la retirer.");
             }
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM PeriodesPaie WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", periode.Id);
+                cmd.Parameters.AjouterValeur("@id", periode.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -369,7 +369,7 @@ namespace IUTSCalculator.Services
         /// salariale déclarée.
         /// </summary>
         private static async Task CalculerTotauxAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, PeriodePaie periode)
+            SqliteConnection conn, SqliteTransaction tx, PeriodePaie periode)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -388,10 +388,10 @@ namespace IUTSCalculator.Services
                     "WHERE CalculationDate >= @debut AND CalculationDate <= @fin " +
                     "  AND IsAnnual = 0 AND IsRegularization = 0";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(periode.PremierJour));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(periode.DernierJour));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(periode.PremierJour));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(periode.DernierJour));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                     {
@@ -409,7 +409,7 @@ namespace IUTSCalculator.Services
         }
 
         private static async Task EnregistrerTotauxAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, PeriodePaie periode)
+            SqliteConnection conn, SqliteTransaction tx, PeriodePaie periode)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -423,21 +423,21 @@ namespace IUTSCalculator.Services
                     "TotalTaxePatronale = @tpa, TotalMasseSalariale = @masse " +
                     "WHERE Id = @id;";
 
-                cmd.Parameters.AddWithValue("@statut", periode.EstCloturee ? 1 : 0);
-                cmd.Parameters.AddWithValue("@cloture",
+                cmd.Parameters.AjouterValeur("@statut", periode.EstCloturee ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@cloture",
                     periode.DateCloture.HasValue
                         ? (object)DbValue.DateToDb(periode.DateCloture.Value)
                         : DBNull.Value);
-                cmd.Parameters.AddWithValue("@par", periode.ClotureePar ?? "");
-                cmd.Parameters.AddWithValue("@nb", periode.NombreBulletins);
-                cmd.Parameters.AddWithValue("@brut", DbValue.MoneyToDb(periode.TotalBrut));
-                cmd.Parameters.AddWithValue("@net", DbValue.MoneyToDb(periode.TotalNetAPayer));
-                cmd.Parameters.AddWithValue("@iuts", DbValue.MoneyToDb(periode.TotalIuts));
-                cmd.Parameters.AddWithValue("@cnssSal", DbValue.MoneyToDb(periode.TotalCnssSalarie));
-                cmd.Parameters.AddWithValue("@cnssPat", DbValue.MoneyToDb(periode.TotalCnssPatronal));
-                cmd.Parameters.AddWithValue("@tpa", DbValue.MoneyToDb(periode.TotalTaxePatronale));
-                cmd.Parameters.AddWithValue("@masse", DbValue.MoneyToDb(periode.TotalMasseSalariale));
-                cmd.Parameters.AddWithValue("@id", periode.Id);
+                cmd.Parameters.AjouterValeur("@par", periode.ClotureePar ?? "");
+                cmd.Parameters.AjouterValeur("@nb", periode.NombreBulletins);
+                cmd.Parameters.AjouterValeur("@brut", DbValue.MoneyToDb(periode.TotalBrut));
+                cmd.Parameters.AjouterValeur("@net", DbValue.MoneyToDb(periode.TotalNetAPayer));
+                cmd.Parameters.AjouterValeur("@iuts", DbValue.MoneyToDb(periode.TotalIuts));
+                cmd.Parameters.AjouterValeur("@cnssSal", DbValue.MoneyToDb(periode.TotalCnssSalarie));
+                cmd.Parameters.AjouterValeur("@cnssPat", DbValue.MoneyToDb(periode.TotalCnssPatronal));
+                cmd.Parameters.AjouterValeur("@tpa", DbValue.MoneyToDb(periode.TotalTaxePatronale));
+                cmd.Parameters.AjouterValeur("@masse", DbValue.MoneyToDb(periode.TotalMasseSalariale));
+                cmd.Parameters.AjouterValeur("@id", periode.Id);
 
                 await cmd.ExecuteNonQueryAsync();
             }

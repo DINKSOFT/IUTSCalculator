@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -68,7 +68,7 @@ namespace IUTSCalculator.Services
 
             var toutesLesLignes = new List<LigneOrdreVirement>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -93,10 +93,10 @@ namespace IUTSCalculator.Services
                       AND c.IsRegularization = 0
                     ORDER BY e.LastName, e.FirstName, c.CalculationDate";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debutPeriode.Date));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(finPeriode.Date.AddDays(1).AddTicks(-1)));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debutPeriode.Date));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(finPeriode.Date.AddDays(1).AddTicks(-1)));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     int index = 1;
                     while (await reader.ReadAsync())
@@ -216,7 +216,7 @@ namespace IUTSCalculator.Services
 
             var banques = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -231,10 +231,10 @@ namespace IUTSCalculator.Services
                       AND TRIM(e.Banque) != ''
                     ORDER BY e.Banque";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut.Date));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.Date.AddDays(1).AddTicks(-1)));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debut.Date));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(fin.Date.AddDays(1).AddTicks(-1)));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

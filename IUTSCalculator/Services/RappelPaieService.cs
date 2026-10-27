@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -45,7 +45,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     var sql = @"
                         SELECT r.Id, r.EmployeeId, r.TypeRappel, r.Libelle, r.Sens,
@@ -73,10 +73,10 @@ namespace IUTSCalculator.Services
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = sql;
-                        if (anneeImputation.HasValue) cmd.Parameters.AddWithValue("@ai", anneeImputation.Value);
-                        if (moisImputation.HasValue) cmd.Parameters.AddWithValue("@mi", moisImputation.Value);
-                        if (!string.IsNullOrWhiteSpace(employeeId)) cmd.Parameters.AddWithValue("@emp", employeeId);
-                        if (statut.HasValue) cmd.Parameters.AddWithValue("@st", (int)statut.Value);
+                        if (anneeImputation.HasValue) cmd.Parameters.AjouterValeur("@ai", anneeImputation.Value);
+                        if (moisImputation.HasValue) cmd.Parameters.AjouterValeur("@mi", moisImputation.Value);
+                        if (!string.IsNullOrWhiteSpace(employeeId)) cmd.Parameters.AjouterValeur("@emp", employeeId);
+                        if (statut.HasValue) cmd.Parameters.AjouterValeur("@st", (int)statut.Value);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -96,7 +96,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -111,7 +111,7 @@ namespace IUTSCalculator.Services
                             FROM RappelsPaie r
                             LEFT JOIN Employees e ON e.EmployeeId = r.EmployeeId
                             WHERE r.Id = @id LIMIT 1;";
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -147,7 +147,7 @@ namespace IUTSCalculator.Services
             return await Task.Run(async () =>
             {
                 int id = rappel.Id;
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     // Défaut n° 9 du guide : un rappel en attente pouvait viser un mois déjà
                     // clôturé — il n'y était jamais imputé (aucun bulletin ne s'y recalcule)
@@ -208,31 +208,31 @@ namespace IUTSCalculator.Services
                                     DetailsCalculJson = @details,
                                     DateImputation = @di
                                 WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", id);
+                            cmd.Parameters.AjouterValeur("@id", id);
                         }
-                        cmd.Parameters.AddWithValue("@emp", rappel.EmployeeId);
-                        cmd.Parameters.AddWithValue("@type", (int)rappel.TypeRappel);
-                        cmd.Parameters.AddWithValue("@libelle", rappel.Libelle ?? string.Empty);
-                        cmd.Parameters.AddWithValue("@sens", (int)rappel.Sens);
-                        cmd.Parameters.AddWithValue("@mod", rappel.MoisOrigineDebut.HasValue ? DbValue.DateToDb(rappel.MoisOrigineDebut.Value) : (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@mof", rappel.MoisOrigineFin.HasValue ? DbValue.DateToDb(rappel.MoisOrigineFin.Value) : (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ai", rappel.AnneeImputation);
-                        cmd.Parameters.AddWithValue("@mi", rappel.MoisImputation);
-                        cmd.Parameters.AddWithValue("@brut", DbValue.MoneyToDb(rappel.MontantBrut));
-                        cmd.Parameters.AddWithValue("@cnsss", DbValue.MoneyToDb(rappel.MontantCnssSalarial));
-                        cmd.Parameters.AddWithValue("@cnssp", DbValue.MoneyToDb(rappel.MontantCnssPatronal));
-                        cmd.Parameters.AddWithValue("@tpa", DbValue.MoneyToDb(rappel.MontantTPA));
-                        cmd.Parameters.AddWithValue("@iuts", DbValue.MoneyToDb(rappel.MontantIUTS));
-                        cmd.Parameters.AddWithValue("@net", DbValue.MoneyToDb(rappel.MontantNet));
-                        cmd.Parameters.AddWithValue("@siuts", rappel.SoumisIUTS ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@scnss", rappel.SoumisCNSS ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@stpa", rappel.SoumisTPA ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@statut", (int)rappel.Statut);
-                        cmd.Parameters.AddWithValue("@motif", rappel.Motif ?? (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@details", rappel.DetailsCalculJson ?? (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@dc", DbValue.DateToDb(rappel.DateCreation));
-                        cmd.Parameters.AddWithValue("@di", rappel.DateImputation.HasValue ? DbValue.DateToDb(rappel.DateImputation.Value) : (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@creepar", rappel.CreePar ?? (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@emp", rappel.EmployeeId);
+                        cmd.Parameters.AjouterValeur("@type", (int)rappel.TypeRappel);
+                        cmd.Parameters.AjouterValeur("@libelle", rappel.Libelle ?? string.Empty);
+                        cmd.Parameters.AjouterValeur("@sens", (int)rappel.Sens);
+                        cmd.Parameters.AjouterValeur("@mod", rappel.MoisOrigineDebut.HasValue ? DbValue.DateToDb(rappel.MoisOrigineDebut.Value) : (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@mof", rappel.MoisOrigineFin.HasValue ? DbValue.DateToDb(rappel.MoisOrigineFin.Value) : (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ai", rappel.AnneeImputation);
+                        cmd.Parameters.AjouterValeur("@mi", rappel.MoisImputation);
+                        cmd.Parameters.AjouterValeur("@brut", DbValue.MoneyToDb(rappel.MontantBrut));
+                        cmd.Parameters.AjouterValeur("@cnsss", DbValue.MoneyToDb(rappel.MontantCnssSalarial));
+                        cmd.Parameters.AjouterValeur("@cnssp", DbValue.MoneyToDb(rappel.MontantCnssPatronal));
+                        cmd.Parameters.AjouterValeur("@tpa", DbValue.MoneyToDb(rappel.MontantTPA));
+                        cmd.Parameters.AjouterValeur("@iuts", DbValue.MoneyToDb(rappel.MontantIUTS));
+                        cmd.Parameters.AjouterValeur("@net", DbValue.MoneyToDb(rappel.MontantNet));
+                        cmd.Parameters.AjouterValeur("@siuts", rappel.SoumisIUTS ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@scnss", rappel.SoumisCNSS ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@stpa", rappel.SoumisTPA ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@statut", (int)rappel.Statut);
+                        cmd.Parameters.AjouterValeur("@motif", rappel.Motif ?? (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@details", rappel.DetailsCalculJson ?? (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@dc", DbValue.DateToDb(rappel.DateCreation));
+                        cmd.Parameters.AjouterValeur("@di", rappel.DateImputation.HasValue ? DbValue.DateToDb(rappel.DateImputation.Value) : (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@creepar", rappel.CreePar ?? (object)DBNull.Value);
                         if (id == 0)
                         {
                             id = Convert.ToInt32(cmd.ExecuteScalar());
@@ -264,7 +264,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -285,11 +285,11 @@ namespace IUTSCalculator.Services
                               AND r.MoisOrigineFin = @mof
                               AND r.Statut != 2
                             LIMIT 1;";
-                        cmd.Parameters.AddWithValue("@emp", rappel.EmployeeId);
-                        cmd.Parameters.AddWithValue("@type", (int)rappel.TypeRappel);
-                        cmd.Parameters.AddWithValue("@brut", DbValue.MoneyToDb(rappel.MontantBrut));
-                        cmd.Parameters.AddWithValue("@mod", rappel.MoisOrigineDebut.HasValue ? DbValue.DateToDb(rappel.MoisOrigineDebut.Value) : (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@mof", rappel.MoisOrigineFin.HasValue ? DbValue.DateToDb(rappel.MoisOrigineFin.Value) : (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@emp", rappel.EmployeeId);
+                        cmd.Parameters.AjouterValeur("@type", (int)rappel.TypeRappel);
+                        cmd.Parameters.AjouterValeur("@brut", DbValue.MoneyToDb(rappel.MontantBrut));
+                        cmd.Parameters.AjouterValeur("@mod", rappel.MoisOrigineDebut.HasValue ? DbValue.DateToDb(rappel.MoisOrigineDebut.Value) : (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@mof", rappel.MoisOrigineFin.HasValue ? DbValue.DateToDb(rappel.MoisOrigineFin.Value) : (object)DBNull.Value);
                         using (var reader = cmd.ExecuteReader())
                         {
                             if (reader.Read()) return LireRappel(reader);
@@ -304,12 +304,12 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(async () =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "DELETE FROM RappelsPaie WHERE Id = @id AND Statut != 1;";
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
                         int affected = cmd.ExecuteNonQuery();
                         if (affected > 0 && _auditService != null)
                         {
@@ -331,7 +331,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -339,8 +339,8 @@ namespace IUTSCalculator.Services
                             UPDATE RappelsPaie 
                             SET Statut = 1, DateImputation = @di 
                             WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", id);
-                        cmd.Parameters.AddWithValue("@di", DbValue.DateToDb(dateImputation));
+                        cmd.Parameters.AjouterValeur("@id", id);
+                        cmd.Parameters.AjouterValeur("@di", DbValue.DateToDb(dateImputation));
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
@@ -351,7 +351,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -362,12 +362,12 @@ namespace IUTSCalculator.Services
                         if (!string.IsNullOrWhiteSpace(employeeId))
                         {
                             sql += " AND EmployeeId = @emp";
-                            cmd.Parameters.AddWithValue("@emp", employeeId);
+                            cmd.Parameters.AjouterValeur("@emp", employeeId);
                         }
                         cmd.CommandText = sql;
-                        cmd.Parameters.AddWithValue("@ai", annee);
-                        cmd.Parameters.AddWithValue("@mi", mois);
-                        cmd.Parameters.AddWithValue("@di", DbValue.DateToDb(dateImputation ?? DateTime.Today));
+                        cmd.Parameters.AjouterValeur("@ai", annee);
+                        cmd.Parameters.AjouterValeur("@mi", mois);
+                        cmd.Parameters.AjouterValeur("@di", DbValue.DateToDb(dateImputation ?? DateTime.Today));
                         return cmd.ExecuteNonQuery();
                     }
                 }
@@ -378,19 +378,19 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "UPDATE RappelsPaie SET Statut = 2 WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
             });
         }
 
-        private static RappelPaie LireRappel(SQLiteDataReader reader)
+        private static RappelPaie LireRappel(SqliteDataReader reader)
         {
             string prenom = Convert.ToString(reader["FirstName"] ?? string.Empty);
             string nom = Convert.ToString(reader["LastName"] ?? string.Empty);
@@ -442,7 +442,7 @@ namespace IUTSCalculator.Services
             var aujourdhui = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             try
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -471,7 +471,7 @@ namespace IUTSCalculator.Services
                     }
                 }
             }
-            catch (SQLiteException)
+            catch (SqliteException)
             {
                 // Base illisible : repli sur le mois en cours.
             }
@@ -590,7 +590,7 @@ namespace IUTSCalculator.Services
             var list = new List<RegularisationIutsAnnuel>();
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -604,7 +604,7 @@ namespace IUTSCalculator.Services
                             LEFT JOIN Employees e ON e.EmployeeId = r.EmployeeId
                             WHERE r.Annee = @annee
                             ORDER BY e.LastName, e.FirstName;";
-                        cmd.Parameters.AddWithValue("@annee", annee);
+                        cmd.Parameters.AjouterValeur("@annee", annee);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -644,7 +644,7 @@ namespace IUTSCalculator.Services
             if (regul == null) throw new ArgumentNullException(nameof(regul));
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -681,22 +681,22 @@ namespace IUTSCalculator.Services
                                     Observations = @obs,
                                     DateModification = @dm
                                 WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", regul.Id);
+                            cmd.Parameters.AjouterValeur("@id", regul.Id);
                         }
 
-                        cmd.Parameters.AddWithValue("@emp", regul.EmployeeId);
-                        cmd.Parameters.AddWithValue("@annee", regul.Annee);
-                        cmd.Parameters.AddWithValue("@nmois", regul.NombreMoisTravailles);
-                        cmd.Parameters.AddWithValue("@brut", DbValue.MoneyToDb(regul.CumulBrutImposable));
-                        cmd.Parameters.AddWithValue("@theorique", DbValue.MoneyToDb(regul.IutsTheoriqueAnnuel));
-                        cmd.Parameters.AddWithValue("@preleve", DbValue.MoneyToDb(regul.CumulIutsPreleve));
-                        cmd.Parameters.AddWithValue("@diff", DbValue.MoneyToDb(regul.DifferenceRegularisation));
-                        cmd.Parameters.AddWithValue("@mi", regul.MoisImputation);
-                        cmd.Parameters.AddWithValue("@statut", (int)regul.Statut);
-                        cmd.Parameters.AddWithValue("@rpid", regul.RappelPaieId.HasValue ? (object)regul.RappelPaieId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@obs", regul.Observations ?? (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@dc", DbValue.DateToDb(regul.DateCreation));
-                        cmd.Parameters.AddWithValue("@dm", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@emp", regul.EmployeeId);
+                        cmd.Parameters.AjouterValeur("@annee", regul.Annee);
+                        cmd.Parameters.AjouterValeur("@nmois", regul.NombreMoisTravailles);
+                        cmd.Parameters.AjouterValeur("@brut", DbValue.MoneyToDb(regul.CumulBrutImposable));
+                        cmd.Parameters.AjouterValeur("@theorique", DbValue.MoneyToDb(regul.IutsTheoriqueAnnuel));
+                        cmd.Parameters.AjouterValeur("@preleve", DbValue.MoneyToDb(regul.CumulIutsPreleve));
+                        cmd.Parameters.AjouterValeur("@diff", DbValue.MoneyToDb(regul.DifferenceRegularisation));
+                        cmd.Parameters.AjouterValeur("@mi", regul.MoisImputation);
+                        cmd.Parameters.AjouterValeur("@statut", (int)regul.Statut);
+                        cmd.Parameters.AjouterValeur("@rpid", regul.RappelPaieId.HasValue ? (object)regul.RappelPaieId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@obs", regul.Observations ?? (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@dc", DbValue.DateToDb(regul.DateCreation));
+                        cmd.Parameters.AjouterValeur("@dm", DbValue.DateToDb(DateTime.Now));
 
                         if (regul.Id == 0)
                         {
@@ -728,7 +728,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -738,7 +738,7 @@ namespace IUTSCalculator.Services
                             WHERE CalculationDate LIKE @anneePrefix
                               AND IsAnnual = 0 AND IsRegularization = 0
                             ORDER BY CalculationDate ASC;";
-                        cmd.Parameters.AddWithValue("@anneePrefix", $"{annee:0000}-%");
+                        cmd.Parameters.AjouterValeur("@anneePrefix", $"{annee:0000}-%");
 
                         using (var reader = cmd.ExecuteReader())
                         {

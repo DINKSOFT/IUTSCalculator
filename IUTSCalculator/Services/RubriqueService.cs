@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
 
@@ -61,11 +61,11 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<Rubrique>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT " + Colonnes + " FROM Rubriques ORDER BY Ordre, Code";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -75,7 +75,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static Rubrique Lire(SQLiteDataReader reader)
+        private static Rubrique Lire(SqliteDataReader reader)
         {
             return new Rubrique
             {
@@ -108,7 +108,7 @@ namespace IUTSCalculator.Services
             if (string.IsNullOrWhiteSpace(rubrique.Code))
                 throw new InvalidOperationException("Le code de la rubrique est obligatoire.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 await EcrireAsync(rubrique, conn, tx);
@@ -120,7 +120,7 @@ namespace IUTSCalculator.Services
         {
             if (rubriques == null) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var r in rubriques)
@@ -129,7 +129,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task EcrireAsync(Rubrique r, SQLiteConnection conn, SQLiteTransaction tx)
+        private static async Task EcrireAsync(Rubrique r, SqliteConnection conn, SqliteTransaction tx)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -144,26 +144,26 @@ namespace IUTSCalculator.Services
                      @SoumisIUTS, @SoumisCNSS, @SoumisTPA, @Plafonne, @Plafond, @PourcentagePlafond, @Ordre, @Active,
                      @EstSysteme, @CompteComptable, @CompteContrepartie, @Commentaire);";
 
-                cmd.Parameters.AddWithValue("@Code", (r.Code ?? "").Trim().ToUpperInvariant());
-                cmd.Parameters.AddWithValue("@Libelle", r.Libelle ?? "");
-                cmd.Parameters.AddWithValue("@Sens", (int)r.Sens);
-                cmd.Parameters.AddWithValue("@ModeCalcul", (int)r.ModeCalcul);
-                cmd.Parameters.AddWithValue("@MontantFixe", DbValue.MoneyToDb(r.MontantFixe));
-                cmd.Parameters.AddWithValue("@TauxSalarial", DbValue.DecimalToDb(r.TauxSalarial));
-                cmd.Parameters.AddWithValue("@TauxPatronal", DbValue.DecimalToDb(r.TauxPatronal));
-                cmd.Parameters.AddWithValue("@CodeBase", r.CodeBase ?? "");
-                cmd.Parameters.AddWithValue("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
-                cmd.Parameters.AddWithValue("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
-                cmd.Parameters.AddWithValue("@SoumisTPA", r.SoumisTPA ? 1 : 0);
-                cmd.Parameters.AddWithValue("@Plafonne", r.Plafonne ? 1 : 0);
-                cmd.Parameters.AddWithValue("@Plafond", DbValue.MoneyToDb(r.Plafond));
-                cmd.Parameters.AddWithValue("@PourcentagePlafond", DbValue.DecimalToDb(r.PourcentagePlafond));
-                cmd.Parameters.AddWithValue("@Ordre", r.Ordre);
-                cmd.Parameters.AddWithValue("@Active", r.Active ? 1 : 0);
-                cmd.Parameters.AddWithValue("@EstSysteme", r.EstSysteme ? 1 : 0);
-                cmd.Parameters.AddWithValue("@CompteComptable", r.CompteComptable ?? "");
-                cmd.Parameters.AddWithValue("@CompteContrepartie", r.CompteContrepartie ?? "");
-                cmd.Parameters.AddWithValue("@Commentaire", r.Commentaire ?? "");
+                cmd.Parameters.AjouterValeur("@Code", (r.Code ?? "").Trim().ToUpperInvariant());
+                cmd.Parameters.AjouterValeur("@Libelle", r.Libelle ?? "");
+                cmd.Parameters.AjouterValeur("@Sens", (int)r.Sens);
+                cmd.Parameters.AjouterValeur("@ModeCalcul", (int)r.ModeCalcul);
+                cmd.Parameters.AjouterValeur("@MontantFixe", DbValue.MoneyToDb(r.MontantFixe));
+                cmd.Parameters.AjouterValeur("@TauxSalarial", DbValue.DecimalToDb(r.TauxSalarial));
+                cmd.Parameters.AjouterValeur("@TauxPatronal", DbValue.DecimalToDb(r.TauxPatronal));
+                cmd.Parameters.AjouterValeur("@CodeBase", r.CodeBase ?? "");
+                cmd.Parameters.AjouterValeur("@SoumisIUTS", r.SoumisIUTS ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@SoumisCNSS", r.SoumisCNSS ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@SoumisTPA", r.SoumisTPA ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@Plafonne", r.Plafonne ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@Plafond", DbValue.MoneyToDb(r.Plafond));
+                cmd.Parameters.AjouterValeur("@PourcentagePlafond", DbValue.DecimalToDb(r.PourcentagePlafond));
+                cmd.Parameters.AjouterValeur("@Ordre", r.Ordre);
+                cmd.Parameters.AjouterValeur("@Active", r.Active ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@EstSysteme", r.EstSysteme ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@CompteComptable", r.CompteComptable ?? "");
+                cmd.Parameters.AjouterValeur("@CompteContrepartie", r.CompteContrepartie ?? "");
+                cmd.Parameters.AjouterValeur("@Commentaire", r.Commentaire ?? "");
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -184,11 +184,11 @@ namespace IUTSCalculator.Services
                 return;
             }
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM Rubriques WHERE Code = @Code";
-                cmd.Parameters.AddWithValue("@Code", rubrique.Code ?? "");
+                cmd.Parameters.AjouterValeur("@Code", rubrique.Code ?? "");
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -197,11 +197,11 @@ namespace IUTSCalculator.Services
         {
             if (string.IsNullOrWhiteSpace(code)) return false;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM Rubriques WHERE Code = @Code";
-                cmd.Parameters.AddWithValue("@Code", code.Trim().ToUpperInvariant());
+                cmd.Parameters.AjouterValeur("@Code", code.Trim().ToUpperInvariant());
                 var resultat = await cmd.ExecuteScalarAsync();
                 return DbValue.IntFromDb(resultat) > 0;
             }

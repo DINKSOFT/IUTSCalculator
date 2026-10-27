@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -31,7 +31,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -64,7 +64,7 @@ namespace IUTSCalculator.Services
                         if (annee.HasValue)
                         {
                             sql += " AND p.AnneeExercice = @annee ";
-                            cmd.Parameters.AddWithValue("@annee", annee.Value);
+                            cmd.Parameters.AjouterValeur("@annee", annee.Value);
                         }
 
                         sql += " ORDER BY p.AnneeExercice DESC, p.Code ASC;";
@@ -126,15 +126,15 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     // Vérification unicité code
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM PlansFormation WHERE Code = @code AND Id <> @id;";
-                        checkCmd.Parameters.AddWithValue("@code", plan.Code.Trim().ToUpperInvariant());
-                        checkCmd.Parameters.AddWithValue("@id", plan.Id);
+                        checkCmd.Parameters.AjouterValeur("@code", plan.Code.Trim().ToUpperInvariant());
+                        checkCmd.Parameters.AjouterValeur("@id", plan.Id);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException($"Un plan de formation avec le code '{plan.Code}' existe déjà.");
@@ -158,17 +158,17 @@ namespace IUTSCalculator.Services
                                     BudgetPrevisionnel = @BudgetPrevisionnel, Statut = @Statut,
                                     ObjectifsStrategiques = @ObjectifsStrategiques, DateValidation = @DateValidation
                                 WHERE Id = @Id;";
-                            cmd.Parameters.AddWithValue("@Id", plan.Id);
+                            cmd.Parameters.AjouterValeur("@Id", plan.Id);
                         }
 
-                        cmd.Parameters.AddWithValue("@Code", plan.Code.Trim().ToUpperInvariant());
-                        cmd.Parameters.AddWithValue("@Titre", plan.Titre.Trim());
-                        cmd.Parameters.AddWithValue("@AnneeExercice", plan.AnneeExercice);
-                        cmd.Parameters.AddWithValue("@BudgetPrevisionnel", DbValue.MoneyToDb(plan.BudgetPrevisionnel));
-                        cmd.Parameters.AddWithValue("@Statut", (int)plan.Statut);
-                        cmd.Parameters.AddWithValue("@ObjectifsStrategiques", (object)plan.ObjectifsStrategiques ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DateValidation", plan.DateValidation.HasValue ? plan.DateValidation.Value.ToString("yyyy-MM-dd HH:mm:ss") : (object)DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DateCreation", plan.DateCreation.ToString("yyyy-MM-dd HH:mm:ss"));
+                        cmd.Parameters.AjouterValeur("@Code", plan.Code.Trim().ToUpperInvariant());
+                        cmd.Parameters.AjouterValeur("@Titre", plan.Titre.Trim());
+                        cmd.Parameters.AjouterValeur("@AnneeExercice", plan.AnneeExercice);
+                        cmd.Parameters.AjouterValeur("@BudgetPrevisionnel", DbValue.MoneyToDb(plan.BudgetPrevisionnel));
+                        cmd.Parameters.AjouterValeur("@Statut", (int)plan.Statut);
+                        cmd.Parameters.AjouterValeur("@ObjectifsStrategiques", (object)plan.ObjectifsStrategiques ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DateValidation", plan.DateValidation.HasValue ? plan.DateValidation.Value.ToString("yyyy-MM-dd HH:mm:ss") : (object)DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DateCreation", plan.DateCreation.ToString("yyyy-MM-dd HH:mm:ss"));
 
                         if (plan.Id == 0)
                         {
@@ -191,7 +191,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     // Vérification du verrou probatoire : présence d'attestation délivrée
@@ -202,7 +202,7 @@ namespace IUTSCalculator.Services
                             FROM SessionInscriptions i
                             INNER JOIN SessionsFormation s ON i.SessionId = s.Id
                             WHERE s.PlanFormationId = @PlanId AND i.AttestationObtenue = 1;";
-                        checkCmd.Parameters.AddWithValue("@PlanId", planId);
+                        checkCmd.Parameters.AjouterValeur("@PlanId", planId);
                         int attestations = Convert.ToInt32(checkCmd.ExecuteScalar());
                         if (attestations > 0)
                         {
@@ -225,7 +225,7 @@ namespace IUTSCalculator.Services
                                     UPDATE EntretienBesoinsFormation
                                     SET SessionFormationId = NULL
                                     WHERE SessionFormationId IN (SELECT Id FROM SessionsFormation WHERE PlanFormationId = @PlanId);";
-                                cmdDetach.Parameters.AddWithValue("@PlanId", planId);
+                                cmdDetach.Parameters.AjouterValeur("@PlanId", planId);
                                 cmdDetach.ExecuteNonQuery();
                             }
 
@@ -236,7 +236,7 @@ namespace IUTSCalculator.Services
                                 cmdDelInsc.CommandText = @"
                                     DELETE FROM SessionInscriptions
                                     WHERE SessionId IN (SELECT Id FROM SessionsFormation WHERE PlanFormationId = @PlanId);";
-                                cmdDelInsc.Parameters.AddWithValue("@PlanId", planId);
+                                cmdDelInsc.Parameters.AjouterValeur("@PlanId", planId);
                                 cmdDelInsc.ExecuteNonQuery();
                             }
 
@@ -245,7 +245,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelSess.Transaction = transaction;
                                 cmdDelSess.CommandText = "DELETE FROM SessionsFormation WHERE PlanFormationId = @PlanId;";
-                                cmdDelSess.Parameters.AddWithValue("@PlanId", planId);
+                                cmdDelSess.Parameters.AjouterValeur("@PlanId", planId);
                                 cmdDelSess.ExecuteNonQuery();
                             }
 
@@ -254,7 +254,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelPlan.Transaction = transaction;
                                 cmdDelPlan.CommandText = "DELETE FROM PlansFormation WHERE Id = @PlanId;";
-                                cmdDelPlan.Parameters.AddWithValue("@PlanId", planId);
+                                cmdDelPlan.Parameters.AjouterValeur("@PlanId", planId);
                                 cmdDelPlan.ExecuteNonQuery();
                             }
 
@@ -277,7 +277,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -286,9 +286,9 @@ namespace IUTSCalculator.Services
                             SET Statut = @Statut,
                                 DateValidation = CASE WHEN @Statut = 1 AND DateValidation IS NULL THEN @DateNow ELSE DateValidation END
                             WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Statut", (int)nouveauStatut);
-                        cmd.Parameters.AddWithValue("@DateNow", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                        cmd.Parameters.AddWithValue("@Id", planId);
+                        cmd.Parameters.AjouterValeur("@Statut", (int)nouveauStatut);
+                        cmd.Parameters.AjouterValeur("@DateNow", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                        cmd.Parameters.AjouterValeur("@Id", planId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -308,7 +308,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -356,7 +356,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -375,17 +375,17 @@ namespace IUTSCalculator.Services
                                     Email = @Email, Adresse = @Adresse, NumeroAgrement = @NumeroAgrement,
                                     Specialites = @Specialites, Actif = @Actif
                                 WHERE Id = @Id;";
-                            cmd.Parameters.AddWithValue("@Id", organisme.Id);
+                            cmd.Parameters.AjouterValeur("@Id", organisme.Id);
                         }
 
-                        cmd.Parameters.AddWithValue("@RaisonSociale", organisme.RaisonSociale.Trim());
-                        cmd.Parameters.AddWithValue("@ContactNom", (object)organisme.ContactNom ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Telephone", (object)organisme.Telephone ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Email", (object)organisme.Email ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Adresse", (object)organisme.Adresse ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@NumeroAgrement", (object)organisme.NumeroAgrement ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Specialites", (object)organisme.Specialites ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Actif", organisme.Actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@RaisonSociale", organisme.RaisonSociale.Trim());
+                        cmd.Parameters.AjouterValeur("@ContactNom", (object)organisme.ContactNom ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Telephone", (object)organisme.Telephone ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Email", (object)organisme.Email ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Adresse", (object)organisme.Adresse ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@NumeroAgrement", (object)organisme.NumeroAgrement ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Specialites", (object)organisme.Specialites ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Actif", organisme.Actif ? 1 : 0);
 
                         if (organisme.Id == 0)
                         {
@@ -407,13 +407,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM SessionsFormation WHERE OrganismeId = @Id;";
-                        checkCmd.Parameters.AddWithValue("@Id", organismeId);
+                        checkCmd.Parameters.AjouterValeur("@Id", organismeId);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException(
@@ -425,7 +425,7 @@ namespace IUTSCalculator.Services
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "DELETE FROM OrganismesFormation WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", organismeId);
+                        cmd.Parameters.AjouterValeur("@Id", organismeId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -439,13 +439,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "UPDATE OrganismesFormation SET Actif = @Actif WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Actif", actif ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@Id", organismeId);
+                        cmd.Parameters.AjouterValeur("@Actif", actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Id", organismeId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -465,7 +465,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -531,14 +531,14 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM FormationsCatalogue WHERE Code = @code AND Id <> @id;";
-                        checkCmd.Parameters.AddWithValue("@code", formation.Code.Trim().ToUpperInvariant());
-                        checkCmd.Parameters.AddWithValue("@id", formation.Id);
+                        checkCmd.Parameters.AjouterValeur("@code", formation.Code.Trim().ToUpperInvariant());
+                        checkCmd.Parameters.AjouterValeur("@id", formation.Id);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException($"Une formation avec le code '{formation.Code}' existe déjà.");
@@ -563,19 +563,19 @@ namespace IUTSCalculator.Services
                                     DureeHeures = @DureeHeures, CoutEstimeParParticipant = @CoutEstimeParParticipant,
                                     ObjectifsPedagogiques = @ObjectifsPedagogiques, Prerequis = @Prerequis, Actif = @Actif
                                 WHERE Id = @Id;";
-                            cmd.Parameters.AddWithValue("@Id", formation.Id);
+                            cmd.Parameters.AjouterValeur("@Id", formation.Id);
                         }
 
-                        cmd.Parameters.AddWithValue("@Code", formation.Code.Trim().ToUpperInvariant());
-                        cmd.Parameters.AddWithValue("@Intitule", formation.Intitule.Trim());
-                        cmd.Parameters.AddWithValue("@Domaine", (object)formation.Domaine ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@CompetenceViseeId", (object)formation.CompetenceViseeId ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@TypeFormation", (int)formation.TypeFormation);
-                        cmd.Parameters.AddWithValue("@DureeHeures", formation.DureeHeures);
-                        cmd.Parameters.AddWithValue("@CoutEstimeParParticipant", DbValue.MoneyToDb(formation.CoutEstimeParParticipant));
-                        cmd.Parameters.AddWithValue("@ObjectifsPedagogiques", (object)formation.ObjectifsPedagogiques ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Prerequis", (object)formation.Prerequis ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Actif", formation.Actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Code", formation.Code.Trim().ToUpperInvariant());
+                        cmd.Parameters.AjouterValeur("@Intitule", formation.Intitule.Trim());
+                        cmd.Parameters.AjouterValeur("@Domaine", (object)formation.Domaine ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@CompetenceViseeId", (object)formation.CompetenceViseeId ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@TypeFormation", (int)formation.TypeFormation);
+                        cmd.Parameters.AjouterValeur("@DureeHeures", formation.DureeHeures);
+                        cmd.Parameters.AjouterValeur("@CoutEstimeParParticipant", DbValue.MoneyToDb(formation.CoutEstimeParParticipant));
+                        cmd.Parameters.AjouterValeur("@ObjectifsPedagogiques", (object)formation.ObjectifsPedagogiques ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Prerequis", (object)formation.Prerequis ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Actif", formation.Actif ? 1 : 0);
 
                         if (formation.Id == 0)
                         {
@@ -597,13 +597,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM SessionsFormation WHERE FormationId = @Id;";
-                        checkCmd.Parameters.AddWithValue("@Id", formationId);
+                        checkCmd.Parameters.AjouterValeur("@Id", formationId);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException(
@@ -615,7 +615,7 @@ namespace IUTSCalculator.Services
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "DELETE FROM FormationsCatalogue WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", formationId);
+                        cmd.Parameters.AjouterValeur("@Id", formationId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -629,13 +629,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "UPDATE FormationsCatalogue SET Actif = @Actif WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Actif", actif ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@Id", formationId);
+                        cmd.Parameters.AjouterValeur("@Actif", actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Id", formationId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -655,7 +655,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -680,7 +680,7 @@ namespace IUTSCalculator.Services
                         if (planId.HasValue)
                         {
                             sql += " AND s.PlanFormationId = @PlanId ";
-                            cmd.Parameters.AddWithValue("@PlanId", planId.Value);
+                            cmd.Parameters.AjouterValeur("@PlanId", planId.Value);
                         }
 
                         sql += @" GROUP BY s.Id, s.FormationId, s.PlanFormationId, s.OrganismeId, s.CodeSession,
@@ -750,14 +750,14 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM SessionsFormation WHERE CodeSession = @code AND Id <> @id;";
-                        checkCmd.Parameters.AddWithValue("@code", session.CodeSession.Trim().ToUpperInvariant());
-                        checkCmd.Parameters.AddWithValue("@id", session.Id);
+                        checkCmd.Parameters.AjouterValeur("@code", session.CodeSession.Trim().ToUpperInvariant());
+                        checkCmd.Parameters.AjouterValeur("@id", session.Id);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException($"Une session avec le code '{session.CodeSession}' existe déjà.");
@@ -792,24 +792,24 @@ namespace IUTSCalculator.Services
                                     CoutLogistique = @CoutLogistique, CoutAutre = @CoutAutre,
                                     CoutTotalReel = @CoutTotalReel, Commentaire = @Commentaire
                                 WHERE Id = @Id;";
-                            cmd.Parameters.AddWithValue("@Id", session.Id);
+                            cmd.Parameters.AjouterValeur("@Id", session.Id);
                         }
 
-                        cmd.Parameters.AddWithValue("@FormationId", session.FormationId);
-                        cmd.Parameters.AddWithValue("@PlanFormationId", session.PlanFormationId);
-                        cmd.Parameters.AddWithValue("@OrganismeId", (object)session.OrganismeId ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@CodeSession", session.CodeSession.Trim().ToUpperInvariant());
-                        cmd.Parameters.AddWithValue("@IntituleSession", (object)session.IntituleSession ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DateDebut", session.DateDebut.ToString("yyyy-MM-dd"));
-                        cmd.Parameters.AddWithValue("@DateFin", session.DateFin.ToString("yyyy-MM-dd"));
-                        cmd.Parameters.AddWithValue("@Lieu", (object)session.Lieu ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@FormateurNom", (object)session.FormateurNom ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Statut", (int)session.Statut);
-                        cmd.Parameters.AddWithValue("@CoutPedagogique", DbValue.MoneyToDb(session.CoutPedagogique));
-                        cmd.Parameters.AddWithValue("@CoutLogistique", DbValue.MoneyToDb(session.CoutLogistique));
-                        cmd.Parameters.AddWithValue("@CoutAutre", DbValue.MoneyToDb(session.CoutAutre));
-                        cmd.Parameters.AddWithValue("@CoutTotalReel", DbValue.MoneyToDb(session.CoutTotalReel));
-                        cmd.Parameters.AddWithValue("@Commentaire", (object)session.Commentaire ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@FormationId", session.FormationId);
+                        cmd.Parameters.AjouterValeur("@PlanFormationId", session.PlanFormationId);
+                        cmd.Parameters.AjouterValeur("@OrganismeId", (object)session.OrganismeId ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@CodeSession", session.CodeSession.Trim().ToUpperInvariant());
+                        cmd.Parameters.AjouterValeur("@IntituleSession", (object)session.IntituleSession ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DateDebut", session.DateDebut.ToString("yyyy-MM-dd"));
+                        cmd.Parameters.AjouterValeur("@DateFin", session.DateFin.ToString("yyyy-MM-dd"));
+                        cmd.Parameters.AjouterValeur("@Lieu", (object)session.Lieu ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@FormateurNom", (object)session.FormateurNom ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Statut", (int)session.Statut);
+                        cmd.Parameters.AjouterValeur("@CoutPedagogique", DbValue.MoneyToDb(session.CoutPedagogique));
+                        cmd.Parameters.AjouterValeur("@CoutLogistique", DbValue.MoneyToDb(session.CoutLogistique));
+                        cmd.Parameters.AjouterValeur("@CoutAutre", DbValue.MoneyToDb(session.CoutAutre));
+                        cmd.Parameters.AjouterValeur("@CoutTotalReel", DbValue.MoneyToDb(session.CoutTotalReel));
+                        cmd.Parameters.AjouterValeur("@Commentaire", (object)session.Commentaire ?? DBNull.Value);
 
                         if (session.Id == 0)
                         {
@@ -832,13 +832,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM SessionInscriptions WHERE SessionId = @Id AND AttestationObtenue = 1;";
-                        checkCmd.Parameters.AddWithValue("@Id", sessionId);
+                        checkCmd.Parameters.AjouterValeur("@Id", sessionId);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException(
@@ -856,7 +856,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDetach.Transaction = transaction;
                                 cmdDetach.CommandText = "UPDATE EntretienBesoinsFormation SET SessionFormationId = NULL WHERE SessionFormationId = @Id;";
-                                cmdDetach.Parameters.AddWithValue("@Id", sessionId);
+                                cmdDetach.Parameters.AjouterValeur("@Id", sessionId);
                                 cmdDetach.ExecuteNonQuery();
                             }
 
@@ -865,7 +865,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelInsc.Transaction = transaction;
                                 cmdDelInsc.CommandText = "DELETE FROM SessionInscriptions WHERE SessionId = @Id;";
-                                cmdDelInsc.Parameters.AddWithValue("@Id", sessionId);
+                                cmdDelInsc.Parameters.AjouterValeur("@Id", sessionId);
                                 cmdDelInsc.ExecuteNonQuery();
                             }
 
@@ -874,7 +874,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelSess.Transaction = transaction;
                                 cmdDelSess.CommandText = "DELETE FROM SessionsFormation WHERE Id = @Id;";
-                                cmdDelSess.Parameters.AddWithValue("@Id", sessionId);
+                                cmdDelSess.Parameters.AjouterValeur("@Id", sessionId);
                                 cmdDelSess.ExecuteNonQuery();
                             }
 
@@ -897,13 +897,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "UPDATE SessionsFormation SET Statut = @Statut WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Statut", (int)nouveauStatut);
-                        cmd.Parameters.AddWithValue("@Id", sessionId);
+                        cmd.Parameters.AjouterValeur("@Statut", (int)nouveauStatut);
+                        cmd.Parameters.AjouterValeur("@Id", sessionId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -923,7 +923,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -943,7 +943,7 @@ namespace IUTSCalculator.Services
                             LEFT JOIN Postes p ON e.PosteId = p.Id
                             WHERE i.SessionId = @SessionId
                             ORDER BY e.LastName ASC, e.FirstName ASC;";
-                        cmd.Parameters.AddWithValue("@SessionId", sessionId);
+                        cmd.Parameters.AjouterValeur("@SessionId", sessionId);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -989,7 +989,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -1009,7 +1009,7 @@ namespace IUTSCalculator.Services
                             LEFT JOIN Postes p ON e.PosteId = p.Id
                             WHERE s.PlanFormationId = @PlanId
                             ORDER BY s.DateDebut ASC, e.LastName ASC;";
-                        cmd.Parameters.AddWithValue("@PlanId", planId);
+                        cmd.Parameters.AjouterValeur("@PlanId", planId);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -1056,14 +1056,14 @@ namespace IUTSCalculator.Services
 
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT COUNT(*) FROM SessionInscriptions WHERE SessionId = @SessionId AND EmployeeId = @EmployeeId;";
-                        checkCmd.Parameters.AddWithValue("@SessionId", sessionId);
-                        checkCmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+                        checkCmd.Parameters.AjouterValeur("@SessionId", sessionId);
+                        checkCmd.Parameters.AjouterValeur("@EmployeeId", employeeId);
                         if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
                         {
                             throw new InvalidOperationException("Ce salarié est déjà inscrit à cette session de formation.");
@@ -1076,11 +1076,11 @@ namespace IUTSCalculator.Services
                             INSERT INTO SessionInscriptions (SessionId, EmployeeId, DateInscription, StatutPresence, NoteEvaluation, AttestationObtenue, FraisImputes, Commentaire)
                             VALUES (@SessionId, @EmployeeId, @DateInscription, 0, NULL, 0, @FraisImputes, @Commentaire);
                             SELECT last_insert_rowid();";
-                        cmd.Parameters.AddWithValue("@SessionId", sessionId);
-                        cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
-                        cmd.Parameters.AddWithValue("@DateInscription", DateTime.Today.ToString("yyyy-MM-dd"));
-                        cmd.Parameters.AddWithValue("@FraisImputes", DbValue.MoneyToDb(fraisImputes));
-                        cmd.Parameters.AddWithValue("@Commentaire", (object)commentaire ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@SessionId", sessionId);
+                        cmd.Parameters.AjouterValeur("@EmployeeId", employeeId);
+                        cmd.Parameters.AjouterValeur("@DateInscription", DateTime.Today.ToString("yyyy-MM-dd"));
+                        cmd.Parameters.AjouterValeur("@FraisImputes", DbValue.MoneyToDb(fraisImputes));
+                        cmd.Parameters.AjouterValeur("@Commentaire", (object)commentaire ?? DBNull.Value);
 
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
@@ -1097,7 +1097,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -1109,12 +1109,12 @@ namespace IUTSCalculator.Services
                                 FraisImputes = @FraisImputes,
                                 Commentaire = @Commentaire
                             WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@StatutPresence", (int)inscription.StatutPresence);
-                        cmd.Parameters.AddWithValue("@NoteEvaluation", (object)inscription.NoteEvaluation ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@AttestationObtenue", inscription.AttestationObtenue ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@FraisImputes", DbValue.MoneyToDb(inscription.FraisImputes));
-                        cmd.Parameters.AddWithValue("@Commentaire", (object)inscription.Commentaire ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Id", inscription.Id);
+                        cmd.Parameters.AjouterValeur("@StatutPresence", (int)inscription.StatutPresence);
+                        cmd.Parameters.AjouterValeur("@NoteEvaluation", (object)inscription.NoteEvaluation ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@AttestationObtenue", inscription.AttestationObtenue ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@FraisImputes", DbValue.MoneyToDb(inscription.FraisImputes));
+                        cmd.Parameters.AjouterValeur("@Commentaire", (object)inscription.Commentaire ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Id", inscription.Id);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -1128,13 +1128,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     using (var checkCmd = connection.CreateCommand())
                     {
                         checkCmd.CommandText = "SELECT AttestationObtenue FROM SessionInscriptions WHERE Id = @Id;";
-                        checkCmd.Parameters.AddWithValue("@Id", inscriptionId);
+                        checkCmd.Parameters.AjouterValeur("@Id", inscriptionId);
                         object res = checkCmd.ExecuteScalar();
                         if (res != null && DbValue.IntFromDb(res) == 1)
                         {
@@ -1146,7 +1146,7 @@ namespace IUTSCalculator.Services
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "DELETE FROM SessionInscriptions WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", inscriptionId);
+                        cmd.Parameters.AjouterValeur("@Id", inscriptionId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -1160,7 +1160,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -1170,10 +1170,10 @@ namespace IUTSCalculator.Services
                                 AttestationObtenue = @AttestationObtenue,
                                 NoteEvaluation = COALESCE(@NoteEvaluation, NoteEvaluation)
                             WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@StatutPresence", (int)presence);
-                        cmd.Parameters.AddWithValue("@AttestationObtenue", attestation ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@NoteEvaluation", (object)note ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Id", inscriptionId);
+                        cmd.Parameters.AjouterValeur("@StatutPresence", (int)presence);
+                        cmd.Parameters.AjouterValeur("@AttestationObtenue", attestation ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@NoteEvaluation", (object)note ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Id", inscriptionId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -1193,7 +1193,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -1219,13 +1219,13 @@ namespace IUTSCalculator.Services
                         if (anneeExercice.HasValue)
                         {
                             sql += " AND camp.AnneeExercice = @annee ";
-                            cmd.Parameters.AddWithValue("@annee", anneeExercice.Value);
+                            cmd.Parameters.AjouterValeur("@annee", anneeExercice.Value);
                         }
 
                         if (statut.HasValue)
                         {
                             sql += " AND b.Statut = @statut ";
-                            cmd.Parameters.AddWithValue("@statut", (int)statut.Value);
+                            cmd.Parameters.AjouterValeur("@statut", (int)statut.Value);
                         }
 
                         sql += " ORDER BY b.Priorite DESC, camp.AnneeExercice DESC, e.LastName ASC;";
@@ -1265,7 +1265,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -1274,9 +1274,9 @@ namespace IUTSCalculator.Services
                             SET SessionFormationId = @SessionId,
                                 Statut = @StatutRetenu
                             WHERE Id = @BesoinId;";
-                        cmd.Parameters.AddWithValue("@SessionId", sessionId);
-                        cmd.Parameters.AddWithValue("@StatutRetenu", (int)StatutBesoinFormation.Retenu);
-                        cmd.Parameters.AddWithValue("@BesoinId", besoinId);
+                        cmd.Parameters.AjouterValeur("@SessionId", sessionId);
+                        cmd.Parameters.AjouterValeur("@StatutRetenu", (int)StatutBesoinFormation.Retenu);
+                        cmd.Parameters.AjouterValeur("@BesoinId", besoinId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -1290,7 +1290,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -1299,8 +1299,8 @@ namespace IUTSCalculator.Services
                             SET SessionFormationId = NULL,
                                 Statut = @StatutDemande
                             WHERE Id = @BesoinId;";
-                        cmd.Parameters.AddWithValue("@StatutDemande", (int)StatutBesoinFormation.Demande);
-                        cmd.Parameters.AddWithValue("@BesoinId", besoinId);
+                        cmd.Parameters.AjouterValeur("@StatutDemande", (int)StatutBesoinFormation.Demande);
+                        cmd.Parameters.AjouterValeur("@BesoinId", besoinId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -1325,7 +1325,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
 
                     // 1. Masse salariale soumise TPA et TPA brute due (source TaxCalculations)
@@ -1340,8 +1340,8 @@ namespace IUTSCalculator.Services
                             FROM TaxCalculations
                             WHERE CalculationDate >= @DateDebut AND CalculationDate <= @DateFin
                               AND IsAnnual = 0 AND IsRegularization = 0;";
-                        cmdTax.Parameters.AddWithValue("@DateDebut", dateDebut);
-                        cmdTax.Parameters.AddWithValue("@DateFin", dateFin);
+                        cmdTax.Parameters.AjouterValeur("@DateDebut", dateDebut);
+                        cmdTax.Parameters.AjouterValeur("@DateFin", dateFin);
 
                         using (var reader = cmdTax.ExecuteReader())
                         {
@@ -1390,11 +1390,11 @@ namespace IUTSCalculator.Services
 
                         if (planId.HasValue)
                         {
-                            cmdPlan.Parameters.AddWithValue("@PlanId", planId.Value);
+                            cmdPlan.Parameters.AjouterValeur("@PlanId", planId.Value);
                         }
 
                         cmdPlan.CommandText = sql;
-                        cmdPlan.Parameters.AddWithValue("@Annee", anneeExercice);
+                        cmdPlan.Parameters.AjouterValeur("@Annee", anneeExercice);
 
                         using (var reader = cmdPlan.ExecuteReader())
                         {

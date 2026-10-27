@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -102,7 +102,7 @@ namespace IUTSCalculator.Services
             // Transaction immédiate : lire la dernière empreinte et insérer la suivante doivent
             // se faire sous le même verrou d'écriture, sinon deux écritures simultanées
             // (deux écrans, deux postes sur le même dossier) chaîneraient sur la même entrée.
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -127,8 +127,8 @@ namespace IUTSCalculator.Services
         /// tient le verrou d'écriture bloquerait jusqu'au délai d'attente.
         /// </summary>
         public static async Task EnregistrerDansTransactionAsync(
-            SQLiteConnection conn,
-            SQLiteTransaction tx,
+            SqliteConnection conn,
+            SqliteTransaction tx,
             string action,
             string entite,
             string entiteId,
@@ -179,20 +179,20 @@ namespace IUTSCalculator.Services
                     VALUES
                     (@date, @user, @action, @entite, @entiteId, @champ, @ancienne, @nouvelle, @details, @machine);";
 
-                cmd.Parameters.AddWithValue("@date", dateStr);
-                cmd.Parameters.AddWithValue("@user", user);
-                cmd.Parameters.AddWithValue("@action", action);
-                cmd.Parameters.AddWithValue("@entite", entite);
-                cmd.Parameters.AddWithValue("@entiteId", vEntiteId);
-                cmd.Parameters.AddWithValue("@champ", vChamp);
-                cmd.Parameters.AddWithValue("@ancienne", vAncienne);
-                cmd.Parameters.AddWithValue("@nouvelle", vNouvelle);
-                cmd.Parameters.AddWithValue("@details", vDetails);
-                cmd.Parameters.AddWithValue("@machine", machine);
+                cmd.Parameters.AjouterValeur("@date", dateStr);
+                cmd.Parameters.AjouterValeur("@user", user);
+                cmd.Parameters.AjouterValeur("@action", action);
+                cmd.Parameters.AjouterValeur("@entite", entite);
+                cmd.Parameters.AjouterValeur("@entiteId", vEntiteId);
+                cmd.Parameters.AjouterValeur("@champ", vChamp);
+                cmd.Parameters.AjouterValeur("@ancienne", vAncienne);
+                cmd.Parameters.AjouterValeur("@nouvelle", vNouvelle);
+                cmd.Parameters.AjouterValeur("@details", vDetails);
+                cmd.Parameters.AjouterValeur("@machine", machine);
                 if (scelle)
                 {
-                    cmd.Parameters.AddWithValue("@empreinte", empreinte);
-                    cmd.Parameters.AddWithValue("@precedente", precedente);
+                    cmd.Parameters.AjouterValeur("@empreinte", empreinte);
+                    cmd.Parameters.AjouterValeur("@precedente", precedente);
                 }
 
                 await cmd.ExecuteNonQueryAsync();
@@ -235,7 +235,7 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>Vrai si la table porte les colonnes de scellement (migration 38).</summary>
-        private static bool ScellementActif(SQLiteConnection conn, SQLiteTransaction tx)
+        private static bool ScellementActif(SqliteConnection conn, SqliteTransaction tx)
         {
             bool empreinte = false, precedente = false;
             using (var cmd = conn.CreateCommand())
@@ -255,7 +255,7 @@ namespace IUTSCalculator.Services
             return empreinte && precedente;
         }
 
-        private static async Task<string> DerniereEmpreinteAsync(SQLiteConnection conn, SQLiteTransaction tx)
+        private static async Task<string> DerniereEmpreinteAsync(SqliteConnection conn, SqliteTransaction tx)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -266,12 +266,12 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static bool TableExiste(SQLiteConnection conn, string table)
+        private static bool TableExiste(SqliteConnection conn, string table)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @n;";
-                cmd.Parameters.AddWithValue("@n", table);
+                cmd.Parameters.AjouterValeur("@n", table);
                 return DbValue.IntFromDb(cmd.ExecuteScalar()) > 0;
             }
         }
@@ -280,7 +280,7 @@ namespace IUTSCalculator.Services
         /// Dernier n° d'entrée antérieur au scellement, noté par la migration 38 dans
         /// JournalAuditScellement ; -1 s'il est inconnu.
         /// </summary>
-        private static long BorneScellement(SQLiteConnection conn)
+        private static long BorneScellement(SqliteConnection conn)
         {
             if (!TableExiste(conn, "JournalAuditScellement")) return -1;
             using (var cmd = conn.CreateCommand())
@@ -294,7 +294,7 @@ namespace IUTSCalculator.Services
         /// <summary>Empreinte de la dernière entrée du journal (vide si non scellé).</summary>
         public async Task<string> ObtenirEmpreinteDeTeteAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 if (!ScellementActif(conn, null)) return "";
                 using (var cmd = conn.CreateCommand())
@@ -308,7 +308,7 @@ namespace IUTSCalculator.Services
         /// <summary>N° de la dernière entrée du journal (0 s'il est vide).</summary>
         public async Task<long> DernierIdAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT IFNULL(MAX(Id), 0) FROM JournalAudit;";
@@ -319,7 +319,7 @@ namespace IUTSCalculator.Services
 
         public async Task<bool> EstScelleAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 await Task.Yield();
                 return ScellementActif(conn, null);
@@ -341,7 +341,7 @@ namespace IUTSCalculator.Services
         {
             var resultat = new ResultatIntegriteAudit { DateVerification = DateTime.Now };
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 resultat.ScellementActif = ScellementActif(conn, null);
                 if (!resultat.ScellementActif) return resultat;
@@ -375,7 +375,7 @@ namespace IUTSCalculator.Services
                         FROM JournalAudit
                         ORDER BY Id;";
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -704,8 +704,8 @@ namespace IUTSCalculator.Services
         /// <param name="bulletinArchive">Vrai si le document du bulletin est archivé avec le calcul.</param>
         /// <param name="lignesRemplacees">Nombre de calculs du même mois supprimés pour être remplacés.</param>
         public static Task AuditerEnregistrementCalculAsync(
-            SQLiteConnection conn,
-            SQLiteTransaction tx,
+            SqliteConnection conn,
+            SqliteTransaction tx,
             TaxCalculation calcul,
             DateTime periode,
             bool bulletinArchive,
@@ -747,8 +747,8 @@ namespace IUTSCalculator.Services
         /// dans la transaction qui le supprime.
         /// </summary>
         public static Task AuditerSuppressionCalculAsync(
-            SQLiteConnection conn,
-            SQLiteTransaction tx,
+            SqliteConnection conn,
+            SqliteTransaction tx,
             string calculationId,
             DateTime dateCalcul,
             string employeeId = null)
@@ -766,7 +766,7 @@ namespace IUTSCalculator.Services
         // ── Lecture et filtrage multicritère ─────────────────────────────────
 
         /// <summary>Clause WHERE commune à la recherche, au comptage et aux statistiques.</summary>
-        private static string ClauseFiltre(FiltreAudit filtre, List<SQLiteParameter> parametres)
+        private static string ClauseFiltre(FiltreAudit filtre, List<SqliteParameter> parametres)
         {
             var sql = new StringBuilder(" WHERE 1=1 ");
             if (filtre == null) return sql.ToString();
@@ -774,33 +774,33 @@ namespace IUTSCalculator.Services
             if (filtre.IdMax.HasValue)
             {
                 sql.Append(" AND Id <= @idmax");
-                parametres.Add(new SQLiteParameter("@idmax", filtre.IdMax.Value));
+                parametres.Add(new SqliteParameter("@idmax", filtre.IdMax.Value));
             }
 
             if (filtre.DateDebut.HasValue)
             {
                 sql.Append(" AND DateAction >= @debut");
-                parametres.Add(new SQLiteParameter("@debut", DbValue.DateToDb(filtre.DateDebut.Value.Date)));
+                parametres.Add(new SqliteParameter("@debut", DbValue.DateToDb(filtre.DateDebut.Value.Date)));
             }
 
             if (filtre.DateFin.HasValue)
             {
                 sql.Append(" AND DateAction <= @fin");
-                parametres.Add(new SQLiteParameter("@fin", DbValue.DateToDb(filtre.DateFin.Value.Date.AddDays(1).AddTicks(-1))));
+                parametres.Add(new SqliteParameter("@fin", DbValue.DateToDb(filtre.DateFin.Value.Date.AddDays(1).AddTicks(-1))));
             }
 
             if (!string.IsNullOrWhiteSpace(filtre.Utilisateur) &&
                 filtre.Utilisateur != "Tous les utilisateurs")
             {
                 sql.Append(" AND Utilisateur = @user");
-                parametres.Add(new SQLiteParameter("@user", filtre.Utilisateur));
+                parametres.Add(new SqliteParameter("@user", filtre.Utilisateur));
             }
 
             if (!string.IsNullOrWhiteSpace(filtre.Entite) &&
                 filtre.Entite != "Toutes les entités")
             {
                 sql.Append(" AND Entite = @entite");
-                parametres.Add(new SQLiteParameter("@entite", filtre.Entite));
+                parametres.Add(new SqliteParameter("@entite", filtre.Entite));
             }
 
             if (!string.IsNullOrWhiteSpace(filtre.Action) &&
@@ -821,14 +821,14 @@ namespace IUTSCalculator.Services
                 else
                 {
                     sql.Append(" AND Action = @action");
-                    parametres.Add(new SQLiteParameter("@action", filtre.Action));
+                    parametres.Add(new SqliteParameter("@action", filtre.Action));
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(filtre.RechercheTexte))
             {
                 sql.Append(" AND (EntiteId LIKE @txt OR ChampModifie LIKE @txt OR Details LIKE @txt OR AncienneValeur LIKE @txt OR NouvelleValeur LIKE @txt)");
-                parametres.Add(new SQLiteParameter("@txt", "%" + filtre.RechercheTexte.Trim() + "%"));
+                parametres.Add(new SqliteParameter("@txt", "%" + filtre.RechercheTexte.Trim() + "%"));
             }
 
             return sql.ToString();
@@ -843,9 +843,9 @@ namespace IUTSCalculator.Services
         public async Task<List<EntreeAudit>> RechercherAsync(FiltreAudit filtre)
         {
             var resultats = new List<EntreeAudit>();
-            var parametres = new List<SQLiteParameter>();
+            var parametres = new List<SqliteParameter>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 bool scelle = ScellementActif(conn, null);
 
@@ -870,7 +870,7 @@ namespace IUTSCalculator.Services
                     foreach (var p in parametres)
                         cmd.Parameters.Add(p);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -901,8 +901,8 @@ namespace IUTSCalculator.Services
         /// <summary>Nombre total d'entrées répondant au filtre (pagination ignorée).</summary>
         public async Task<int> CompterAsync(FiltreAudit filtre)
         {
-            var parametres = new List<SQLiteParameter>();
-            using (var conn = _sqliteService.CreateConnection())
+            var parametres = new List<SqliteParameter>();
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM JournalAudit " + ClauseFiltre(filtre, parametres) + ";";
@@ -919,9 +919,9 @@ namespace IUTSCalculator.Services
         public async Task<StatistiquesAudit> StatistiquesAsync(FiltreAudit filtre)
         {
             var stats = new StatistiquesAudit();
-            var parametres = new List<SQLiteParameter>();
+            var parametres = new List<SqliteParameter>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT DateAction, Action, ChampModifie FROM JournalAudit " +
@@ -929,7 +929,7 @@ namespace IUTSCalculator.Services
                 foreach (var p in parametres)
                     cmd.Parameters.Add(p);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     var tampon = new EntreeAudit();
                     while (await reader.ReadAsync())
@@ -952,11 +952,11 @@ namespace IUTSCalculator.Services
         public async Task<List<string>> ObtenirUtilisateursDistinctsAsync()
         {
             var liste = new List<string>();
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT DISTINCT Utilisateur FROM JournalAudit WHERE Utilisateur IS NOT NULL AND Utilisateur <> '' ORDER BY Utilisateur;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -970,11 +970,11 @@ namespace IUTSCalculator.Services
         public async Task<List<string>> ObtenirModulesDistinctsAsync()
         {
             var liste = new List<string>();
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT DISTINCT Entite FROM JournalAudit WHERE Entite IS NOT NULL AND Entite <> '' ORDER BY Entite;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

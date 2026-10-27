@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
@@ -122,7 +122,7 @@ namespace IUTSCalculator.Services
         {
             var rapport = new RapportRattrapageCnss();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 // CnssPartPatronale > 0 avec les quatre colonnes de ventilation encore à
@@ -140,7 +140,7 @@ namespace IUTSCalculator.Services
                       AND c.CnssPensionsPatronal = 0
                     ORDER BY c.CalculationDate, e.LastName, e.FirstName";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -207,7 +207,7 @@ namespace IUTSCalculator.Services
 
             rapport.CopieSauvegarde = DeposerCopieSauvegarde();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var ligne in rapport.ARattraper)
@@ -223,11 +223,11 @@ namespace IUTSCalculator.Services
                                 CnssPensionsPatronal = @pp
                             WHERE Id = @id";
 
-                        cmd.Parameters.AddWithValue("@assiette", DbValue.MoneyToDb(ligne.AssietteCnss));
-                        cmd.Parameters.AddWithValue("@pf", DbValue.MoneyToDb(ligne.CnssPrestationsFamiliales));
-                        cmd.Parameters.AddWithValue("@rp", DbValue.MoneyToDb(ligne.CnssRisquesProfessionnels));
-                        cmd.Parameters.AddWithValue("@pp", DbValue.MoneyToDb(ligne.CnssPensionsPatronal));
-                        cmd.Parameters.AddWithValue("@id", ligne.Id);
+                        cmd.Parameters.AjouterValeur("@assiette", DbValue.MoneyToDb(ligne.AssietteCnss));
+                        cmd.Parameters.AjouterValeur("@pf", DbValue.MoneyToDb(ligne.CnssPrestationsFamiliales));
+                        cmd.Parameters.AjouterValeur("@rp", DbValue.MoneyToDb(ligne.CnssRisquesProfessionnels));
+                        cmd.Parameters.AjouterValeur("@pp", DbValue.MoneyToDb(ligne.CnssPensionsPatronal));
+                        cmd.Parameters.AjouterValeur("@id", ligne.Id);
 
                         await cmd.ExecuteNonQueryAsync();
                     }

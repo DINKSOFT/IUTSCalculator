@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -41,18 +41,18 @@ namespace IUTSCalculator.Services
 
         // ── Paramètres comptables du dossier ─────────────────────────────────
 
-        private static bool TableExiste(SQLiteConnection conn, SQLiteTransaction tx, string table)
+        private static bool TableExiste(SqliteConnection conn, SqliteTransaction tx, string table)
         {
             using (var cmd = conn.CreateCommand())
             {
                 if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @n;";
-                cmd.Parameters.AddWithValue("@n", table);
+                cmd.Parameters.AjouterValeur("@n", table);
                 return DbValue.IntFromDb(cmd.ExecuteScalar()) > 0;
             }
         }
 
-        private static async Task<Dictionary<string, string>> LireValeursAsync(SQLiteConnection conn, SQLiteTransaction tx)
+        private static async Task<Dictionary<string, string>> LireValeursAsync(SqliteConnection conn, SqliteTransaction tx)
         {
             var valeurs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (!TableExiste(conn, tx, TableParametres)) return valeurs;
@@ -61,7 +61,7 @@ namespace IUTSCalculator.Services
             {
                 if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText = "SELECT Cle, Valeur FROM " + TableParametres + ";";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -77,7 +77,7 @@ namespace IUTSCalculator.Services
         /// <summary>Vrai si la base du dossier peut enregistrer les paramètres (migration 38 passée).</summary>
         public async Task<bool> ParametresEnregistrablesAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 await Task.Yield();
                 return TableExiste(conn, null, TableParametres);
@@ -91,7 +91,7 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task<ParametresComptables> ChargerParametresAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 return ParametresComptables.Depuis(await LireValeursAsync(conn, null));
             }
@@ -114,7 +114,7 @@ namespace IUTSCalculator.Services
             var nouvelles = parametres.Valeurs();
             int modifies = 0;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -139,8 +139,8 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "INSERT OR REPLACE INTO " + TableParametres + " (Cle, Valeur) VALUES (@cle, @valeur);";
-                            cmd.Parameters.AddWithValue("@cle", d.Cle);
-                            cmd.Parameters.AddWithValue("@valeur", valeur);
+                            cmd.Parameters.AjouterValeur("@cle", d.Cle);
+                            cmd.Parameters.AjouterValeur("@valeur", valeur);
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -287,7 +287,7 @@ namespace IUTSCalculator.Services
             string compteGainsRepli = Normaliser(parametres.CompteGainsVariables);
             string compteRetenuesRepli = Normaliser(parametres.CompteRetenuesDiverses);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -318,12 +318,12 @@ namespace IUTSCalculator.Services
                       AND c.IsRegularization = 0
                     ORDER BY e.LastName, e.FirstName, c.CalculationDate";
 
-                cmd.Parameters.AddWithValue("@debut",
+                cmd.Parameters.AjouterValeur("@debut",
                     DbValue.DateToDb(piece.DebutPeriode.Date));
-                cmd.Parameters.AddWithValue("@fin",
+                cmd.Parameters.AjouterValeur("@fin",
                     DbValue.DateToDb(piece.FinPeriode.Date.AddDays(1).AddTicks(-1)));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

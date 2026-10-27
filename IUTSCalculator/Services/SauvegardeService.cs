@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -8,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using IUTSCalculator.Helpers;
+using Microsoft.Data.Sqlite;
 
 namespace IUTSCalculator.Services
 {
@@ -180,7 +180,9 @@ namespace IUTSCalculator.Services
             try
             {
                 SupprimerSiPresent(cible);
-                using (var connection = new SQLiteConnection("Data Source=" + source + ";Version=3;BusyTimeout=10000;"))
+                SqliteNatif.Initialiser();
+                var chaine = new SqliteConnectionStringBuilder { DataSource = source, Pooling = false, DefaultTimeout = 10 };
+                using (var connection = new SqliteConnection(chaine.ToString()))
                 {
                     connection.Open();
                     using (var cmd = connection.CreateCommand())

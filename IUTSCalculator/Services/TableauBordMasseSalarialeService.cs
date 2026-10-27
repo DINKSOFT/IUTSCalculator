@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -89,7 +89,7 @@ namespace IUTSCalculator.Services
             var parCategorie = new Dictionary<string, VentilationMasseSalariale>(StringComparer.OrdinalIgnoreCase);
             var parService = new Dictionary<string, VentilationMasseSalariale>(StringComparer.OrdinalIgnoreCase);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -106,10 +106,10 @@ namespace IUTSCalculator.Services
                       AND c.IsAnnual = 0
                       AND c.IsRegularization = 0";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debut));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(fin));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -127,7 +127,7 @@ namespace IUTSCalculator.Services
 
             var liste = new List<Absence>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -138,11 +138,11 @@ namespace IUTSCalculator.Services
                     "       AND a.DateDebut <= @fin AND a.DateFin >= @debut) " +
                     "   OR a.PeriodeImputation = @imputation " +
                     "ORDER BY e.LastName, e.FirstName, a.DateDebut";
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin));
-                cmd.Parameters.AddWithValue("@imputation", Absence.CleImputation(annee, mois));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debut));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(fin));
+                cmd.Parameters.AjouterValeur("@imputation", Absence.CleImputation(annee, mois));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -158,7 +158,7 @@ namespace IUTSCalculator.Services
             var liste = new List<Absence>();
             if (string.IsNullOrWhiteSpace(employeeId)) return liste;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -167,9 +167,9 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = a.EmployeeId " +
                     "WHERE a.EmployeeId = @employe " +
                     "ORDER BY a.DateDebut DESC";
-                cmd.Parameters.AddWithValue("@employe", employeeId);
+                cmd.Parameters.AjouterValeur("@employe", employeeId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -184,7 +184,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<Absence>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -193,7 +193,7 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = a.EmployeeId " +
                     "ORDER BY a.DateDebut DESC";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -203,7 +203,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static Absence Lire(SQLiteDataReader reader)
+        private static Absence Lire(SqliteDataReader reader)
         {
             string nom = DbValue.TextFromDb(reader["LastName"]);
             string prenom = DbValue.TextFromDb(reader["FirstName"]);
@@ -670,7 +670,7 @@ namespace IUTSCalculator.Services
             var anomalie = Anomalie(absence);
             if (anomalie != null) throw new InvalidOperationException(anomalie);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 await VerifierPeriodesOuvertesAsync(conn, absence);
                 await VerifierChevauchementAsync(conn, absence);
@@ -684,7 +684,7 @@ namespace IUTSCalculator.Services
                             "DateDebut = @debut, DateFin = @fin, NombreJours = @jours, " +
                             "NombreHeures = @heures, Commentaire = @commentaire " +
                             "WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", absence.Id);
+                        cmd.Parameters.AjouterValeur("@id", absence.Id);
                     }
                     else
                     {
@@ -696,17 +696,17 @@ namespace IUTSCalculator.Services
                             " Commentaire, DateSaisie, PeriodeImputation) " +
                             "VALUES (@employe, @type, @debut, @fin, @jours, @heures, " +
                             "        @commentaire, @saisie, @imputation);";
-                        cmd.Parameters.AddWithValue("@saisie", DbValue.DateToDb(DateTime.Now));
-                        cmd.Parameters.AddWithValue("@imputation", (object)absence.PeriodeImputation ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@saisie", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@imputation", (object)absence.PeriodeImputation ?? DBNull.Value);
                     }
 
-                    cmd.Parameters.AddWithValue("@employe", absence.EmployeeId ?? "");
-                    cmd.Parameters.AddWithValue("@type", (int)absence.Type);
-                    cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(absence.DateDebut));
-                    cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(absence.DateFin));
-                    cmd.Parameters.AddWithValue("@jours", DbValue.DecimalToDb(absence.NombreJours));
-                    cmd.Parameters.AddWithValue("@heures", DbValue.DecimalToDb(absence.NombreHeures));
-                    cmd.Parameters.AddWithValue("@commentaire", absence.Commentaire ?? "");
+                    cmd.Parameters.AjouterValeur("@employe", absence.EmployeeId ?? "");
+                    cmd.Parameters.AjouterValeur("@type", (int)absence.Type);
+                    cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(absence.DateDebut));
+                    cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(absence.DateFin));
+                    cmd.Parameters.AjouterValeur("@jours", DbValue.DecimalToDb(absence.NombreJours));
+                    cmd.Parameters.AjouterValeur("@heures", DbValue.DecimalToDb(absence.NombreHeures));
+                    cmd.Parameters.AjouterValeur("@commentaire", absence.Commentaire ?? "");
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -733,7 +733,7 @@ namespace IUTSCalculator.Services
                 }
             }
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 // Vérifier les périodes concernées une seule fois par mois distinct
                 var moisDistincts = new HashSet<DateTime>();
@@ -802,15 +802,15 @@ namespace IUTSCalculator.Services
                             "VALUES (@employe, @type, @debut, @fin, @jours, @heures, " +
                             "        @commentaire, @saisie, @imputation);";
 
-                        var pImputation = cmd.Parameters.Add("@imputation", System.Data.DbType.String);
-                        var pEmploye = cmd.Parameters.Add("@employe", System.Data.DbType.String);
-                        var pType = cmd.Parameters.Add("@type", System.Data.DbType.Int32);
-                        var pDebut = cmd.Parameters.Add("@debut", System.Data.DbType.String);
-                        var pFin = cmd.Parameters.Add("@fin", System.Data.DbType.String);
-                        var pJours = cmd.Parameters.Add("@jours", System.Data.DbType.Decimal);
-                        var pHeures = cmd.Parameters.Add("@heures", System.Data.DbType.Decimal);
-                        var pCommentaire = cmd.Parameters.Add("@commentaire", System.Data.DbType.String);
-                        var pSaisie = cmd.Parameters.Add("@saisie", System.Data.DbType.String);
+                        var pImputation = cmd.Parameters.Add("@imputation", SqliteType.Text);
+                        var pEmploye = cmd.Parameters.Add("@employe", SqliteType.Text);
+                        var pType = cmd.Parameters.Add("@type", SqliteType.Integer);
+                        var pDebut = cmd.Parameters.Add("@debut", SqliteType.Text);
+                        var pFin = cmd.Parameters.Add("@fin", SqliteType.Text);
+                        var pJours = cmd.Parameters.Add("@jours", SqliteType.Text);
+                        var pHeures = cmd.Parameters.Add("@heures", SqliteType.Text);
+                        var pCommentaire = cmd.Parameters.Add("@commentaire", SqliteType.Text);
+                        var pSaisie = cmd.Parameters.Add("@saisie", SqliteType.Text);
 
                         string maintenantDb = DbValue.DateToDb(DateTime.Now);
 
@@ -841,14 +841,14 @@ namespace IUTSCalculator.Services
         {
             if (absence == null || absence.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 await VerifierPeriodesOuvertesAsync(conn, absence);
 
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "DELETE FROM Absences WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", absence.Id);
+                    cmd.Parameters.AjouterValeur("@id", absence.Id);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -858,7 +858,7 @@ namespace IUTSCalculator.Services
         /// Une absence peut couvrir plusieurs mois : toutes les périodes qu'elle touche
         /// doivent être ouvertes, pas seulement celle de sa date de début.
         /// </summary>
-        private static async Task VerifierPeriodesOuvertesAsync(SQLiteConnection conn, Absence absence)
+        private static async Task VerifierPeriodesOuvertesAsync(SqliteConnection conn, Absence absence)
         {
             // Une absence imputée (RH-08) ne touche que son mois de paie.
             if (absence.EstImputee && absence.MoisImputation.HasValue)
@@ -896,7 +896,7 @@ namespace IUTSCalculator.Services
         /// non rémunérée sur la même date — faussant le compteur de congés et la retenue sur
         /// le brut du bulletin concerné.
         /// </summary>
-        private static async Task VerifierChevauchementAsync(SQLiteConnection conn, Absence absence)
+        private static async Task VerifierChevauchementAsync(SqliteConnection conn, Absence absence)
         {
             if (string.IsNullOrWhiteSpace(absence.EmployeeId)) return;
 
@@ -906,12 +906,12 @@ namespace IUTSCalculator.Services
                     "SELECT DateDebut, DateFin FROM Absences " +
                     "WHERE EmployeeId = @employe AND Id <> @id " +
                     "AND DateDebut <= @fin AND DateFin >= @debut;";
-                cmd.Parameters.AddWithValue("@employe", absence.EmployeeId);
-                cmd.Parameters.AddWithValue("@id", absence.Id);
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(absence.DateDebut));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(absence.DateFin));
+                cmd.Parameters.AjouterValeur("@employe", absence.EmployeeId);
+                cmd.Parameters.AjouterValeur("@id", absence.Id);
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(absence.DateDebut));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(absence.DateFin));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                     {
@@ -961,7 +961,7 @@ namespace IUTSCalculator.Services
                     a.Commentaire = MarqueurReleveTemps + " " + (a.Commentaire ?? "");
             }
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 if (await PeriodePaieService.EstClotureeAsync(conn, new DateTime(annee, mois, 1), null))
                 {
@@ -999,12 +999,12 @@ namespace IUTSCalculator.Services
                                         "SELECT DateDebut, DateFin FROM Absences WHERE EmployeeId = @employe " +
                                         "AND DateDebut <= @fin AND DateFin >= @debut " +
                                         "AND NOT (PeriodeImputation = @cle AND Commentaire LIKE @marqueur) LIMIT 1;";
-                                    cmd.Parameters.AddWithValue("@employe", employe);
-                                    cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(a.DateDebut));
-                                    cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(a.DateFin));
-                                    cmd.Parameters.AddWithValue("@cle", cle);
-                                    cmd.Parameters.AddWithValue("@marqueur", MarqueurReleveTemps + "%");
-                                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                                    cmd.Parameters.AjouterValeur("@employe", employe);
+                                    cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(a.DateDebut));
+                                    cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(a.DateFin));
+                                    cmd.Parameters.AjouterValeur("@cle", cle);
+                                    cmd.Parameters.AjouterValeur("@marqueur", MarqueurReleveTemps + "%");
+                                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                                     {
                                         if (await reader.ReadAsync())
                                         {
@@ -1031,9 +1031,9 @@ namespace IUTSCalculator.Services
                                 cmd.CommandText =
                                     "DELETE FROM Absences WHERE EmployeeId = @employe AND PeriodeImputation = @cle " +
                                     "AND Commentaire LIKE @marqueur;";
-                                cmd.Parameters.AddWithValue("@employe", employe);
-                                cmd.Parameters.AddWithValue("@cle", cle);
-                                cmd.Parameters.AddWithValue("@marqueur", MarqueurReleveTemps + "%");
+                                cmd.Parameters.AjouterValeur("@employe", employe);
+                                cmd.Parameters.AjouterValeur("@cle", cle);
+                                cmd.Parameters.AjouterValeur("@marqueur", MarqueurReleveTemps + "%");
                                 await cmd.ExecuteNonQueryAsync();
                             }
 
@@ -1048,15 +1048,15 @@ namespace IUTSCalculator.Services
                                         " Commentaire, DateSaisie, PeriodeImputation) " +
                                         "VALUES (@employe, @type, @debut, @fin, @jours, @heures, " +
                                         "        @commentaire, @saisie, @imputation);";
-                                    cmd.Parameters.AddWithValue("@employe", a.EmployeeId);
-                                    cmd.Parameters.AddWithValue("@type", (int)a.Type);
-                                    cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(a.DateDebut));
-                                    cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(a.DateFin));
-                                    cmd.Parameters.AddWithValue("@jours", DbValue.DecimalToDb(a.NombreJours));
-                                    cmd.Parameters.AddWithValue("@heures", DbValue.DecimalToDb(a.NombreHeures));
-                                    cmd.Parameters.AddWithValue("@commentaire", a.Commentaire ?? "");
-                                    cmd.Parameters.AddWithValue("@saisie", DbValue.DateToDb(DateTime.Now));
-                                    cmd.Parameters.AddWithValue("@imputation", cle);
+                                    cmd.Parameters.AjouterValeur("@employe", a.EmployeeId);
+                                    cmd.Parameters.AjouterValeur("@type", (int)a.Type);
+                                    cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(a.DateDebut));
+                                    cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(a.DateFin));
+                                    cmd.Parameters.AjouterValeur("@jours", DbValue.DecimalToDb(a.NombreJours));
+                                    cmd.Parameters.AjouterValeur("@heures", DbValue.DecimalToDb(a.NombreHeures));
+                                    cmd.Parameters.AjouterValeur("@commentaire", a.Commentaire ?? "");
+                                    cmd.Parameters.AjouterValeur("@saisie", DbValue.DateToDb(DateTime.Now));
+                                    cmd.Parameters.AjouterValeur("@imputation", cle);
                                     await cmd.ExecuteNonQueryAsync();
                                 }
                             }
@@ -1079,7 +1079,7 @@ namespace IUTSCalculator.Services
         /// <summary>Vrai si la période accepte encore des saisies.</summary>
         public async Task<bool> PeriodeOuverteAsync(int annee, int mois)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 return !await PeriodePaieService.EstClotureeAsync(conn, new DateTime(annee, mois, 1), null);
             }

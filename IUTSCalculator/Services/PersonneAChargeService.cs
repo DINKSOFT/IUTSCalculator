@@ -50,7 +50,7 @@ namespace IUTSCalculator.Services
                 cmd.CommandText =
                     "SELECT " + Colonnes + " FROM PersonnesACharge WHERE EmployeeId = @id " +
                     "ORDER BY Lien, DateNaissance, Nom";
-                cmd.Parameters.AddWithValue("@id", employeeId);
+                cmd.Parameters.AjouterValeur("@id", employeeId);
 
                 using (var reader = await cmd.ExecuteReaderAsync())
                 {
@@ -101,7 +101,7 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "DELETE FROM PersonnesACharge WHERE EmployeeId = @id;";
-                        cmd.Parameters.AddWithValue("@id", employeeId);
+                        cmd.Parameters.AjouterValeur("@id", employeeId);
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -117,15 +117,15 @@ namespace IUTSCalculator.Services
                                 "VALUES (@employe, @nom, @prenom, @lien, @naissance, @etudes, " +
                                 "        @handicap, @compte, @commentaire);";
 
-                            cmd.Parameters.AddWithValue("@employe", employeeId);
-                            cmd.Parameters.AddWithValue("@nom", personne.Nom ?? "");
-                            cmd.Parameters.AddWithValue("@prenom", personne.Prenom ?? "");
-                            cmd.Parameters.AddWithValue("@lien", (int)personne.Lien);
-                            cmd.Parameters.AddWithValue("@naissance", DbValue.DateNullableToDb(personne.DateNaissance));
-                            cmd.Parameters.AddWithValue("@etudes", personne.PoursuitDesEtudes ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@handicap", personne.SituationDeHandicap ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@compte", personne.CompteCommeCharge ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@commentaire", personne.Commentaire ?? "");
+                            cmd.Parameters.AjouterValeur("@employe", employeeId);
+                            cmd.Parameters.AjouterValeur("@nom", personne.Nom ?? "");
+                            cmd.Parameters.AjouterValeur("@prenom", personne.Prenom ?? "");
+                            cmd.Parameters.AjouterValeur("@lien", (int)personne.Lien);
+                            cmd.Parameters.AjouterValeur("@naissance", DbValue.DateNullableToDb(personne.DateNaissance));
+                            cmd.Parameters.AjouterValeur("@etudes", personne.PoursuitDesEtudes ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@handicap", personne.SituationDeHandicap ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@compte", personne.CompteCommeCharge ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@commentaire", personne.Commentaire ?? "");
 
                             await cmd.ExecuteNonQueryAsync();
                         }

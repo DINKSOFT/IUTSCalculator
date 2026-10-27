@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -154,7 +154,7 @@ namespace IUTSCalculator.Services
             decimal tauxSalarie = declaration.Bareme != null ? declaration.Bareme.TauxCnssSalarie : 0m;
             decimal tauxPatronal = declaration.Bareme != null ? declaration.Bareme.TauxCnssEmployeurTotal : 0m;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 // Jointure externe : un bulletin dont la fiche salarié a été supprimée doit
@@ -177,11 +177,11 @@ namespace IUTSCalculator.Services
                       AND c.IsRegularization = 0
                     ORDER BY e.LastName, e.FirstName, c.CalculationDate";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(declaration.DebutPeriode.Date));
-                cmd.Parameters.AddWithValue("@fin",
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(declaration.DebutPeriode.Date));
+                cmd.Parameters.AjouterValeur("@fin",
                     DbValue.DateToDb(declaration.FinPeriode.Date.AddDays(1).AddTicks(-1)));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -223,15 +223,15 @@ namespace IUTSCalculator.Services
             var debut = new DateTime(annee, mois, 1);
             var fin = debut.AddMonths(1).AddTicks(-1);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "SELECT COUNT(DISTINCT EmployeeId) FROM TaxCalculations " +
                     "WHERE CalculationDate >= @debut AND CalculationDate <= @fin " +
                     "  AND IsAnnual = 0 AND IsRegularization = 0";
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debut));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(fin));
 
                 return DbValue.IntFromDb(await cmd.ExecuteScalarAsync());
             }

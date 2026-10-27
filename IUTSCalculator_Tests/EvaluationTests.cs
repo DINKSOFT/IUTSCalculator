@@ -55,7 +55,7 @@ namespace IUTSCalculator.Tests
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
         public async Task Schema_Migration31_TablesEtIndexCrees()
         {
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {

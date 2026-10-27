@@ -1,5 +1,5 @@
 using System;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -28,7 +28,7 @@ namespace IUTSCalculator.Tests
 
         private static void Sql(string db, string sql)
         {
-            using (var c = new SQLiteConnection("Data Source=" + db + ";Version=3;"))
+            using (var c = new SqliteConnection("Data Source=" + db + ";Pooling=False"))
             {
                 c.Open();
                 using (var cmd = c.CreateCommand()) { cmd.CommandText = sql; cmd.ExecuteNonQuery(); }
@@ -110,7 +110,7 @@ namespace IUTSCalculator.Tests
 
             Assert.That(File.Exists(securite), Is.True);
             Assert.That(File.ReadAllText(Path.Combine(racine, "users.json")), Is.EqualTo("avant"));
-            using (var c = new SQLiteConnection("Data Source=" + db + ";Version=3;"))
+            using (var c = new SqliteConnection("Data Source=" + db + ";Pooling=False"))
             {
                 c.Open();
                 using (var cmd = c.CreateCommand())

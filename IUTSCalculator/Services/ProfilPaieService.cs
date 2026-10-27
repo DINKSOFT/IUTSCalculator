@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -105,7 +105,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<ProfilPaie>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
@@ -113,7 +113,7 @@ namespace IUTSCalculator.Services
                         "SELECT " + ColonnesProfil + " FROM ProfilsPaie p " +
                         "ORDER BY p.Ordre, p.Code;";
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                             liste.Add(LireProfil(reader));
@@ -141,7 +141,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static async Task<Dictionary<int, int>> CompterAsync(SQLiteConnection conn, string sql)
+        private static async Task<Dictionary<int, int>> CompterAsync(SqliteConnection conn, string sql)
         {
             var comptes = new Dictionary<int, int>();
 
@@ -149,7 +149,7 @@ namespace IUTSCalculator.Services
             {
                 cmd.CommandText = sql;
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         comptes[DbValue.IntFromDb(reader["ProfilId"])] = DbValue.IntFromDb(reader["N"]);
@@ -159,7 +159,7 @@ namespace IUTSCalculator.Services
             return comptes;
         }
 
-        private static ProfilPaie LireProfil(SQLiteDataReader reader)
+        private static ProfilPaie LireProfil(SqliteDataReader reader)
         {
             return new ProfilPaie
             {
@@ -184,15 +184,15 @@ namespace IUTSCalculator.Services
             var liste = new List<LigneProfil>();
             if (profilId <= 0) return liste;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "SELECT Id, ProfilId, CodeRubrique, Montant, Quantite, Ordre, Active, Commentaire " +
                     "FROM LignesProfil WHERE ProfilId = @profil ORDER BY Ordre, Id;";
-                cmd.Parameters.AddWithValue("@profil", profilId);
+                cmd.Parameters.AjouterValeur("@profil", profilId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -257,14 +257,14 @@ namespace IUTSCalculator.Services
 
             string code = Cle(profil.Code);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText =
                         "SELECT COUNT(*) FROM ProfilsPaie WHERE UPPER(Code) = @code AND Id <> @id;";
-                    cmd.Parameters.AddWithValue("@code", code);
-                    cmd.Parameters.AddWithValue("@id", profil.Id);
+                    cmd.Parameters.AjouterValeur("@code", code);
+                    cmd.Parameters.AjouterValeur("@id", profil.Id);
 
                     if (DbValue.IntFromDb(await cmd.ExecuteScalarAsync()) > 0)
                     {
@@ -283,7 +283,7 @@ namespace IUTSCalculator.Services
                             "UPDATE ProfilsPaie SET Code = @code, Libelle = @libelle, " +
                             "Population = @population, Description = @description, " +
                             "Actif = @actif, Ordre = @ordre WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", profil.Id);
+                        cmd.Parameters.AjouterValeur("@id", profil.Id);
                     }
                     else
                     {
@@ -291,15 +291,15 @@ namespace IUTSCalculator.Services
                             "INSERT INTO ProfilsPaie " +
                             "(Code, Libelle, Population, Description, Actif, Ordre, DateSaisie) " +
                             "VALUES (@code, @libelle, @population, @description, @actif, @ordre, @saisie);";
-                        cmd.Parameters.AddWithValue("@saisie", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@saisie", DbValue.DateToDb(DateTime.Now));
                     }
 
-                    cmd.Parameters.AddWithValue("@code", code);
-                    cmd.Parameters.AddWithValue("@libelle", profil.Libelle ?? "");
-                    cmd.Parameters.AddWithValue("@population", (int)profil.Population);
-                    cmd.Parameters.AddWithValue("@description", profil.Description ?? "");
-                    cmd.Parameters.AddWithValue("@actif", profil.Actif ? 1 : 0);
-                    cmd.Parameters.AddWithValue("@ordre", profil.Ordre);
+                    cmd.Parameters.AjouterValeur("@code", code);
+                    cmd.Parameters.AjouterValeur("@libelle", profil.Libelle ?? "");
+                    cmd.Parameters.AjouterValeur("@population", (int)profil.Population);
+                    cmd.Parameters.AjouterValeur("@description", profil.Description ?? "");
+                    cmd.Parameters.AjouterValeur("@actif", profil.Actif ? 1 : 0);
+                    cmd.Parameters.AjouterValeur("@ordre", profil.Ordre);
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -326,12 +326,12 @@ namespace IUTSCalculator.Services
         {
             if (profil == null || profil.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT COUNT(*) FROM AffectationsProfil WHERE ProfilId = @id;";
-                    cmd.Parameters.AddWithValue("@id", profil.Id);
+                    cmd.Parameters.AjouterValeur("@id", profil.Id);
 
                     int affectations = DbValue.IntFromDb(await cmd.ExecuteScalarAsync());
                     if (affectations > 0)
@@ -352,7 +352,7 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "DELETE FROM LignesProfil WHERE ProfilId = @id;";
-                            cmd.Parameters.AddWithValue("@id", profil.Id);
+                            cmd.Parameters.AjouterValeur("@id", profil.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -360,7 +360,7 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "DELETE FROM ProfilsPaie WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", profil.Id);
+                            cmd.Parameters.AjouterValeur("@id", profil.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -388,7 +388,7 @@ namespace IUTSCalculator.Services
                 .Where(l => l != null && !string.IsNullOrWhiteSpace(l.CodeRubrique))
                 .ToList();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -397,7 +397,7 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "DELETE FROM LignesProfil WHERE ProfilId = @profil;";
-                        cmd.Parameters.AddWithValue("@profil", profilId);
+                        cmd.Parameters.AjouterValeur("@profil", profilId);
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -414,13 +414,13 @@ namespace IUTSCalculator.Services
                                 "INSERT INTO LignesProfil " +
                                 "(ProfilId, CodeRubrique, Montant, Quantite, Ordre, Active, Commentaire) " +
                                 "VALUES (@profil, @code, @montant, @quantite, @ordre, @active, @commentaire);";
-                            cmd.Parameters.AddWithValue("@profil", profilId);
-                            cmd.Parameters.AddWithValue("@code", Cle(ligne.CodeRubrique));
-                            cmd.Parameters.AddWithValue("@montant", DbValue.MoneyToDb(ligne.Montant));
-                            cmd.Parameters.AddWithValue("@quantite", DbValue.DecimalToDb(ligne.Quantite));
-                            cmd.Parameters.AddWithValue("@ordre", ligne.Ordre > 0 ? ligne.Ordre : ordre);
-                            cmd.Parameters.AddWithValue("@active", ligne.Active ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@commentaire", ligne.Commentaire ?? "");
+                            cmd.Parameters.AjouterValeur("@profil", profilId);
+                            cmd.Parameters.AjouterValeur("@code", Cle(ligne.CodeRubrique));
+                            cmd.Parameters.AjouterValeur("@montant", DbValue.MoneyToDb(ligne.Montant));
+                            cmd.Parameters.AjouterValeur("@quantite", DbValue.DecimalToDb(ligne.Quantite));
+                            cmd.Parameters.AjouterValeur("@ordre", ligne.Ordre > 0 ? ligne.Ordre : ordre);
+                            cmd.Parameters.AjouterValeur("@active", ligne.Active ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@commentaire", ligne.Commentaire ?? "");
                             await cmd.ExecuteNonQueryAsync();
                         }
                     }
@@ -446,7 +446,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<AffectationProfil>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -457,7 +457,7 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN ProfilsPaie p ON p.Id = a.ProfilId " +
                     "ORDER BY a.DateEffet DESC, a.Id DESC;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -501,15 +501,15 @@ namespace IUTSCalculator.Services
 
             var jour = dateEffet.Date;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText =
                         "DELETE FROM AffectationsProfil " +
                         "WHERE EmployeeId = @employe AND DateEffet = @date;";
-                    cmd.Parameters.AddWithValue("@employe", employeeId);
-                    cmd.Parameters.AddWithValue("@date", DbValue.DateToDb(jour));
+                    cmd.Parameters.AjouterValeur("@employe", employeeId);
+                    cmd.Parameters.AjouterValeur("@date", DbValue.DateToDb(jour));
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -518,10 +518,10 @@ namespace IUTSCalculator.Services
                     cmd.CommandText =
                         "INSERT INTO AffectationsProfil (EmployeeId, ProfilId, DateEffet, Commentaire) " +
                         "VALUES (@employe, @profil, @date, @commentaire);";
-                    cmd.Parameters.AddWithValue("@employe", employeeId);
-                    cmd.Parameters.AddWithValue("@profil", profilId < 0 ? 0 : profilId);
-                    cmd.Parameters.AddWithValue("@date", DbValue.DateToDb(jour));
-                    cmd.Parameters.AddWithValue("@commentaire", commentaire ?? "");
+                    cmd.Parameters.AjouterValeur("@employe", employeeId);
+                    cmd.Parameters.AjouterValeur("@profil", profilId < 0 ? 0 : profilId);
+                    cmd.Parameters.AjouterValeur("@date", DbValue.DateToDb(jour));
+                    cmd.Parameters.AjouterValeur("@commentaire", commentaire ?? "");
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -532,11 +532,11 @@ namespace IUTSCalculator.Services
         {
             if (affectation == null || affectation.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM AffectationsProfil WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", affectation.Id);
+                cmd.Parameters.AjouterValeur("@id", affectation.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -547,14 +547,14 @@ namespace IUTSCalculator.Services
         /// </summary>
         public async Task<Dictionary<string, int>> ProfilsApplicablesAsync(DateTime arrete)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 return await ProfilsApplicablesAsync(conn, arrete);
             }
         }
 
         private static async Task<Dictionary<string, int>> ProfilsApplicablesAsync(
-            SQLiteConnection conn, DateTime arrete)
+            SqliteConnection conn, DateTime arrete)
         {
             var applicables = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -569,9 +569,9 @@ namespace IUTSCalculator.Services
                         "SELECT EmployeeId, ProfilId FROM AffectationsProfil " +
                         "WHERE DateEffet <= @arrete " +
                         "ORDER BY EmployeeId, DateEffet, Id;";
-                    cmd.Parameters.AddWithValue("@arrete", DbValue.DateToDb(arrete));
+                    cmd.Parameters.AjouterValeur("@arrete", DbValue.DateToDb(arrete));
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -618,7 +618,7 @@ namespace IUTSCalculator.Services
             Dictionary<int, ProfilPaie> profils;
             Dictionary<int, List<LigneProfil>> lignesParProfil;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 applicables = await ProfilsApplicablesAsync(conn, arrete);
                 if (applicables.Count == 0) return resultat;
@@ -705,7 +705,7 @@ namespace IUTSCalculator.Services
             return ApportProfil.Aucun();
         }
 
-        private static async Task<Dictionary<int, ProfilPaie>> ChargerProfilsIndexesAsync(SQLiteConnection conn)
+        private static async Task<Dictionary<int, ProfilPaie>> ChargerProfilsIndexesAsync(SqliteConnection conn)
         {
             var profils = new Dictionary<int, ProfilPaie>();
 
@@ -713,7 +713,7 @@ namespace IUTSCalculator.Services
             {
                 cmd.CommandText = "SELECT " + ColonnesProfil + " FROM ProfilsPaie p;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -726,7 +726,7 @@ namespace IUTSCalculator.Services
             return profils;
         }
 
-        private static async Task<Dictionary<int, List<LigneProfil>>> ChargerToutesLignesAsync(SQLiteConnection conn)
+        private static async Task<Dictionary<int, List<LigneProfil>>> ChargerToutesLignesAsync(SqliteConnection conn)
         {
             var parProfil = new Dictionary<int, List<LigneProfil>>();
 
@@ -736,7 +736,7 @@ namespace IUTSCalculator.Services
                     "SELECT Id, ProfilId, CodeRubrique, Montant, Quantite, Ordre, Active, Commentaire " +
                     "FROM LignesProfil ORDER BY ProfilId, Ordre, Id;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

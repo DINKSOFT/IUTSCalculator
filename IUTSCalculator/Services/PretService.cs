@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -121,7 +121,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<Pret>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -130,7 +130,7 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = p.EmployeeId " +
                     "ORDER BY p.DateOctroi DESC, p.Id DESC";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LirePret(reader));
@@ -140,7 +140,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static Pret LirePret(SQLiteDataReader reader)
+        private static Pret LirePret(SqliteDataReader reader)
         {
             string nom = DbValue.TextFromDb(reader["LastName"]);
             string prenom = DbValue.TextFromDb(reader["FirstName"]);
@@ -176,7 +176,7 @@ namespace IUTSCalculator.Services
             var liste = new List<EcheancePret>();
             if (pretId <= 0) return liste;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 var cloturees = await ChargerPeriodesClotureesAsync(conn, null);
 
@@ -185,9 +185,9 @@ namespace IUTSCalculator.Services
                     cmd.CommandText =
                         "SELECT Id, PretId, Rang, Annee, Mois, MontantPrevu, Statut, Commentaire " +
                         "FROM EcheancesPret WHERE PretId = @pret ORDER BY Annee, Mois, Rang;";
-                    cmd.Parameters.AddWithValue("@pret", pretId);
+                    cmd.Parameters.AjouterValeur("@pret", pretId);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -202,7 +202,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static EcheancePret LireEcheance(SQLiteDataReader reader)
+        private static EcheancePret LireEcheance(SqliteDataReader reader)
         {
             return new EcheancePret
             {
@@ -233,7 +233,7 @@ namespace IUTSCalculator.Services
 
             var lignes = new List<EcheanceAvecPret>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 var cloturees = await ChargerPeriodesClotureesAsync(conn, null);
 
@@ -250,9 +250,9 @@ namespace IUTSCalculator.Services
                         "INNER JOIN Prets p ON p.Id = e.PretId " +
                         "WHERE p.Statut = @enCours " +
                         "ORDER BY p.Id, e.Annee, e.Mois, e.Rang;";
-                    cmd.Parameters.AddWithValue("@enCours", (int)StatutPret.EnCours);
+                    cmd.Parameters.AjouterValeur("@enCours", (int)StatutPret.EnCours);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -372,7 +372,7 @@ namespace IUTSCalculator.Services
             var apports = await ApportsAsync(annee, mois);
             var situations = new List<SituationPret>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 var cloturees = await ChargerPeriodesClotureesAsync(conn, null);
                 var parPret = await ChargerToutesEcheancesAsync(conn, cloturees);
@@ -422,7 +422,7 @@ namespace IUTSCalculator.Services
         }
 
         private static async Task<Dictionary<int, List<EcheancePret>>> ChargerToutesEcheancesAsync(
-            SQLiteConnection conn, HashSet<int> cloturees)
+            SqliteConnection conn, HashSet<int> cloturees)
         {
             var parPret = new Dictionary<int, List<EcheancePret>>();
 
@@ -432,7 +432,7 @@ namespace IUTSCalculator.Services
                     "SELECT Id, PretId, Rang, Annee, Mois, MontantPrevu, Statut, Commentaire " +
                     "FROM EcheancesPret ORDER BY PretId, Annee, Mois, Rang;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -470,7 +470,7 @@ namespace IUTSCalculator.Services
             var anomalie = Anomalie(pret);
             if (anomalie != null) throw new InvalidOperationException(anomalie);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -488,7 +488,7 @@ namespace IUTSCalculator.Services
                                 "MoisPremiereEcheance = @mois, Statut = @statut, " +
                                 "Motif = @motif, Commentaire = @commentaire " +
                                 "WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", pret.Id);
+                            cmd.Parameters.AjouterValeur("@id", pret.Id);
                             AjouterParametres(cmd, pret);
                             await cmd.ExecuteNonQueryAsync();
                         }
@@ -507,7 +507,7 @@ namespace IUTSCalculator.Services
                                 "        @echeance, @nombre, @annee, @mois, @statut, @motif, " +
                                 "        @commentaire, @saisie);";
                             AjouterParametres(cmd, pret);
-                            cmd.Parameters.AddWithValue("@saisie", DbValue.DateToDb(DateTime.Now));
+                            cmd.Parameters.AjouterValeur("@saisie", DbValue.DateToDb(DateTime.Now));
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -537,20 +537,20 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static void AjouterParametres(SQLiteCommand cmd, Pret pret)
+        private static void AjouterParametres(SqliteCommand cmd, Pret pret)
         {
-            cmd.Parameters.AddWithValue("@employe", pret.EmployeeId ?? "");
-            cmd.Parameters.AddWithValue("@type", (int)pret.Type);
-            cmd.Parameters.AddWithValue("@reference", pret.Reference ?? "");
-            cmd.Parameters.AddWithValue("@octroi", DbValue.DateToDb(pret.DateOctroi));
-            cmd.Parameters.AddWithValue("@accorde", DbValue.MoneyToDb(pret.MontantAccorde));
-            cmd.Parameters.AddWithValue("@echeance", DbValue.MoneyToDb(pret.MontantEcheance));
-            cmd.Parameters.AddWithValue("@nombre", pret.NombreEcheances);
-            cmd.Parameters.AddWithValue("@annee", pret.AnneePremiereEcheance);
-            cmd.Parameters.AddWithValue("@mois", pret.MoisPremiereEcheance);
-            cmd.Parameters.AddWithValue("@statut", (int)pret.Statut);
-            cmd.Parameters.AddWithValue("@motif", pret.Motif ?? "");
-            cmd.Parameters.AddWithValue("@commentaire", pret.Commentaire ?? "");
+            cmd.Parameters.AjouterValeur("@employe", pret.EmployeeId ?? "");
+            cmd.Parameters.AjouterValeur("@type", (int)pret.Type);
+            cmd.Parameters.AjouterValeur("@reference", pret.Reference ?? "");
+            cmd.Parameters.AjouterValeur("@octroi", DbValue.DateToDb(pret.DateOctroi));
+            cmd.Parameters.AjouterValeur("@accorde", DbValue.MoneyToDb(pret.MontantAccorde));
+            cmd.Parameters.AjouterValeur("@echeance", DbValue.MoneyToDb(pret.MontantEcheance));
+            cmd.Parameters.AjouterValeur("@nombre", pret.NombreEcheances);
+            cmd.Parameters.AjouterValeur("@annee", pret.AnneePremiereEcheance);
+            cmd.Parameters.AjouterValeur("@mois", pret.MoisPremiereEcheance);
+            cmd.Parameters.AjouterValeur("@statut", (int)pret.Statut);
+            cmd.Parameters.AjouterValeur("@motif", pret.Motif ?? "");
+            cmd.Parameters.AjouterValeur("@commentaire", pret.Commentaire ?? "");
         }
 
         /// <summary>
@@ -563,7 +563,7 @@ namespace IUTSCalculator.Services
         {
             if (pret == null || pret.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 var cloturees = await ChargerPeriodesClotureesAsync(conn, null);
                 var echeances = await ChargerEcheancesDuPretAsync(conn, null, pret.Id, cloturees);
@@ -584,7 +584,7 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "DELETE FROM EcheancesPret WHERE PretId = @id;";
-                            cmd.Parameters.AddWithValue("@id", pret.Id);
+                            cmd.Parameters.AjouterValeur("@id", pret.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -592,7 +592,7 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "DELETE FROM Prets WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@id", pret.Id);
+                            cmd.Parameters.AjouterValeur("@id", pret.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -617,7 +617,7 @@ namespace IUTSCalculator.Services
         {
             if (pret == null || pret.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -632,8 +632,8 @@ namespace IUTSCalculator.Services
                             cmd.Transaction = tx;
                             cmd.CommandText =
                                 "UPDATE EcheancesPret SET Statut = @statut WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@statut", (int)StatutEcheance.Suspendue);
-                            cmd.Parameters.AddWithValue("@id", echeance.Id);
+                            cmd.Parameters.AjouterValeur("@statut", (int)StatutEcheance.Suspendue);
+                            cmd.Parameters.AjouterValeur("@id", echeance.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
                     }
@@ -647,9 +647,9 @@ namespace IUTSCalculator.Services
                         cmd.Transaction = tx;
                         cmd.CommandText =
                             "UPDATE Prets SET Statut = @statut, Motif = @motif WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@statut", (int)StatutPret.Suspendu);
-                        cmd.Parameters.AddWithValue("@motif", trace);
-                        cmd.Parameters.AddWithValue("@id", pret.Id);
+                        cmd.Parameters.AjouterValeur("@statut", (int)StatutPret.Suspendu);
+                        cmd.Parameters.AjouterValeur("@motif", trace);
+                        cmd.Parameters.AjouterValeur("@id", pret.Id);
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -679,7 +679,7 @@ namespace IUTSCalculator.Services
             if (mois < 1 || mois > 12)
                 throw new InvalidOperationException("Le mois de reprise doit être compris entre 1 et 12.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -688,8 +688,8 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "UPDATE Prets SET Statut = @statut WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@statut", (int)StatutPret.EnCours);
-                        cmd.Parameters.AddWithValue("@id", pret.Id);
+                        cmd.Parameters.AjouterValeur("@statut", (int)StatutPret.EnCours);
+                        cmd.Parameters.AjouterValeur("@id", pret.Id);
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -717,7 +717,7 @@ namespace IUTSCalculator.Services
         {
             if (pret == null || pret.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -731,8 +731,8 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "UPDATE EcheancesPret SET Statut = @statut WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@statut", (int)StatutEcheance.Annulee);
-                            cmd.Parameters.AddWithValue("@id", echeance.Id);
+                            cmd.Parameters.AjouterValeur("@statut", (int)StatutEcheance.Annulee);
+                            cmd.Parameters.AjouterValeur("@id", echeance.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
                     }
@@ -745,9 +745,9 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "UPDATE Prets SET Statut = @statut, Motif = @motif WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@statut", (int)StatutPret.Annule);
-                        cmd.Parameters.AddWithValue("@motif", trace);
-                        cmd.Parameters.AddWithValue("@id", pret.Id);
+                        cmd.Parameters.AjouterValeur("@statut", (int)StatutPret.Annule);
+                        cmd.Parameters.AjouterValeur("@motif", trace);
+                        cmd.Parameters.AjouterValeur("@id", pret.Id);
                         await cmd.ExecuteNonQueryAsync();
                     }
 
@@ -775,7 +775,7 @@ namespace IUTSCalculator.Services
         /// solde ne se solderait jamais.
         /// </summary>
         private static async Task ReconstruireEcheancierAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, Pret pret, int? anneeReprise, int? moisReprise)
+            SqliteConnection conn, SqliteTransaction tx, Pret pret, int? anneeReprise, int? moisReprise)
         {
             var cloturees = await ChargerPeriodesClotureesAsync(conn, tx);
             var existantes = await ChargerEcheancesDuPretAsync(conn, tx, pret.Id, cloturees);
@@ -794,7 +794,7 @@ namespace IUTSCalculator.Services
                     (retenues.Count == 0
                         ? "SELECT 0"
                         : string.Join(",", retenues.Select(e => e.Id.ToString()))) + ");";
-                cmd.Parameters.AddWithValue("@pret", pret.Id);
+                cmd.Parameters.AjouterValeur("@pret", pret.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -856,20 +856,20 @@ namespace IUTSCalculator.Services
                         "INSERT INTO EcheancesPret " +
                         "(PretId, Rang, Annee, Mois, MontantPrevu, Statut, Commentaire) " +
                         "VALUES (@pret, @rang, @annee, @mois, @montant, @statut, @commentaire);";
-                    cmd.Parameters.AddWithValue("@pret", pret.Id);
-                    cmd.Parameters.AddWithValue("@rang", echeance.Rang);
-                    cmd.Parameters.AddWithValue("@annee", echeance.Annee);
-                    cmd.Parameters.AddWithValue("@mois", echeance.Mois);
-                    cmd.Parameters.AddWithValue("@montant", DbValue.MoneyToDb(echeance.MontantPrevu));
-                    cmd.Parameters.AddWithValue("@statut", (int)StatutEcheance.Prevue);
-                    cmd.Parameters.AddWithValue("@commentaire", echeance.Commentaire ?? "");
+                    cmd.Parameters.AjouterValeur("@pret", pret.Id);
+                    cmd.Parameters.AjouterValeur("@rang", echeance.Rang);
+                    cmd.Parameters.AjouterValeur("@annee", echeance.Annee);
+                    cmd.Parameters.AjouterValeur("@mois", echeance.Mois);
+                    cmd.Parameters.AjouterValeur("@montant", DbValue.MoneyToDb(echeance.MontantPrevu));
+                    cmd.Parameters.AjouterValeur("@statut", (int)StatutEcheance.Prevue);
+                    cmd.Parameters.AjouterValeur("@commentaire", echeance.Commentaire ?? "");
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
         }
 
         private static async Task<List<EcheancePret>> ChargerEcheancesDuPretAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, int pretId, HashSet<int> cloturees)
+            SqliteConnection conn, SqliteTransaction tx, int pretId, HashSet<int> cloturees)
         {
             var liste = new List<EcheancePret>();
 
@@ -879,9 +879,9 @@ namespace IUTSCalculator.Services
                 cmd.CommandText =
                     "SELECT Id, PretId, Rang, Annee, Mois, MontantPrevu, Statut, Commentaire " +
                     "FROM EcheancesPret WHERE PretId = @pret ORDER BY Annee, Mois, Rang;";
-                cmd.Parameters.AddWithValue("@pret", pretId);
+                cmd.Parameters.AjouterValeur("@pret", pretId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -901,7 +901,7 @@ namespace IUTSCalculator.Services
         /// multiplierait les allers-retours pour une information qui tient en mémoire.
         /// </summary>
         private static async Task<HashSet<int>> ChargerPeriodesClotureesAsync(
-            SQLiteConnection conn, SQLiteTransaction tx)
+            SqliteConnection conn, SqliteTransaction tx)
         {
             var cles = new HashSet<int>();
 
@@ -912,9 +912,9 @@ namespace IUTSCalculator.Services
                     cmd.Transaction = tx;
                     cmd.CommandText =
                         "SELECT Annee, Mois FROM PeriodesPaie WHERE Statut = @cloturee;";
-                    cmd.Parameters.AddWithValue("@cloturee", (int)StatutPeriode.Cloturee);
+                    cmd.Parameters.AjouterValeur("@cloturee", (int)StatutPeriode.Cloturee);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {

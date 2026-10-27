@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -88,11 +88,11 @@ namespace IUTSCalculator.Services
 
         public async Task<ParametresTemps> ChargerParametresAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT JourArrete, AJCompteDansSeuil FROM ParametresTemps WHERE Id = 1;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                     {
@@ -114,14 +114,14 @@ namespace IUTSCalculator.Services
             if (parametres.JourArrete < 0 || parametres.JourArrete > 27)
                 throw new InvalidOperationException("Le jour d'arrêté doit être compris entre 1 et 27 (0 pour le mois civil).");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "INSERT INTO ParametresTemps (Id, JourArrete, AJCompteDansSeuil) VALUES (1, @j, @aj) " +
                     "ON CONFLICT(Id) DO UPDATE SET JourArrete = excluded.JourArrete, AJCompteDansSeuil = excluded.AJCompteDansSeuil;";
-                cmd.Parameters.AddWithValue("@j", parametres.JourArrete);
-                cmd.Parameters.AddWithValue("@aj", parametres.AJCompteDansSeuil ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@j", parametres.JourArrete);
+                cmd.Parameters.AjouterValeur("@aj", parametres.AJCompteDansSeuil ? 1 : 0);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -140,13 +140,13 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<EquipeTravail>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "SELECT e.*, (SELECT COUNT(*) FROM EquipesMembres m WHERE m.EquipeId = e.Id) AS NbMembres " +
                     "FROM EquipesTravail e ORDER BY e.Active DESC, e.Code;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -189,13 +189,13 @@ namespace IUTSCalculator.Services
             var cycle = equipe.Cycle();
             if (cycle != null) equipe.Motif = cycle.Normalise;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT COUNT(*) FROM EquipesTravail WHERE Code = @c AND Id <> @id;";
-                    cmd.Parameters.AddWithValue("@c", equipe.Code);
-                    cmd.Parameters.AddWithValue("@id", equipe.Id);
+                    cmd.Parameters.AjouterValeur("@c", equipe.Code);
+                    cmd.Parameters.AjouterValeur("@id", equipe.Id);
                     if (DbValue.IntFromDb(await cmd.ExecuteScalarAsync()) > 0)
                         throw new InvalidOperationException(string.Format("Une équipe porte déjà le code « {0} ».", equipe.Code));
                 }
@@ -209,7 +209,7 @@ namespace IUTSCalculator.Services
                             "DateDebutCycle = @debut, DureePosteJour = @dj, DureePosteNuit = @dn, " +
                             "HeuresNormalesParPoste = @hn, ModeSemaine = @mode, DimancheMajore = @dim, " +
                             "PanierMode = @pm, PanierValeur = @pv, Active = @active, Commentaire = @comm WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", equipe.Id);
+                        cmd.Parameters.AjouterValeur("@id", equipe.Id);
                     }
                     else
                     {
@@ -218,27 +218,27 @@ namespace IUTSCalculator.Services
                             "DureePosteNuit, HeuresNormalesParPoste, ModeSemaine, DimancheMajore, PanierMode, PanierValeur, " +
                             "Active, Commentaire, DateCreation) VALUES (@code, @libelle, @site, @motif, @debut, @dj, @dn, " +
                             "@hn, @mode, @dim, @pm, @pv, @active, @comm, @creation);";
-                        cmd.Parameters.AddWithValue("@creation", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@creation", DbValue.DateToDb(DateTime.Now));
                     }
 
-                    cmd.Parameters.AddWithValue("@code", equipe.Code);
-                    cmd.Parameters.AddWithValue("@libelle", equipe.Libelle ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@site", equipe.Site ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@motif", equipe.Motif ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(equipe.DateDebutCycle.Date));
-                    cmd.Parameters.AddWithValue("@dj", DbValue.DecimalToDb(equipe.DureePosteJour));
-                    cmd.Parameters.AddWithValue("@dn", DbValue.DecimalToDb(equipe.DureePosteNuit));
-                    cmd.Parameters.AddWithValue("@hn", DbValue.DecimalToDb(equipe.HeuresNormalesParPoste));
-                    cmd.Parameters.AddWithValue("@mode", (int)equipe.ModeSemaine);
-                    cmd.Parameters.AddWithValue("@dim", equipe.DimancheMajore ? 1 : 0);
-                    cmd.Parameters.AddWithValue("@pm", (int)equipe.PanierMode);
-                    cmd.Parameters.AddWithValue("@pv", DbValue.DecimalToDb(equipe.PanierValeur));
-                    cmd.Parameters.AddWithValue("@active", equipe.Active ? 1 : 0);
-                    cmd.Parameters.AddWithValue("@comm", equipe.Commentaire ?? string.Empty);
+                    cmd.Parameters.AjouterValeur("@code", equipe.Code);
+                    cmd.Parameters.AjouterValeur("@libelle", equipe.Libelle ?? string.Empty);
+                    cmd.Parameters.AjouterValeur("@site", equipe.Site ?? string.Empty);
+                    cmd.Parameters.AjouterValeur("@motif", equipe.Motif ?? string.Empty);
+                    cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(equipe.DateDebutCycle.Date));
+                    cmd.Parameters.AjouterValeur("@dj", DbValue.DecimalToDb(equipe.DureePosteJour));
+                    cmd.Parameters.AjouterValeur("@dn", DbValue.DecimalToDb(equipe.DureePosteNuit));
+                    cmd.Parameters.AjouterValeur("@hn", DbValue.DecimalToDb(equipe.HeuresNormalesParPoste));
+                    cmd.Parameters.AjouterValeur("@mode", (int)equipe.ModeSemaine);
+                    cmd.Parameters.AjouterValeur("@dim", equipe.DimancheMajore ? 1 : 0);
+                    cmd.Parameters.AjouterValeur("@pm", (int)equipe.PanierMode);
+                    cmd.Parameters.AjouterValeur("@pv", DbValue.DecimalToDb(equipe.PanierValeur));
+                    cmd.Parameters.AjouterValeur("@active", equipe.Active ? 1 : 0);
+                    cmd.Parameters.AjouterValeur("@comm", equipe.Commentaire ?? string.Empty);
 
                     await cmd.ExecuteNonQueryAsync();
                     if (equipe.Id <= 0)
-                        equipe.Id = (int)conn.LastInsertRowId;
+                        equipe.Id = (int)conn.DernierIdInsere();
                 }
             }
         }
@@ -251,7 +251,7 @@ namespace IUTSCalculator.Services
         {
             if (equipe == null || equipe.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var sql in new[]
@@ -265,7 +265,7 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = sql;
-                        cmd.Parameters.AddWithValue("@id", equipe.Id);
+                        cmd.Parameters.AjouterValeur("@id", equipe.Id);
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
@@ -278,11 +278,11 @@ namespace IUTSCalculator.Services
         {
             var dico = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT EmployeeId, EquipeId FROM EquipesMembres;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         dico[DbValue.TextFromDb(reader["EmployeeId"])] = DbValue.IntFromDb(reader["EquipeId"]);
@@ -298,7 +298,7 @@ namespace IUTSCalculator.Services
             var liste = (employes ?? Enumerable.Empty<string>()).Where(e => !string.IsNullOrWhiteSpace(e)).Distinct().ToList();
             if (liste.Count == 0 || equipeId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var employe in liste)
@@ -309,9 +309,9 @@ namespace IUTSCalculator.Services
                         cmd.CommandText =
                             "INSERT INTO EquipesMembres (EmployeeId, EquipeId, DateAffectation) VALUES (@e, @q, @d) " +
                             "ON CONFLICT(EmployeeId) DO UPDATE SET EquipeId = excluded.EquipeId, DateAffectation = excluded.DateAffectation;";
-                        cmd.Parameters.AddWithValue("@e", employe);
-                        cmd.Parameters.AddWithValue("@q", equipeId);
-                        cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(DateTime.Today));
+                        cmd.Parameters.AjouterValeur("@e", employe);
+                        cmd.Parameters.AjouterValeur("@q", equipeId);
+                        cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(DateTime.Today));
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
@@ -324,7 +324,7 @@ namespace IUTSCalculator.Services
             var liste = (employes ?? Enumerable.Empty<string>()).Where(e => !string.IsNullOrWhiteSpace(e)).Distinct().ToList();
             if (liste.Count == 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 foreach (var employe in liste)
@@ -333,7 +333,7 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "DELETE FROM EquipesMembres WHERE EmployeeId = @e;";
-                        cmd.Parameters.AddWithValue("@e", employe);
+                        cmd.Parameters.AjouterValeur("@e", employe);
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
@@ -349,11 +349,11 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<JourFerie>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT Id, DateJour, Libelle FROM JoursFeries ORDER BY DateJour DESC;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -375,14 +375,14 @@ namespace IUTSCalculator.Services
             if (string.IsNullOrWhiteSpace(libelle))
                 throw new InvalidOperationException("Indiquez le nom du jour férié.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "INSERT INTO JoursFeries (DateJour, Libelle) VALUES (@d, @l) " +
                     "ON CONFLICT(DateJour) DO UPDATE SET Libelle = excluded.Libelle;";
-                cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(date.Date));
-                cmd.Parameters.AddWithValue("@l", libelle.Trim());
+                cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(date.Date));
+                cmd.Parameters.AjouterValeur("@l", libelle.Trim());
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -409,7 +409,7 @@ namespace IUTSCalculator.Services
             int ajoutes = 0;
             if (aAjouter.Count > 0)
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 using (var tx = conn.BeginTransaction())
                 {
                     foreach (var j in aAjouter)
@@ -420,8 +420,8 @@ namespace IUTSCalculator.Services
                             // DO NOTHING : une date saisie entre-temps garde son nom.
                             cmd.CommandText =
                                 "INSERT INTO JoursFeries (DateJour, Libelle) VALUES (@d, @l) ON CONFLICT(DateJour) DO NOTHING;";
-                            cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(j.Date.Date));
-                            cmd.Parameters.AddWithValue("@l", j.Libelle);
+                            cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(j.Date.Date));
+                            cmd.Parameters.AjouterValeur("@l", j.Libelle);
                             ajoutes += await cmd.ExecuteNonQueryAsync();
                         }
                     }
@@ -444,11 +444,11 @@ namespace IUTSCalculator.Services
         {
             if (ferie == null || ferie.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM JoursFeries WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", ferie.Id);
+                cmd.Parameters.AjouterValeur("@id", ferie.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -462,15 +462,15 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<PlanningJour>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "SELECT Id, EmployeeId, DateJour, Code, Heures, EquipeId, Source, Commentaire FROM PlanningJours " +
                     "WHERE DateJour >= @debut AND DateJour <= @fin;";
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut.Date));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.Date));
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debut.Date));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(fin.Date));
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LireJour(reader));
@@ -502,7 +502,7 @@ namespace IUTSCalculator.Services
             }
 
             int n = 0;
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 var parametres = await ChargerParametresAsync();
                 await VerifierPeriodesOuvertesAsync(conn, liste.Select(j => j.Date), parametres);
@@ -529,15 +529,15 @@ namespace IUTSCalculator.Services
                                         "ON CONFLICT(EmployeeId, DateJour) DO UPDATE SET Code = excluded.Code, Heures = excluded.Heures, " +
                                         "EquipeId = excluded.EquipeId, Source = excluded.Source, Commentaire = excluded.Commentaire, " +
                                         "DateModification = excluded.DateModification;";
-                                    cmd.Parameters.AddWithValue("@c", j.Code);
-                                    cmd.Parameters.AddWithValue("@h", j.Heures.HasValue ? (object)DbValue.DecimalToDb(j.Heures.Value) : DBNull.Value);
-                                    cmd.Parameters.AddWithValue("@q", j.EquipeId.HasValue ? (object)j.EquipeId.Value : DBNull.Value);
-                                    cmd.Parameters.AddWithValue("@s", (int)j.Source);
-                                    cmd.Parameters.AddWithValue("@comm", j.Commentaire ?? string.Empty);
-                                    cmd.Parameters.AddWithValue("@m", maintenant);
+                                    cmd.Parameters.AjouterValeur("@c", j.Code);
+                                    cmd.Parameters.AjouterValeur("@h", j.Heures.HasValue ? (object)DbValue.DecimalToDb(j.Heures.Value) : DBNull.Value);
+                                    cmd.Parameters.AjouterValeur("@q", j.EquipeId.HasValue ? (object)j.EquipeId.Value : DBNull.Value);
+                                    cmd.Parameters.AjouterValeur("@s", (int)j.Source);
+                                    cmd.Parameters.AjouterValeur("@comm", j.Commentaire ?? string.Empty);
+                                    cmd.Parameters.AjouterValeur("@m", maintenant);
                                 }
-                                cmd.Parameters.AddWithValue("@e", j.EmployeeId);
-                                cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(j.Date.Date));
+                                cmd.Parameters.AjouterValeur("@e", j.EmployeeId);
+                                cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(j.Date.Date));
                                 await cmd.ExecuteNonQueryAsync();
                                 n++;
                             }
@@ -559,7 +559,7 @@ namespace IUTSCalculator.Services
         /// Un jour de planning appartient à la période de paie qui le contient ; si cette
         /// période est clôturée, ses heures ont déjà été payées.
         /// </summary>
-        private static async Task VerifierPeriodesOuvertesAsync(SQLiteConnection conn, IEnumerable<DateTime> dates, ParametresTemps parametres)
+        private static async Task VerifierPeriodesOuvertesAsync(SqliteConnection conn, IEnumerable<DateTime> dates, ParametresTemps parametres)
         {
             var mois = new HashSet<DateTime>();
             foreach (var d in dates)
@@ -659,7 +659,7 @@ namespace IUTSCalculator.Services
             // Les jours d'une période clôturée (première semaine) sont écartés, pas bloquants.
             var parametres = await ChargerParametresAsync();
             var clotures = new HashSet<DateTime>();
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 foreach (var m in aEcrire.Select(j => MoisDePaie(j.Date, parametres.JourArrete)).Distinct())
                 {
@@ -680,18 +680,18 @@ namespace IUTSCalculator.Services
         {
             var dico = new Dictionary<string, Absence>(StringComparer.OrdinalIgnoreCase);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
                     "SELECT EmployeeId, Type, DateDebut, DateFin FROM Absences " +
                     "WHERE DateDebut <= @fin AND DateFin >= @debut " +
                     "AND (Commentaire IS NULL OR Commentaire NOT LIKE @marqueur);";
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debut.Date));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(fin.Date));
-                cmd.Parameters.AddWithValue("@marqueur", AbsenceService.MarqueurReleveTemps + "%");
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debut.Date));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(fin.Date));
+                cmd.Parameters.AjouterValeur("@marqueur", AbsenceService.MarqueurReleveTemps + "%");
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -909,7 +909,7 @@ namespace IUTSCalculator.Services
             return (employe ?? string.Empty) + "|" + date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
 
-        private static PlanningJour LireJour(SQLiteDataReader reader)
+        private static PlanningJour LireJour(SqliteDataReader reader)
         {
             string heures = DbValue.TextFromDb(reader["Heures"]);
             return new PlanningJour

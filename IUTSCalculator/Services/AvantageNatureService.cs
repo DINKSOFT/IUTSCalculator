@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -41,7 +41,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     var sql = @"
                         SELECT a.Id, a.EmployeeId, a.TypeAvantage, a.Libelle, a.ModeEvaluation,
@@ -62,10 +62,10 @@ namespace IUTSCalculator.Services
 
                     sql += " ORDER BY a.Actif DESC, a.DateDebut DESC, a.Id DESC";
 
-                    using (var cmd = new SQLiteCommand(sql, connection))
+                    using (var cmd = new SqliteCommand(sql, connection))
                     {
                         if (!string.IsNullOrWhiteSpace(employeeId))
-                            cmd.Parameters.AddWithValue("@emp", employeeId);
+                            cmd.Parameters.AjouterValeur("@emp", employeeId);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -85,7 +85,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     var sql = @"
                         SELECT a.Id, a.EmployeeId, a.TypeAvantage, a.Libelle, a.ModeEvaluation,
@@ -99,9 +99,9 @@ namespace IUTSCalculator.Services
                         LEFT JOIN Employees e ON e.EmployeeId = a.EmployeeId
                         WHERE a.Id = @id";
 
-                    using (var cmd = new SQLiteCommand(sql, connection))
+                    using (var cmd = new SqliteCommand(sql, connection))
                     {
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
                         using (var reader = cmd.ExecuteReader())
                         {
                             if (reader.Read())
@@ -127,7 +127,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(async () =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     var maintenant = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
@@ -151,26 +151,26 @@ namespace IUTSCalculator.Services
                             );
                             SELECT last_insert_rowid();";
 
-                        using (var cmd = new SQLiteCommand(sql, connection))
+                        using (var cmd = new SqliteCommand(sql, connection))
                         {
-                            cmd.Parameters.AddWithValue("@emp", avantage.EmployeeId);
-                            cmd.Parameters.AddWithValue("@type", (int)avantage.TypeAvantage);
-                            cmd.Parameters.AddWithValue("@lib", avantage.Libelle);
-                            cmd.Parameters.AddWithValue("@mode", (int)avantage.ModeEvaluation);
-                            cmd.Parameters.AddWithValue("@mont", DbValue.MoneyToDb(avantage.MontantAvantage));
-                            cmd.Parameters.AddWithValue("@part", DbValue.MoneyToDb(avantage.PartSalariale));
-                            cmd.Parameters.AddWithValue("@net", DbValue.MoneyToDb(avantage.ValeurNetteImposable));
-                            cmd.Parameters.AddWithValue("@debut", avantage.DateDebut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-                            cmd.Parameters.AddWithValue("@fin", avantage.DateFin.HasValue ? (object)avantage.DateFin.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : DBNull.Value);
-                            cmd.Parameters.AddWithValue("@actif", avantage.Actif ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@iuts", avantage.SoumisIUTS ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@cnss", avantage.SoumisCNSS ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@tpa", avantage.SoumisTPA ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@codeGain", avantage.CodeRubriqueGain ?? "AVNAT_LOG");
-                            cmd.Parameters.AddWithValue("@codeRet", avantage.CodeRubriqueRetenue ?? "RET_AVNAT");
-                            cmd.Parameters.AddWithValue("@com", (object)avantage.Commentaire ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@dateCre", maintenant);
-                            cmd.Parameters.AddWithValue("@dateMod", maintenant);
+                            cmd.Parameters.AjouterValeur("@emp", avantage.EmployeeId);
+                            cmd.Parameters.AjouterValeur("@type", (int)avantage.TypeAvantage);
+                            cmd.Parameters.AjouterValeur("@lib", avantage.Libelle);
+                            cmd.Parameters.AjouterValeur("@mode", (int)avantage.ModeEvaluation);
+                            cmd.Parameters.AjouterValeur("@mont", DbValue.MoneyToDb(avantage.MontantAvantage));
+                            cmd.Parameters.AjouterValeur("@part", DbValue.MoneyToDb(avantage.PartSalariale));
+                            cmd.Parameters.AjouterValeur("@net", DbValue.MoneyToDb(avantage.ValeurNetteImposable));
+                            cmd.Parameters.AjouterValeur("@debut", avantage.DateDebut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                            cmd.Parameters.AjouterValeur("@fin", avantage.DateFin.HasValue ? (object)avantage.DateFin.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : DBNull.Value);
+                            cmd.Parameters.AjouterValeur("@actif", avantage.Actif ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@iuts", avantage.SoumisIUTS ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@cnss", avantage.SoumisCNSS ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@tpa", avantage.SoumisTPA ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@codeGain", avantage.CodeRubriqueGain ?? "AVNAT_LOG");
+                            cmd.Parameters.AjouterValeur("@codeRet", avantage.CodeRubriqueRetenue ?? "RET_AVNAT");
+                            cmd.Parameters.AjouterValeur("@com", (object)avantage.Commentaire ?? DBNull.Value);
+                            cmd.Parameters.AjouterValeur("@dateCre", maintenant);
+                            cmd.Parameters.AjouterValeur("@dateMod", maintenant);
 
                             idGenere = Convert.ToInt32(cmd.ExecuteScalar());
                             avantage.Id = idGenere;
@@ -215,26 +215,26 @@ namespace IUTSCalculator.Services
                                 DateModification = @dateMod
                             WHERE Id = @id";
 
-                        using (var cmd = new SQLiteCommand(sql, connection))
+                        using (var cmd = new SqliteCommand(sql, connection))
                         {
-                            cmd.Parameters.AddWithValue("@id", avantage.Id);
-                            cmd.Parameters.AddWithValue("@emp", avantage.EmployeeId);
-                            cmd.Parameters.AddWithValue("@type", (int)avantage.TypeAvantage);
-                            cmd.Parameters.AddWithValue("@lib", avantage.Libelle);
-                            cmd.Parameters.AddWithValue("@mode", (int)avantage.ModeEvaluation);
-                            cmd.Parameters.AddWithValue("@mont", DbValue.MoneyToDb(avantage.MontantAvantage));
-                            cmd.Parameters.AddWithValue("@part", DbValue.MoneyToDb(avantage.PartSalariale));
-                            cmd.Parameters.AddWithValue("@net", DbValue.MoneyToDb(avantage.ValeurNetteImposable));
-                            cmd.Parameters.AddWithValue("@debut", avantage.DateDebut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-                            cmd.Parameters.AddWithValue("@fin", avantage.DateFin.HasValue ? (object)avantage.DateFin.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : DBNull.Value);
-                            cmd.Parameters.AddWithValue("@actif", avantage.Actif ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@iuts", avantage.SoumisIUTS ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@cnss", avantage.SoumisCNSS ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@tpa", avantage.SoumisTPA ? 1 : 0);
-                            cmd.Parameters.AddWithValue("@codeGain", avantage.CodeRubriqueGain ?? "AVNAT_LOG");
-                            cmd.Parameters.AddWithValue("@codeRet", avantage.CodeRubriqueRetenue ?? "RET_AVNAT");
-                            cmd.Parameters.AddWithValue("@com", (object)avantage.Commentaire ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@dateMod", maintenant);
+                            cmd.Parameters.AjouterValeur("@id", avantage.Id);
+                            cmd.Parameters.AjouterValeur("@emp", avantage.EmployeeId);
+                            cmd.Parameters.AjouterValeur("@type", (int)avantage.TypeAvantage);
+                            cmd.Parameters.AjouterValeur("@lib", avantage.Libelle);
+                            cmd.Parameters.AjouterValeur("@mode", (int)avantage.ModeEvaluation);
+                            cmd.Parameters.AjouterValeur("@mont", DbValue.MoneyToDb(avantage.MontantAvantage));
+                            cmd.Parameters.AjouterValeur("@part", DbValue.MoneyToDb(avantage.PartSalariale));
+                            cmd.Parameters.AjouterValeur("@net", DbValue.MoneyToDb(avantage.ValeurNetteImposable));
+                            cmd.Parameters.AjouterValeur("@debut", avantage.DateDebut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                            cmd.Parameters.AjouterValeur("@fin", avantage.DateFin.HasValue ? (object)avantage.DateFin.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : DBNull.Value);
+                            cmd.Parameters.AjouterValeur("@actif", avantage.Actif ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@iuts", avantage.SoumisIUTS ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@cnss", avantage.SoumisCNSS ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@tpa", avantage.SoumisTPA ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@codeGain", avantage.CodeRubriqueGain ?? "AVNAT_LOG");
+                            cmd.Parameters.AjouterValeur("@codeRet", avantage.CodeRubriqueRetenue ?? "RET_AVNAT");
+                            cmd.Parameters.AjouterValeur("@com", (object)avantage.Commentaire ?? DBNull.Value);
+                            cmd.Parameters.AjouterValeur("@dateMod", maintenant);
 
                             cmd.ExecuteNonQuery();
                         }
@@ -265,12 +265,12 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(async () =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     var sql = "DELETE FROM AvantagesEnNature WHERE Id = @id";
-                    using (var cmd = new SQLiteCommand(sql, connection))
+                    using (var cmd = new SqliteCommand(sql, connection))
                     {
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -295,7 +295,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(async () =>
             {
-                using (var connection = _sqliteService.CreateConnection())
+                using (var connection = _sqliteService.CreerConnexion())
                 {
                     var maintenant = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                     var sql = @"
@@ -304,11 +304,11 @@ namespace IUTSCalculator.Services
                             DateModification = @dateMod
                         WHERE Id = @id";
 
-                    using (var cmd = new SQLiteCommand(sql, connection))
+                    using (var cmd = new SqliteCommand(sql, connection))
                     {
-                        cmd.Parameters.AddWithValue("@id", id);
-                        cmd.Parameters.AddWithValue("@actif", actif ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@dateMod", maintenant);
+                        cmd.Parameters.AjouterValeur("@id", id);
+                        cmd.Parameters.AjouterValeur("@actif", actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@dateMod", maintenant);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -427,7 +427,7 @@ namespace IUTSCalculator.Services
 
         #region Mappeur
 
-        private static AvantageNature MapperAvantage(SQLiteDataReader reader)
+        private static AvantageNature MapperAvantage(SqliteDataReader reader)
         {
             string prenom = reader.IsDBNull(reader.GetOrdinal("FirstName")) ? "" : reader.GetString(reader.GetOrdinal("FirstName"));
             string nom = reader.IsDBNull(reader.GetOrdinal("LastName")) ? "" : reader.GetString(reader.GetOrdinal("LastName"));

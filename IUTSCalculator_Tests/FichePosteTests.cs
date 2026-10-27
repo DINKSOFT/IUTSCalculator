@@ -173,7 +173,7 @@ namespace IUTSCalculator.Tests
                 var fichePosteService = new FichePosteService(sqlite);
 
                 // Insérer une ligne dans GrillesSalaires (convention 99, Cat 3B, Ech 2 -> 125 000 FCFA = 12 500 000 centimes)
-                using (var conn = sqlite.CreateConnection())
+                using (var conn = sqlite.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -339,7 +339,7 @@ namespace IUTSCalculator.Tests
                 Assert.That(lignes.Single().NiveauEtoiles, Is.EqualTo("★★★★"));
 
                 // Migration 38 : une exigence enregistrée avant la correction est « à vérifier ».
-                using (var conn = sqlite.CreateConnection())
+                using (var conn = sqlite.CreerConnexion())
                 {
                     bool colonne = false;
                     using (var cmd = conn.CreateCommand())

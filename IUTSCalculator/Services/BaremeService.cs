@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -83,12 +83,12 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<BaremeLegal>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT " + ColonnesBareme + " FROM Baremes ORDER BY DateEffet DESC, Id DESC";
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                             liste.Add(LireBareme(reader));
@@ -129,7 +129,7 @@ namespace IUTSCalculator.Services
             return applicable ?? liste[0];
         }
 
-        private static BaremeLegal LireBareme(SQLiteDataReader reader)
+        private static BaremeLegal LireBareme(SqliteDataReader reader)
         {
             return new BaremeLegal
             {
@@ -161,7 +161,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static async Task ChargerTranchesAsync(SQLiteConnection conn, BaremeLegal bareme, SQLiteTransaction tx = null)
+        private static async Task ChargerTranchesAsync(SqliteConnection conn, BaremeLegal bareme, SqliteTransaction tx = null)
         {
             bareme.Tranches.Clear();
 
@@ -171,9 +171,9 @@ namespace IUTSCalculator.Services
                 cmd.CommandText =
                     "SELECT Ordre, BorneInferieure, BorneSuperieure, Taux " +
                     "FROM BaremeTranches WHERE BaremeId = @id ORDER BY Ordre";
-                cmd.Parameters.AddWithValue("@id", bareme.Id);
+                cmd.Parameters.AjouterValeur("@id", bareme.Id);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -194,7 +194,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task ChargerChargesFamilleAsync(SQLiteConnection conn, BaremeLegal bareme, SQLiteTransaction tx = null)
+        private static async Task ChargerChargesFamilleAsync(SqliteConnection conn, BaremeLegal bareme, SqliteTransaction tx = null)
         {
             bareme.ChargesFamille.Clear();
 
@@ -204,9 +204,9 @@ namespace IUTSCalculator.Services
                 cmd.CommandText =
                     "SELECT NombreCharges, Taux FROM BaremeChargesFamille " +
                     "WHERE BaremeId = @id ORDER BY NombreCharges";
-                cmd.Parameters.AddWithValue("@id", bareme.Id);
+                cmd.Parameters.AjouterValeur("@id", bareme.Id);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -223,12 +223,12 @@ namespace IUTSCalculator.Services
         /// <summary>Vrai si un autre barème porte déjà cette date d'effet.</summary>
         public async Task<bool> DateEffetExisteAsync(DateTime dateEffet, int idAExclure)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM Baremes WHERE DateEffet = @d AND Id <> @id";
-                cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(dateEffet.Date));
-                cmd.Parameters.AddWithValue("@id", idAExclure);
+                cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(dateEffet.Date));
+                cmd.Parameters.AjouterValeur("@id", idAExclure);
                 return DbValue.IntFromDb(await cmd.ExecuteScalarAsync()) > 0;
             }
         }
@@ -249,7 +249,7 @@ namespace IUTSCalculator.Services
         {
             if (bareme == null) throw new ArgumentNullException("bareme");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var transaction = conn.BeginTransaction())
             {
                 try
@@ -306,7 +306,7 @@ namespace IUTSCalculator.Services
                                 "AbattementAutresCategories = @abattementAutres " +
                                 "WHERE Id = @id;";
                             AjouterParametres(cmd, bareme);
-                            cmd.Parameters.AddWithValue("@id", bareme.Id);
+                            cmd.Parameters.AjouterValeur("@id", bareme.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
                     }
@@ -327,41 +327,41 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static void AjouterParametres(SQLiteCommand cmd, BaremeLegal b)
+        private static void AjouterParametres(SqliteCommand cmd, BaremeLegal b)
         {
-            cmd.Parameters.AddWithValue("@dateEffet", DbValue.DateToDb(b.DateEffet.Date));
-            cmd.Parameters.AddWithValue("@libelle", b.Libelle ?? "");
-            cmd.Parameters.AddWithValue("@reference", b.Reference ?? "");
-            cmd.Parameters.AddWithValue("@commentaire", b.Commentaire ?? "");
-            cmd.Parameters.AddWithValue("@estSysteme", b.EstSysteme ? 1 : 0);
+            cmd.Parameters.AjouterValeur("@dateEffet", DbValue.DateToDb(b.DateEffet.Date));
+            cmd.Parameters.AjouterValeur("@libelle", b.Libelle ?? "");
+            cmd.Parameters.AjouterValeur("@reference", b.Reference ?? "");
+            cmd.Parameters.AjouterValeur("@commentaire", b.Commentaire ?? "");
+            cmd.Parameters.AjouterValeur("@estSysteme", b.EstSysteme ? 1 : 0);
 
-            cmd.Parameters.AddWithValue("@tauxCnssSalarie", DbValue.DecimalToDb(b.TauxCnssSalarie));
-            cmd.Parameters.AddWithValue("@tauxPf", DbValue.DecimalToDb(b.TauxCnssPrestationsFamiliales));
-            cmd.Parameters.AddWithValue("@tauxRp", DbValue.DecimalToDb(b.TauxCnssRisquesProfessionnels));
-            cmd.Parameters.AddWithValue("@tauxPensions", DbValue.DecimalToDb(b.TauxCnssPensionsPatronal));
-            cmd.Parameters.AddWithValue("@plafondCnss", DbValue.MoneyToDb(b.PlafondCnssMensuel));
-            cmd.Parameters.AddWithValue("@tauxTpa", DbValue.DecimalToDb(b.TauxTaxePatronaleApprentissage));
+            cmd.Parameters.AjouterValeur("@tauxCnssSalarie", DbValue.DecimalToDb(b.TauxCnssSalarie));
+            cmd.Parameters.AjouterValeur("@tauxPf", DbValue.DecimalToDb(b.TauxCnssPrestationsFamiliales));
+            cmd.Parameters.AjouterValeur("@tauxRp", DbValue.DecimalToDb(b.TauxCnssRisquesProfessionnels));
+            cmd.Parameters.AjouterValeur("@tauxPensions", DbValue.DecimalToDb(b.TauxCnssPensionsPatronal));
+            cmd.Parameters.AjouterValeur("@plafondCnss", DbValue.MoneyToDb(b.PlafondCnssMensuel));
+            cmd.Parameters.AjouterValeur("@tauxTpa", DbValue.DecimalToDb(b.TauxTaxePatronaleApprentissage));
 
-            cmd.Parameters.AddWithValue("@tauxLogement", DbValue.DecimalToDb(b.TauxMaxIndemniteLogement));
-            cmd.Parameters.AddWithValue("@plafondLogement", DbValue.MoneyToDb(b.PlafondIndemniteLogement));
-            cmd.Parameters.AddWithValue("@tauxTransport", DbValue.DecimalToDb(b.TauxMaxIndemniteTransport));
-            cmd.Parameters.AddWithValue("@plafondTransport", DbValue.MoneyToDb(b.PlafondIndemniteTransport));
-            cmd.Parameters.AddWithValue("@tauxFonction", DbValue.DecimalToDb(b.TauxMaxIndemniteFonction));
-            cmd.Parameters.AddWithValue("@plafondFonction", DbValue.MoneyToDb(b.PlafondIndemniteFonction));
+            cmd.Parameters.AjouterValeur("@tauxLogement", DbValue.DecimalToDb(b.TauxMaxIndemniteLogement));
+            cmd.Parameters.AjouterValeur("@plafondLogement", DbValue.MoneyToDb(b.PlafondIndemniteLogement));
+            cmd.Parameters.AjouterValeur("@tauxTransport", DbValue.DecimalToDb(b.TauxMaxIndemniteTransport));
+            cmd.Parameters.AjouterValeur("@plafondTransport", DbValue.MoneyToDb(b.PlafondIndemniteTransport));
+            cmd.Parameters.AjouterValeur("@tauxFonction", DbValue.DecimalToDb(b.TauxMaxIndemniteFonction));
+            cmd.Parameters.AjouterValeur("@plafondFonction", DbValue.MoneyToDb(b.PlafondIndemniteFonction));
 
-            cmd.Parameters.AddWithValue("@tauxRetraite", DbValue.DecimalToDb(b.TauxMaxCotisationRetraiteDeductible));
-            cmd.Parameters.AddWithValue("@abattementSup", DbValue.DecimalToDb(b.AbattementCategoriesSuperieures));
-            cmd.Parameters.AddWithValue("@abattementAutres", DbValue.DecimalToDb(b.AbattementAutresCategories));
+            cmd.Parameters.AjouterValeur("@tauxRetraite", DbValue.DecimalToDb(b.TauxMaxCotisationRetraiteDeductible));
+            cmd.Parameters.AjouterValeur("@abattementSup", DbValue.DecimalToDb(b.AbattementCategoriesSuperieures));
+            cmd.Parameters.AjouterValeur("@abattementAutres", DbValue.DecimalToDb(b.AbattementAutresCategories));
         }
 
         private static async Task RemplacerTranchesAsync(
-            SQLiteConnection conn, SQLiteTransaction transaction, BaremeLegal bareme)
+            SqliteConnection conn, SqliteTransaction transaction, BaremeLegal bareme)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = transaction;
                 cmd.CommandText = "DELETE FROM BaremeTranches WHERE BaremeId = @id;";
-                cmd.Parameters.AddWithValue("@id", bareme.Id);
+                cmd.Parameters.AjouterValeur("@id", bareme.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -374,12 +374,12 @@ namespace IUTSCalculator.Services
                     cmd.CommandText =
                         "INSERT INTO BaremeTranches (BaremeId, Ordre, BorneInferieure, BorneSuperieure, Taux) " +
                         "VALUES (@bareme, @ordre, @bas, @haut, @taux);";
-                    cmd.Parameters.AddWithValue("@bareme", bareme.Id);
-                    cmd.Parameters.AddWithValue("@ordre", ordre);
-                    cmd.Parameters.AddWithValue("@bas", DbValue.MoneyToDb(tranche.BorneInferieure));
-                    cmd.Parameters.AddWithValue("@haut", DbValue.MoneyToDb(
+                    cmd.Parameters.AjouterValeur("@bareme", bareme.Id);
+                    cmd.Parameters.AjouterValeur("@ordre", ordre);
+                    cmd.Parameters.AjouterValeur("@bas", DbValue.MoneyToDb(tranche.BorneInferieure));
+                    cmd.Parameters.AjouterValeur("@haut", DbValue.MoneyToDb(
                         tranche.EstDerniereTranche ? BorneSuperieureOuverte : tranche.BorneSuperieure));
-                    cmd.Parameters.AddWithValue("@taux", DbValue.DecimalToDb(tranche.Taux));
+                    cmd.Parameters.AjouterValeur("@taux", DbValue.DecimalToDb(tranche.Taux));
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -389,13 +389,13 @@ namespace IUTSCalculator.Services
         }
 
         private static async Task RemplacerChargesFamilleAsync(
-            SQLiteConnection conn, SQLiteTransaction transaction, BaremeLegal bareme)
+            SqliteConnection conn, SqliteTransaction transaction, BaremeLegal bareme)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = transaction;
                 cmd.CommandText = "DELETE FROM BaremeChargesFamille WHERE BaremeId = @id;";
-                cmd.Parameters.AddWithValue("@id", bareme.Id);
+                cmd.Parameters.AjouterValeur("@id", bareme.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -407,9 +407,9 @@ namespace IUTSCalculator.Services
                     cmd.CommandText =
                         "INSERT INTO BaremeChargesFamille (BaremeId, NombreCharges, Taux) " +
                         "VALUES (@bareme, @nombre, @taux);";
-                    cmd.Parameters.AddWithValue("@bareme", bareme.Id);
-                    cmd.Parameters.AddWithValue("@nombre", charge.NombreCharges);
-                    cmd.Parameters.AddWithValue("@taux", DbValue.DecimalToDb(charge.Taux));
+                    cmd.Parameters.AjouterValeur("@bareme", bareme.Id);
+                    cmd.Parameters.AjouterValeur("@nombre", charge.NombreCharges);
+                    cmd.Parameters.AjouterValeur("@taux", DbValue.DecimalToDb(charge.Taux));
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -423,7 +423,7 @@ namespace IUTSCalculator.Services
         {
             if (bareme == null || bareme.Id <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
@@ -450,7 +450,7 @@ namespace IUTSCalculator.Services
                                 cmd.CommandText = table == "Baremes"
                                     ? "DELETE FROM Baremes WHERE Id = @id;"
                                     : "DELETE FROM " + table + " WHERE BaremeId = @id;";
-                                cmd.Parameters.AddWithValue("@id", bareme.Id);
+                                cmd.Parameters.AjouterValeur("@id", bareme.Id);
                                 await cmd.ExecuteNonQueryAsync();
                             }
                         }
@@ -478,7 +478,7 @@ namespace IUTSCalculator.Services
 
         // ── Journal d'audit ──────────────────────────────────────────────────
 
-        private static async Task<BaremeLegal> LireParIdAsync(SQLiteConnection conn, SQLiteTransaction tx, int id)
+        private static async Task<BaremeLegal> LireParIdAsync(SqliteConnection conn, SqliteTransaction tx, int id)
         {
             BaremeLegal bareme = null;
 
@@ -486,8 +486,8 @@ namespace IUTSCalculator.Services
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = "SELECT " + ColonnesBareme + " FROM Baremes WHERE Id = @id";
-                cmd.Parameters.AddWithValue("@id", id);
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@id", id);
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                         bareme = LireBareme(reader);
@@ -572,7 +572,7 @@ namespace IUTSCalculator.Services
         /// existant (ancienne → nouvelle). Un enregistrement sans changement n'écrit rien.
         /// </summary>
         private static async Task JournaliserEnregistrementAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, BaremeLegal ancien, BaremeLegal nouveau)
+            SqliteConnection conn, SqliteTransaction tx, BaremeLegal ancien, BaremeLegal nouveau)
         {
             if (ancien == null)
             {

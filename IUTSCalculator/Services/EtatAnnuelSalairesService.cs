@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -112,7 +112,7 @@ namespace IUTSCalculator.Services
             var debutAnnee = new DateTime(etat.Annee, 1, 1);
             var finAnnee = new DateTime(etat.Annee, 12, 31, 23, 59, 59);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -140,10 +140,10 @@ namespace IUTSCalculator.Services
                       AND c.IsRegularization = 0
                     ORDER BY e.LastName, e.FirstName, c.CalculationDate";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(debutAnnee));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(finAnnee));
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(debutAnnee));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(finAnnee));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

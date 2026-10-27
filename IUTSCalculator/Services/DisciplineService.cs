@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -60,11 +60,11 @@ namespace IUTSCalculator.Services
         public async Task<ParametresDiscipline> ChargerParametresAsync()
         {
             var prm = ParametresDiscipline.Defaut();
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT * FROM ParametresDiscipline WHERE Id = 1;";
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await r.ReadAsync())
                     {
@@ -96,7 +96,7 @@ namespace IUTSCalculator.Services
             var anomalie = AnomalieParametres(prm);
             if (anomalie != null) throw new InvalidOperationException(anomalie);
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -106,13 +106,13 @@ namespace IUTSCalculator.Services
                     "ON CONFLICT(Id) DO UPDATE SET DelaiEngagementJours = @eng, DelaiReponseJoursOuvrables = @rep, " +
                     "DelaiConvocationJoursOuvrables = @conv, DelaiDecisionJours = @dec, ReferenceReglementInterieur = @ri, " +
                     "Signataire = @sig, FonctionSignataire = @fct;";
-                cmd.Parameters.AddWithValue("@eng", prm.DelaiEngagementJours);
-                cmd.Parameters.AddWithValue("@rep", prm.DelaiReponseJoursOuvrables);
-                cmd.Parameters.AddWithValue("@conv", prm.DelaiConvocationJoursOuvrables);
-                cmd.Parameters.AddWithValue("@dec", prm.DelaiDecisionJours);
-                cmd.Parameters.AddWithValue("@ri", (object)Nettoyer(prm.ReferenceReglementInterieur) ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@sig", (object)Nettoyer(prm.Signataire) ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@fct", (object)Nettoyer(prm.FonctionSignataire) ?? DBNull.Value);
+                cmd.Parameters.AjouterValeur("@eng", prm.DelaiEngagementJours);
+                cmd.Parameters.AjouterValeur("@rep", prm.DelaiReponseJoursOuvrables);
+                cmd.Parameters.AjouterValeur("@conv", prm.DelaiConvocationJoursOuvrables);
+                cmd.Parameters.AjouterValeur("@dec", prm.DelaiDecisionJours);
+                cmd.Parameters.AjouterValeur("@ri", (object)Nettoyer(prm.ReferenceReglementInterieur) ?? DBNull.Value);
+                cmd.Parameters.AjouterValeur("@sig", (object)Nettoyer(prm.Signataire) ?? DBNull.Value);
+                cmd.Parameters.AjouterValeur("@fct", (object)Nettoyer(prm.FonctionSignataire) ?? DBNull.Value);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -128,18 +128,18 @@ namespace IUTSCalculator.Services
 
         public async Task<List<TypeSanction>> ChargerTypesAsync()
         {
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
                 return await ChargerTypesAsync(conn, null);
         }
 
-        private static async Task<List<TypeSanction>> ChargerTypesAsync(SQLiteConnection conn, SQLiteTransaction tx)
+        private static async Task<List<TypeSanction>> ChargerTypesAsync(SqliteConnection conn, SqliteTransaction tx)
         {
             var liste = new List<TypeSanction>();
             using (var cmd = conn.CreateCommand())
             {
                 if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText = "SELECT * FROM TypesSanction ORDER BY Ordre, Code;";
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await r.ReadAsync())
                     {
@@ -188,7 +188,7 @@ namespace IUTSCalculator.Services
             if (!t.EstMiseAPied) t.DureeMaxJours = 0;
             if (!t.EstLicenciement) t.FauteLourde = false;
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 if (t.Id > 0)
@@ -196,7 +196,7 @@ namespace IUTSCalculator.Services
                     cmd.CommandText =
                         "UPDATE TypesSanction SET Code = @c, Libelle = @l, Nature = @n, Ordre = @o, ExigeExplication = @ex, " +
                         "ExigeEntretien = @en, DureeMaxJours = @d, FauteLourde = @fl, EffacementMois = @ef, Actif = @a WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", t.Id);
+                    cmd.Parameters.AjouterValeur("@id", t.Id);
                 }
                 else
                 {
@@ -205,16 +205,16 @@ namespace IUTSCalculator.Services
                         "DureeMaxJours, FauteLourde, EffacementMois, Actif, EstSysteme) " +
                         "VALUES (@c, @l, @n, @o, @ex, @en, @d, @fl, @ef, @a, 0);";
                 }
-                cmd.Parameters.AddWithValue("@c", t.Code.Trim().ToUpperInvariant());
-                cmd.Parameters.AddWithValue("@l", t.Libelle.Trim());
-                cmd.Parameters.AddWithValue("@n", (int)t.Nature);
-                cmd.Parameters.AddWithValue("@o", t.Ordre);
-                cmd.Parameters.AddWithValue("@ex", t.ExigeExplication ? 1 : 0);
-                cmd.Parameters.AddWithValue("@en", t.ExigeEntretien ? 1 : 0);
-                cmd.Parameters.AddWithValue("@d", t.DureeMaxJours);
-                cmd.Parameters.AddWithValue("@fl", t.FauteLourde ? 1 : 0);
-                cmd.Parameters.AddWithValue("@ef", t.EffacementMois);
-                cmd.Parameters.AddWithValue("@a", t.Actif ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@c", t.Code.Trim().ToUpperInvariant());
+                cmd.Parameters.AjouterValeur("@l", t.Libelle.Trim());
+                cmd.Parameters.AjouterValeur("@n", (int)t.Nature);
+                cmd.Parameters.AjouterValeur("@o", t.Ordre);
+                cmd.Parameters.AjouterValeur("@ex", t.ExigeExplication ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@en", t.ExigeEntretien ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@d", t.DureeMaxJours);
+                cmd.Parameters.AjouterValeur("@fl", t.FauteLourde ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@ef", t.EffacementMois);
+                cmd.Parameters.AjouterValeur("@a", t.Actif ? 1 : 0);
                 await cmd.ExecuteNonQueryAsync();
 
                 if (t.Id <= 0) t.Id = await DernierIdAsync(conn, null);
@@ -230,19 +230,19 @@ namespace IUTSCalculator.Services
             if (t.EstSysteme)
                 throw new InvalidOperationException("Une sanction livrée avec le module ne se supprime pas : désactivez-la si votre règlement ne la prévoit pas.");
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT COUNT(*) FROM ProceduresDisciplinaires WHERE TypeSanctionId = @id;";
-                    cmd.Parameters.AddWithValue("@id", t.Id);
+                    cmd.Parameters.AjouterValeur("@id", t.Id);
                     if (DbValue.IntFromDb(await cmd.ExecuteScalarAsync()) > 0)
                         throw new InvalidOperationException("Cette sanction figure dans des procédures : désactivez-la plutôt que de la supprimer.");
                 }
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "DELETE FROM TypesSanction WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", t.Id);
+                    cmd.Parameters.AjouterValeur("@id", t.Id);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -257,7 +257,7 @@ namespace IUTSCalculator.Services
         public async Task<HashSet<DateTime>> ChargerFeriesAsync()
         {
             var feries = new HashSet<DateTime>();
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
@@ -267,7 +267,7 @@ namespace IUTSCalculator.Services
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT DateJour FROM JoursFeries;";
-                    using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await r.ReadAsync())
                         {
@@ -286,7 +286,7 @@ namespace IUTSCalculator.Services
 
         public async Task<List<ProcedureDisciplinaire>> ChargerProceduresAsync()
         {
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 var types = await ChargerTypesAsync(conn, null);
                 return await ChargerProceduresAsync(conn, null, types, null);
@@ -294,7 +294,7 @@ namespace IUTSCalculator.Services
         }
 
         private static async Task<List<ProcedureDisciplinaire>> ChargerProceduresAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, List<TypeSanction> types, string employeeId)
+            SqliteConnection conn, SqliteTransaction tx, List<TypeSanction> types, string employeeId)
         {
             var liste = new List<ProcedureDisciplinaire>();
             using (var cmd = conn.CreateCommand())
@@ -306,9 +306,9 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = p.EmployeeId " +
                     (employeeId != null ? "WHERE p.EmployeeId = @employe " : "") +
                     "ORDER BY p.DateFaits DESC, p.Id DESC;";
-                if (employeeId != null) cmd.Parameters.AddWithValue("@employe", employeeId);
+                if (employeeId != null) cmd.Parameters.AjouterValeur("@employe", employeeId);
 
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await r.ReadAsync())
                     {
@@ -321,7 +321,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static ProcedureDisciplinaire Lire(SQLiteDataReader r)
+        private static ProcedureDisciplinaire Lire(SqliteDataReader r)
         {
             string nom = string.Format("{0} {1}", DbValue.TextFromDb(r["LastName"]), DbValue.TextFromDb(r["FirstName"])).Trim();
             var p = new ProcedureDisciplinaire
@@ -385,7 +385,7 @@ namespace IUTSCalculator.Services
             if (p == null) return new List<AlerteDiscipline>();
             var prm = await ChargerParametresAsync();
             var feries = await ChargerFeriesAsync();
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 var types = await ChargerTypesAsync(conn, null);
                 var type = p.TypeSanctionId.HasValue ? types.FirstOrDefault(t => t.Id == p.TypeSanctionId.Value) : null;
@@ -412,7 +412,7 @@ namespace IUTSCalculator.Services
             var aujourdHui = DateTime.Today;
 
             ProcedureDisciplinaire avant = null;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 var types = await ChargerTypesAsync(conn, null);
                 var type = p.TypeSanctionId.HasValue ? types.FirstOrDefault(t => t.Id == p.TypeSanctionId.Value) : null;
@@ -514,7 +514,7 @@ namespace IUTSCalculator.Services
         {
             if (p == null || p.Id <= 0) return;
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 var types = await ChargerTypesAsync(conn, null);
                 var enBase = (await ChargerProceduresAsync(conn, null, types, p.EmployeeId ?? "")).FirstOrDefault(x => x.Id == p.Id);
@@ -536,7 +536,7 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "DELETE FROM PiecesDisciplinaires WHERE ProcedureId = @id; DELETE FROM ProceduresDisciplinaires WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", p.Id);
+                        cmd.Parameters.AjouterValeur("@id", p.Id);
                         await cmd.ExecuteNonQueryAsync();
                     }
                     tx.Commit();
@@ -562,7 +562,7 @@ namespace IUTSCalculator.Services
         public async Task<ProcedureDisciplinaire> DernierLicenciementNotifieAsync(string employeeId)
         {
             if (string.IsNullOrWhiteSpace(employeeId)) return null;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 if (!TableExiste(conn, "ProceduresDisciplinaires")) return null;
                 var types = await ChargerTypesAsync(conn, null);
@@ -584,7 +584,7 @@ namespace IUTSCalculator.Services
             "DateNotification, ModeNotification, DateAccuseReception, DateRecours, InstanceRecours, IssueRecours, " +
             "AbsenceMiseAPiedId, AbsenceConservatoireId, Commentaire, DateCreation, DateModification, CreePar";
 
-        private static async Task InsererAsync(SQLiteConnection conn, SQLiteTransaction tx, ProcedureDisciplinaire p)
+        private static async Task InsererAsync(SqliteConnection conn, SqliteTransaction tx, ProcedureDisciplinaire p)
         {
             var colonnes = ColonnesEcrites.Split(',').Select(c => c.Trim()).ToList();
             using (var cmd = conn.CreateCommand())
@@ -597,7 +597,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task MettreAJourAsync(SQLiteConnection conn, SQLiteTransaction tx, ProcedureDisciplinaire p)
+        private static async Task MettreAJourAsync(SqliteConnection conn, SqliteTransaction tx, ProcedureDisciplinaire p)
         {
             var colonnes = ColonnesEcrites.Split(',').Select(c => c.Trim()).ToList();
             using (var cmd = conn.CreateCommand())
@@ -606,14 +606,14 @@ namespace IUTSCalculator.Services
                 cmd.CommandText = "UPDATE ProceduresDisciplinaires SET " +
                                   string.Join(", ", colonnes.Select(c => c + " = @" + c)) + " WHERE Id = @Id;";
                 Parametrer(cmd, p);
-                cmd.Parameters.AddWithValue("@Id", p.Id);
+                cmd.Parameters.AjouterValeur("@Id", p.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        private static void Parametrer(SQLiteCommand cmd, ProcedureDisciplinaire p)
+        private static void Parametrer(SqliteCommand cmd, ProcedureDisciplinaire p)
         {
-            Action<string, object> v = (nom, valeur) => cmd.Parameters.AddWithValue("@" + nom, valeur ?? DBNull.Value);
+            Action<string, object> v = (nom, valeur) => cmd.Parameters.AjouterValeur("@" + nom, valeur ?? DBNull.Value);
             Func<DateTime?, object> d = x => DbValue.DateNullableToDb(x);
             Func<string, object> t = x => (object)Nettoyer(x);
 
@@ -666,7 +666,7 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>Référence suivante de l'année : DISC-2026-0001, -0002…</summary>
-        private static async Task<string> ProchaineReferenceAsync(SQLiteConnection conn, SQLiteTransaction tx, int annee)
+        private static async Task<string> ProchaineReferenceAsync(SqliteConnection conn, SqliteTransaction tx, int annee)
         {
             string prefixe = string.Format(CultureInfo.InvariantCulture, "DISC-{0:D4}-", annee);
             int max = 0;
@@ -674,8 +674,8 @@ namespace IUTSCalculator.Services
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = "SELECT Reference FROM ProceduresDisciplinaires WHERE Reference LIKE @p;";
-                cmd.Parameters.AddWithValue("@p", prefixe + "%");
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@p", prefixe + "%");
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await r.ReadAsync())
                     {
@@ -700,7 +700,7 @@ namespace IUTSCalculator.Services
         /// après la clôture du mois ne bute donc pas sur la période fermée.
         /// </summary>
         private static async Task SynchroniserPaieAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, ProcedureDisciplinaire p, TypeSanction type, List<string> messages)
+            SqliteConnection conn, SqliteTransaction tx, ProcedureDisciplinaire p, TypeSanction type, List<string> messages)
         {
             bool notifiee = p.Statut == StatutProcedure.Notifiee && type != null;
             var exclure = new[] { p.AbsenceMiseAPiedId, p.AbsenceConservatoireId };
@@ -750,7 +750,7 @@ namespace IUTSCalculator.Services
         /// non réécrite. Renvoie l'identifiant de l'absence, ou null si elle n'existe plus.
         /// </summary>
         internal static async Task<int?> AppliquerAbsenceAsync(
-            SQLiteConnection conn, SQLiteTransaction tx, int? idExistant, Absence voulue, int?[] exclure, string libelle, List<string> messages)
+            SqliteConnection conn, SqliteTransaction tx, int? idExistant, Absence voulue, int?[] exclure, string libelle, List<string> messages)
         {
             var fr = LibellesDiscipline.Fr;
             Absence existante = idExistant.HasValue ? await LireAbsenceAsync(conn, tx, idExistant.Value) : null;
@@ -788,7 +788,7 @@ namespace IUTSCalculator.Services
                         "UPDATE Absences SET Type = @type, DateDebut = @debut, DateFin = @fin, NombreJours = @jours, " +
                         "NombreHeures = @heures, Commentaire = @commentaire WHERE Id = @id;";
                     ParametrerAbsence(cmd, voulue);
-                    cmd.Parameters.AddWithValue("@id", existante.Id);
+                    cmd.Parameters.AjouterValeur("@id", existante.Id);
                     await cmd.ExecuteNonQueryAsync();
                 }
                 messages.Add(string.Format(fr, "Absence « {0} » mise à jour ({1:0.##} j, du {2:dd/MM/yyyy} au {3:dd/MM/yyyy}).",
@@ -803,8 +803,8 @@ namespace IUTSCalculator.Services
                     "INSERT INTO Absences (EmployeeId, Type, DateDebut, DateFin, NombreJours, NombreHeures, Commentaire, DateSaisie, PeriodeImputation) " +
                     "VALUES (@employe, @type, @debut, @fin, @jours, @heures, @commentaire, @saisie, NULL);";
                 ParametrerAbsence(cmd, voulue);
-                cmd.Parameters.AddWithValue("@employe", voulue.EmployeeId);
-                cmd.Parameters.AddWithValue("@saisie", DbValue.DateToDb(DateTime.Now));
+                cmd.Parameters.AjouterValeur("@employe", voulue.EmployeeId);
+                cmd.Parameters.AjouterValeur("@saisie", DbValue.DateToDb(DateTime.Now));
                 await cmd.ExecuteNonQueryAsync();
             }
             messages.Add(string.Format(fr, "Absence « {0} » transmise à la paie ({1:0.##} j, du {2:dd/MM/yyyy} au {3:dd/MM/yyyy}).",
@@ -812,24 +812,24 @@ namespace IUTSCalculator.Services
             return await DernierIdAsync(conn, tx);
         }
 
-        private static void ParametrerAbsence(SQLiteCommand cmd, Absence a)
+        private static void ParametrerAbsence(SqliteCommand cmd, Absence a)
         {
-            cmd.Parameters.AddWithValue("@type", (int)a.Type);
-            cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(a.DateDebut));
-            cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(a.DateFin));
-            cmd.Parameters.AddWithValue("@jours", DbValue.DecimalToDb(a.NombreJours));
-            cmd.Parameters.AddWithValue("@heures", DbValue.DecimalToDb(0m));
-            cmd.Parameters.AddWithValue("@commentaire", a.Commentaire ?? "");
+            cmd.Parameters.AjouterValeur("@type", (int)a.Type);
+            cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(a.DateDebut));
+            cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(a.DateFin));
+            cmd.Parameters.AjouterValeur("@jours", DbValue.DecimalToDb(a.NombreJours));
+            cmd.Parameters.AjouterValeur("@heures", DbValue.DecimalToDb(0m));
+            cmd.Parameters.AjouterValeur("@commentaire", a.Commentaire ?? "");
         }
 
-        private static async Task<Absence> LireAbsenceAsync(SQLiteConnection conn, SQLiteTransaction tx, int id)
+        private static async Task<Absence> LireAbsenceAsync(SqliteConnection conn, SqliteTransaction tx, int id)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = "SELECT Id, EmployeeId, Type, DateDebut, DateFin, NombreJours, PeriodeImputation FROM Absences WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", id);
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@id", id);
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (!await r.ReadAsync()) return null;
                     return new Absence
@@ -846,7 +846,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task VerifierMoisOuvertsAsync(SQLiteConnection conn, SQLiteTransaction tx, Absence a, string action)
+        private static async Task VerifierMoisOuvertsAsync(SqliteConnection conn, SqliteTransaction tx, Absence a, string action)
         {
             var mois = new DateTime(a.DateDebut.Year, a.DateDebut.Month, 1);
             var dernier = new DateTime(a.DateFin.Year, a.DateFin.Month, 1);
@@ -861,7 +861,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task VerifierChevauchementAsync(SQLiteConnection conn, SQLiteTransaction tx, Absence a, int?[] exclure)
+        private static async Task VerifierChevauchementAsync(SqliteConnection conn, SqliteTransaction tx, Absence a, int?[] exclure)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -869,10 +869,10 @@ namespace IUTSCalculator.Services
                 cmd.CommandText =
                     "SELECT Id, Type, DateDebut, DateFin FROM Absences " +
                     "WHERE EmployeeId = @employe AND DateDebut <= @fin AND DateFin >= @debut;";
-                cmd.Parameters.AddWithValue("@employe", a.EmployeeId);
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(a.DateDebut));
-                cmd.Parameters.AddWithValue("@fin", DbValue.DateToDb(a.DateFin));
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@employe", a.EmployeeId);
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(a.DateDebut));
+                cmd.Parameters.AjouterValeur("@fin", DbValue.DateToDb(a.DateFin));
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await r.ReadAsync())
                     {
@@ -894,11 +894,11 @@ namespace IUTSCalculator.Services
 
         public async Task<List<MandatRepresentatif>> ChargerMandatsAsync()
         {
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
                 return await ChargerMandatsAsync(conn);
         }
 
-        private static async Task<List<MandatRepresentatif>> ChargerMandatsAsync(SQLiteConnection conn)
+        private static async Task<List<MandatRepresentatif>> ChargerMandatsAsync(SqliteConnection conn)
         {
             var liste = new List<MandatRepresentatif>();
             if (!TableExiste(conn, "MandatsRepresentatifs")) return liste;
@@ -909,7 +909,7 @@ namespace IUTSCalculator.Services
                     "SELECT m.*, e.FirstName, e.LastName FROM MandatsRepresentatifs m " +
                     "LEFT JOIN Employees e ON e.EmployeeId = m.EmployeeId " +
                     "ORDER BY e.LastName, e.FirstName, m.DateDebut DESC;";
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await r.ReadAsync())
                     {
@@ -950,7 +950,7 @@ namespace IUTSCalculator.Services
             var anomalie = AnomalieMandat(m);
             if (anomalie != null) throw new InvalidOperationException(anomalie);
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 if (m.Id > 0)
@@ -958,7 +958,7 @@ namespace IUTSCalculator.Services
                     cmd.CommandText =
                         "UPDATE MandatsRepresentatifs SET EmployeeId = @e, Mandat = @m, DateDebut = @d, DateFin = @f, " +
                         "FinProtection = @p, Commentaire = @c WHERE Id = @id;";
-                    cmd.Parameters.AddWithValue("@id", m.Id);
+                    cmd.Parameters.AjouterValeur("@id", m.Id);
                 }
                 else
                 {
@@ -966,12 +966,12 @@ namespace IUTSCalculator.Services
                         "INSERT INTO MandatsRepresentatifs (EmployeeId, Mandat, DateDebut, DateFin, FinProtection, Commentaire) " +
                         "VALUES (@e, @m, @d, @f, @p, @c);";
                 }
-                cmd.Parameters.AddWithValue("@e", m.EmployeeId.Trim());
-                cmd.Parameters.AddWithValue("@m", m.Mandat.Trim());
-                cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(m.DateDebut.Date));
-                cmd.Parameters.AddWithValue("@f", DbValue.DateNullableToDb(m.DateFin));
-                cmd.Parameters.AddWithValue("@p", DbValue.DateNullableToDb(m.FinProtection));
-                cmd.Parameters.AddWithValue("@c", (object)Nettoyer(m.Commentaire) ?? DBNull.Value);
+                cmd.Parameters.AjouterValeur("@e", m.EmployeeId.Trim());
+                cmd.Parameters.AjouterValeur("@m", m.Mandat.Trim());
+                cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(m.DateDebut.Date));
+                cmd.Parameters.AjouterValeur("@f", DbValue.DateNullableToDb(m.DateFin));
+                cmd.Parameters.AjouterValeur("@p", DbValue.DateNullableToDb(m.FinProtection));
+                cmd.Parameters.AjouterValeur("@c", (object)Nettoyer(m.Commentaire) ?? DBNull.Value);
                 await cmd.ExecuteNonQueryAsync();
 
                 if (m.Id <= 0) m.Id = await DernierIdAsync(conn, null);
@@ -984,7 +984,7 @@ namespace IUTSCalculator.Services
         public async Task SupprimerMandatAsync(MandatRepresentatif m)
         {
             if (m == null || m.Id <= 0) return;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
                 await ExecuterAsync(conn, null, "DELETE FROM MandatsRepresentatifs WHERE Id = @id;", m.Id);
 
             await _audit.EnregistrerAsync("Mandat retiré du registre des salariés protégés", EntiteAudit, m.EmployeeId,
@@ -1017,18 +1017,18 @@ namespace IUTSCalculator.Services
 
         public async Task<List<PieceDisciplinaire>> ChargerPiecesAsync(int procedureId)
         {
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
                 return await ChargerPiecesAsync(conn, procedureId);
         }
 
-        private static async Task<List<PieceDisciplinaire>> ChargerPiecesAsync(SQLiteConnection conn, int procedureId)
+        private static async Task<List<PieceDisciplinaire>> ChargerPiecesAsync(SqliteConnection conn, int procedureId)
         {
             var liste = new List<PieceDisciplinaire>();
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT * FROM PiecesDisciplinaires WHERE ProcedureId = @id ORDER BY DateAjout, Id;";
-                cmd.Parameters.AddWithValue("@id", procedureId);
-                using (var r = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@id", procedureId);
+                using (var r = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await r.ReadAsync())
                     {
@@ -1086,20 +1086,20 @@ namespace IUTSCalculator.Services
                 EstGeneree = estGeneree
             };
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText =
                         "INSERT INTO PiecesDisciplinaires (ProcedureId, Type, Libelle, NomFichier, NomOriginal, DateAjout, EstGeneree) " +
                         "VALUES (@p, @t, @l, @f, @o, @d, @g);";
-                    cmd.Parameters.AddWithValue("@p", piece.ProcedureId);
-                    cmd.Parameters.AddWithValue("@t", (int)piece.Type);
-                    cmd.Parameters.AddWithValue("@l", piece.Libelle);
-                    cmd.Parameters.AddWithValue("@f", piece.NomFichier);
-                    cmd.Parameters.AddWithValue("@o", piece.NomOriginal);
-                    cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(piece.DateAjout));
-                    cmd.Parameters.AddWithValue("@g", piece.EstGeneree ? 1 : 0);
+                    cmd.Parameters.AjouterValeur("@p", piece.ProcedureId);
+                    cmd.Parameters.AjouterValeur("@t", (int)piece.Type);
+                    cmd.Parameters.AjouterValeur("@l", piece.Libelle);
+                    cmd.Parameters.AjouterValeur("@f", piece.NomFichier);
+                    cmd.Parameters.AjouterValeur("@o", piece.NomOriginal);
+                    cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(piece.DateAjout));
+                    cmd.Parameters.AjouterValeur("@g", piece.EstGeneree ? 1 : 0);
                     await cmd.ExecuteNonQueryAsync();
                 }
                 piece.Id = await DernierIdAsync(conn, null);
@@ -1117,7 +1117,7 @@ namespace IUTSCalculator.Services
             if (p.Statut == StatutProcedure.Notifiee)
                 throw new InvalidOperationException("Le dossier d'une sanction notifiée est figé : ses pièces ne peuvent plus être retirées (vous pouvez en ajouter).");
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
                 await ExecuterAsync(conn, null, "DELETE FROM PiecesDisciplinaires WHERE Id = @id;", piece.Id);
 
             try { File.Delete(CheminPiece(p, piece)); } catch { /* fichier déjà absent */ }
@@ -1150,7 +1150,7 @@ namespace IUTSCalculator.Services
 
             var messages = new List<string>();
             ProcedureDisciplinaire enBase;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             {
                 var types = await ChargerTypesAsync(conn, null);
                 enBase = (await ChargerProceduresAsync(conn, null, types, p.EmployeeId ?? "")).FirstOrDefault(x => x.Id == p.Id);
@@ -1183,10 +1183,10 @@ namespace IUTSCalculator.Services
                             cmd.CommandText =
                                 "UPDATE ProceduresDisciplinaires SET MiseAPiedJours = @j, AbsenceMiseAPiedId = NULL, " +
                                 "IssueRecours = @issue, DateModification = @maj WHERE Id = @id;";
-                            cmd.Parameters.AddWithValue("@j", DbValue.DecimalToDb(0m));
-                            cmd.Parameters.AddWithValue("@issue", issue);
-                            cmd.Parameters.AddWithValue("@maj", DbValue.DateToDb(DateTime.Now));
-                            cmd.Parameters.AddWithValue("@id", p.Id);
+                            cmd.Parameters.AjouterValeur("@j", DbValue.DecimalToDb(0m));
+                            cmd.Parameters.AjouterValeur("@issue", issue);
+                            cmd.Parameters.AjouterValeur("@maj", DbValue.DateToDb(DateTime.Now));
+                            cmd.Parameters.AjouterValeur("@id", p.Id);
                             await cmd.ExecuteNonQueryAsync();
                         }
                         tx.Commit();
@@ -1264,7 +1264,7 @@ namespace IUTSCalculator.Services
             return nom.Length > 80 ? nom.Substring(0, 80) : nom;
         }
 
-        private static async Task<int> DernierIdAsync(SQLiteConnection conn, SQLiteTransaction tx)
+        private static async Task<int> DernierIdAsync(SqliteConnection conn, SqliteTransaction tx)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -1274,23 +1274,23 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static async Task ExecuterAsync(SQLiteConnection conn, SQLiteTransaction tx, string sql, int id)
+        private static async Task ExecuterAsync(SqliteConnection conn, SqliteTransaction tx, string sql, int id)
         {
             using (var cmd = conn.CreateCommand())
             {
                 if (tx != null) cmd.Transaction = tx;
                 cmd.CommandText = sql;
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AjouterValeur("@id", id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        private static bool TableExiste(SQLiteConnection conn, string nom)
+        private static bool TableExiste(SqliteConnection conn, string nom)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @n;";
-                cmd.Parameters.AddWithValue("@n", nom);
+                cmd.Parameters.AjouterValeur("@n", nom);
                 return DbValue.IntFromDb(cmd.ExecuteScalar()) > 0;
             }
         }

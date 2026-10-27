@@ -44,7 +44,7 @@ namespace IUTSCalculator.Tests
         {
             try
             {
-                System.Data.SQLite.SQLiteConnection.ClearAllPools();
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (File.Exists(_dbPath))
                 {
                     File.Delete(_dbPath);

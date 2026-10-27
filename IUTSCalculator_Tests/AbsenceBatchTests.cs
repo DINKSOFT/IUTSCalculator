@@ -36,7 +36,7 @@ namespace IUTSCalculator.Tests
         {
             try
             {
-                System.Data.SQLite.SQLiteConnection.ClearAllPools();
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (File.Exists(_sqliteService.DatabasePath))
                 {
                     File.Delete(_sqliteService.DatabasePath);
@@ -133,7 +133,7 @@ namespace IUTSCalculator.Tests
         public async Task EnregistrerEnMasseAsync_RefuseEnregistrementSiPeriodeCloturee()
         {
             // Clôturer la période 09/2026 directement en base
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "INSERT INTO PeriodesPaie (Annee, Mois, Statut, DateCloture, ClotureePar) " +

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -92,7 +92,7 @@ namespace IUTSCalculator.Services
             var codesRubriques = new Dictionary<string, ColonneRubriqueDynamique>(
                 StringComparer.OrdinalIgnoreCase);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -127,12 +127,12 @@ namespace IUTSCalculator.Services
                       AND c.IsRegularization = 0
                     ORDER BY e.LastName, e.FirstName, c.CalculationDate";
 
-                cmd.Parameters.AddWithValue("@debut",
+                cmd.Parameters.AjouterValeur("@debut",
                     DbValue.DateToDb(livre.DebutPeriode.Date));
-                cmd.Parameters.AddWithValue("@fin",
+                cmd.Parameters.AjouterValeur("@fin",
                     DbValue.DateToDb(livre.FinPeriode.Date.AddDays(1).AddTicks(-1)));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

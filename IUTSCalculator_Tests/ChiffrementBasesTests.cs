@@ -10,8 +10,8 @@ namespace IUTSCalculator.Tests
 {
     /// <summary>
     /// Chiffrement des bases (SQLite3MC, format SQLCipher) : clé du poste protégée par DPAPI,
-    /// mise en place du schéma dans une base chiffrée, service pilote passé à
-    /// Microsoft.Data.Sqlite, et cohabitation avec les services encore sous System.Data.SQLite.
+    /// mise en place du schéma dans une base chiffrée, accès Microsoft.Data.Sqlite et garde
+    /// « Lecture seule ».
     /// </summary>
     [TestFixture]
     [Microsoft.VisualStudio.TestTools.UnitTesting.TestClass]
@@ -88,9 +88,6 @@ namespace IUTSCalculator.Tests
                 Assert.That(SQLiteService.LireVersionFichier(db), Is.EqualTo(-1));
                 Assert.That(SQLiteService.LireVersionFichier(db, cle), Is.EqualTo(SQLiteService.SchemaCible));
 
-                // Un service resté sous System.Data.SQLite est refusé plutôt que de lire n'importe quoi.
-                Assert.Throws<InvalidOperationException>(() => sqlite.CreateConnection());
-
                 // Réouverture (nouvelle instance) : le schéma est reconnu, pas de migration.
                 Assert.That(new PersonneAChargeService(new SQLiteService(db)).ChargerAsync("M001").GetAwaiter().GetResult(), Has.Count.EqualTo(2));
             }
@@ -102,7 +99,7 @@ namespace IUTSCalculator.Tests
 
         [Test]
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
-        public void BaseEnClair_PiloteEtServicesHeritesCohabitent()
+        public void SansCle_BaseEnClairCommeAvant()
         {
             string dir = NouveauDossier();
             string db = Path.Combine(dir, "dossier.db");
@@ -111,12 +108,27 @@ namespace IUTSCalculator.Tests
 
             new PersonneAChargeService(sqlite).EnregistrerToutAsync("M002", new[] { Enfant("FATI") }).GetAwaiter().GetResult();
 
-            // Ce que le pilote (Microsoft.Data.Sqlite) a écrit est lu par System.Data.SQLite.
-            using (var c = sqlite.CreateConnection())
+            using (var c = sqlite.CreerConnexion())
             using (var cmd = c.CreateCommand())
             {
                 cmd.CommandText = "SELECT Prenom FROM PersonnesACharge WHERE EmployeeId = 'M002';";
                 Assert.That(cmd.ExecuteScalar(), Is.EqualTo("FATI"));
+            }
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void ParametreNull_EnregistreCommeNull()
+        {
+            // System.Data.SQLite liait une valeur null à NULL ; Microsoft.Data.Sqlite la refuse.
+            // AjouterValeur rétablit l'ancien comportement pour tous les services.
+            var sqlite = new SQLiteService(Path.Combine(NouveauDossier(), "dossier.db"));
+            using (var c = sqlite.CreerConnexion())
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.CommandText = "SELECT @v IS NULL;";
+                cmd.Parameters.AjouterValeur("@v", null);
+                Assert.That(cmd.ExecuteScalar(), Is.EqualTo(1L));
             }
         }
 
@@ -142,7 +154,6 @@ namespace IUTSCalculator.Tests
             finally
             {
                 UserSession.Instance.Logout();
-                SQLiteService.GardeConnexion = null;
                 SQLiteService.GardeConnexionSqlite = null;
             }
         }

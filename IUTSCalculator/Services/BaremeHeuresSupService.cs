@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -30,11 +30,11 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<BaremeHeuresSup>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT " + Colonnes + " FROM BaremesHeuresSup ORDER BY DateEffet DESC, Id DESC;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -55,13 +55,13 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>Version synchrone, pour les appels déjà sur une connexion ouverte.</summary>
-        public static BaremeHeuresSup Applicable(SQLiteConnection conn, DateTime date)
+        public static BaremeHeuresSup Applicable(SqliteConnection conn, DateTime date)
         {
             var liste = new List<BaremeHeuresSup>();
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT " + Colonnes + " FROM BaremesHeuresSup;";
-                using (var reader = (SQLiteDataReader)cmd.ExecuteReader())
+                using (var reader = (SqliteDataReader)cmd.ExecuteReader())
                 {
                     while (reader.Read())
                         liste.Add(Lire(reader));
@@ -82,13 +82,13 @@ namespace IUTSCalculator.Services
             if (anomalies.Count > 0)
                 throw new InvalidOperationException(string.Join(Environment.NewLine, anomalies));
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT COUNT(*) FROM BaremesHeuresSup WHERE DateEffet = @d AND Id <> @id;";
-                    cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(bareme.DateEffet.Date));
-                    cmd.Parameters.AddWithValue("@id", bareme.Id);
+                    cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(bareme.DateEffet.Date));
+                    cmd.Parameters.AjouterValeur("@id", bareme.Id);
                     if (DbValue.IntFromDb(await cmd.ExecuteScalarAsync()) > 0)
                     {
                         throw new InvalidOperationException(string.Format(
@@ -105,7 +105,7 @@ namespace IUTSCalculator.Services
                             "UPDATE BaremesHeuresSup SET DateEffet = @d, Libelle = @l, Reference = @r, " +
                             "TauxTranche1 = @t1, TauxTranche2 = @t2, TauxNuit = @tn, TauxFerieJour = @tfj, " +
                             "TauxFerieNuit = @tfn, SeuilTranche1 = @s1, DureeHebdoLegale = @dh WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@id", bareme.Id);
+                        cmd.Parameters.AjouterValeur("@id", bareme.Id);
                     }
                     else
                     {
@@ -115,21 +115,21 @@ namespace IUTSCalculator.Services
                             "VALUES (@d, @l, @r, 0, @t1, @t2, @tn, @tfj, @tfn, @s1, @dh);";
                     }
 
-                    cmd.Parameters.AddWithValue("@d", DbValue.DateToDb(bareme.DateEffet.Date));
-                    cmd.Parameters.AddWithValue("@l", bareme.Libelle ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@r", bareme.Reference ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@t1", DbValue.DecimalToDb(bareme.TauxTranche1));
-                    cmd.Parameters.AddWithValue("@t2", DbValue.DecimalToDb(bareme.TauxTranche2));
-                    cmd.Parameters.AddWithValue("@tn", DbValue.DecimalToDb(bareme.TauxNuit));
-                    cmd.Parameters.AddWithValue("@tfj", DbValue.DecimalToDb(bareme.TauxFerieJour));
-                    cmd.Parameters.AddWithValue("@tfn", DbValue.DecimalToDb(bareme.TauxFerieNuit));
-                    cmd.Parameters.AddWithValue("@s1", DbValue.DecimalToDb(bareme.SeuilTranche1));
-                    cmd.Parameters.AddWithValue("@dh", DbValue.DecimalToDb(bareme.DureeHebdoLegale));
+                    cmd.Parameters.AjouterValeur("@d", DbValue.DateToDb(bareme.DateEffet.Date));
+                    cmd.Parameters.AjouterValeur("@l", bareme.Libelle ?? string.Empty);
+                    cmd.Parameters.AjouterValeur("@r", bareme.Reference ?? string.Empty);
+                    cmd.Parameters.AjouterValeur("@t1", DbValue.DecimalToDb(bareme.TauxTranche1));
+                    cmd.Parameters.AjouterValeur("@t2", DbValue.DecimalToDb(bareme.TauxTranche2));
+                    cmd.Parameters.AjouterValeur("@tn", DbValue.DecimalToDb(bareme.TauxNuit));
+                    cmd.Parameters.AjouterValeur("@tfj", DbValue.DecimalToDb(bareme.TauxFerieJour));
+                    cmd.Parameters.AjouterValeur("@tfn", DbValue.DecimalToDb(bareme.TauxFerieNuit));
+                    cmd.Parameters.AjouterValeur("@s1", DbValue.DecimalToDb(bareme.SeuilTranche1));
+                    cmd.Parameters.AjouterValeur("@dh", DbValue.DecimalToDb(bareme.DureeHebdoLegale));
 
                     await cmd.ExecuteNonQueryAsync();
 
                     if (bareme.Id <= 0)
-                        bareme.Id = (int)conn.LastInsertRowId;
+                        bareme.Id = (int)conn.DernierIdInsere();
                 }
             }
         }
@@ -141,16 +141,16 @@ namespace IUTSCalculator.Services
             if (bareme.EstSysteme)
                 throw new InvalidOperationException("Un barème livré avec l'application ne se supprime pas : créez-en un nouveau avec une date d'effet plus récente.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM BaremesHeuresSup WHERE Id = @id AND EstSysteme = 0;";
-                cmd.Parameters.AddWithValue("@id", bareme.Id);
+                cmd.Parameters.AjouterValeur("@id", bareme.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        private static BaremeHeuresSup Lire(SQLiteDataReader reader)
+        private static BaremeHeuresSup Lire(SqliteDataReader reader)
         {
             return new BaremeHeuresSup
             {

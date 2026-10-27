@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -61,7 +61,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<VariablePaie>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -71,10 +71,10 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Rubriques r ON r.Code = v.CodeRubrique " +
                     "WHERE v.Annee = @a AND v.Mois = @m " +
                     "ORDER BY e.LastName, e.FirstName, v.CodeRubrique";
-                cmd.Parameters.AddWithValue("@a", annee);
-                cmd.Parameters.AddWithValue("@m", mois);
+                cmd.Parameters.AjouterValeur("@a", annee);
+                cmd.Parameters.AjouterValeur("@m", mois);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -84,7 +84,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static VariablePaie Lire(SQLiteDataReader reader)
+        private static VariablePaie Lire(SqliteDataReader reader)
         {
             string nom = DbValue.TextFromDb(reader["LastName"]);
             string prenom = DbValue.TextFromDb(reader["FirstName"]);
@@ -186,7 +186,7 @@ namespace IUTSCalculator.Services
                 .Where(v => v != null && v.EstValide)
                 .ToList();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 await VerifierPeriodeOuverteAsync(conn, annee, mois, null);
                 await VerifierHeuresSupSansDoublonAsync(conn, annee, mois, liste);
@@ -199,8 +199,8 @@ namespace IUTSCalculator.Services
                         {
                             cmd.Transaction = tx;
                             cmd.CommandText = "DELETE FROM VariablesPaie WHERE Annee = @a AND Mois = @m;";
-                            cmd.Parameters.AddWithValue("@a", annee);
-                            cmd.Parameters.AddWithValue("@m", mois);
+                            cmd.Parameters.AjouterValeur("@a", annee);
+                            cmd.Parameters.AjouterValeur("@m", mois);
                             await cmd.ExecuteNonQueryAsync();
                         }
 
@@ -214,14 +214,14 @@ namespace IUTSCalculator.Services
                                     "(Annee, Mois, EmployeeId, CodeRubrique, Quantite, Montant, Commentaire, DateSaisie) " +
                                     "VALUES (@a, @m, @employe, @code, @quantite, @montant, @commentaire, @saisie);";
 
-                                cmd.Parameters.AddWithValue("@a", annee);
-                                cmd.Parameters.AddWithValue("@m", mois);
-                                cmd.Parameters.AddWithValue("@employe", variable.EmployeeId ?? "");
-                                cmd.Parameters.AddWithValue("@code", (variable.CodeRubrique ?? "").Trim().ToUpperInvariant());
-                                cmd.Parameters.AddWithValue("@quantite", DbValue.DecimalToDb(variable.Quantite));
-                                cmd.Parameters.AddWithValue("@montant", DbValue.MoneyToDb(variable.Montant));
-                                cmd.Parameters.AddWithValue("@commentaire", variable.Commentaire ?? "");
-                                cmd.Parameters.AddWithValue("@saisie", DbValue.DateToDb(
+                                cmd.Parameters.AjouterValeur("@a", annee);
+                                cmd.Parameters.AjouterValeur("@m", mois);
+                                cmd.Parameters.AjouterValeur("@employe", variable.EmployeeId ?? "");
+                                cmd.Parameters.AjouterValeur("@code", (variable.CodeRubrique ?? "").Trim().ToUpperInvariant());
+                                cmd.Parameters.AjouterValeur("@quantite", DbValue.DecimalToDb(variable.Quantite));
+                                cmd.Parameters.AjouterValeur("@montant", DbValue.MoneyToDb(variable.Montant));
+                                cmd.Parameters.AjouterValeur("@commentaire", variable.Commentaire ?? "");
+                                cmd.Parameters.AjouterValeur("@saisie", DbValue.DateToDb(
                                     variable.DateSaisie == default(DateTime) ? DateTime.Now : variable.DateSaisie));
 
                                 await cmd.ExecuteNonQueryAsync();
@@ -282,7 +282,7 @@ namespace IUTSCalculator.Services
         /// (défaut n° 23 du guide). Un seul circuit par salarié et par mois.
         /// </summary>
         private static async Task VerifierHeuresSupSansDoublonAsync(
-            SQLiteConnection conn, int annee, int mois, IEnumerable<VariablePaie> variables)
+            SqliteConnection conn, int annee, int mois, IEnumerable<VariablePaie> variables)
         {
             var salaries = variables
                 .Where(v => string.Equals((v.CodeRubrique ?? "").Trim(), CodeHeuresSupLibre, StringComparison.OrdinalIgnoreCase))
@@ -305,9 +305,9 @@ namespace IUTSCalculator.Services
                 {
                     cmd.CommandText = "SELECT COUNT(*) FROM HeuresSupplementaires " +
                                       "WHERE Annee = @a AND Mois = @m AND EmployeeId = @e AND MontantTotal > 0;";
-                    cmd.Parameters.AddWithValue("@a", annee);
-                    cmd.Parameters.AddWithValue("@m", mois);
-                    cmd.Parameters.AddWithValue("@e", employe);
+                    cmd.Parameters.AjouterValeur("@a", annee);
+                    cmd.Parameters.AjouterValeur("@m", mois);
+                    cmd.Parameters.AjouterValeur("@e", employe);
                     if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0)
                         enDouble.Add(employe);
                 }
@@ -324,7 +324,7 @@ namespace IUTSCalculator.Services
         }
 
         private static async Task VerifierPeriodeOuverteAsync(
-            SQLiteConnection conn, int annee, int mois, SQLiteTransaction tx)
+            SqliteConnection conn, int annee, int mois, SqliteTransaction tx)
         {
             var premierJour = new DateTime(annee, mois, 1);
 
@@ -340,7 +340,7 @@ namespace IUTSCalculator.Services
         /// <summary>Vrai si la période accepte encore des saisies.</summary>
         public async Task<bool> PeriodeOuverteAsync(int annee, int mois)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 return !await PeriodePaieService.EstClotureeAsync(conn, new DateTime(annee, mois, 1));
             }

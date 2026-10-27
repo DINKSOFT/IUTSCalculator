@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -342,7 +342,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<SaisieOpposition>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -351,7 +351,7 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = s.EmployeeId " +
                     "ORDER BY s.Statut ASC, s.DateDebut DESC, s.Id DESC";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LireSaisie(reader));
@@ -366,7 +366,7 @@ namespace IUTSCalculator.Services
             var liste = new List<SaisieOpposition>();
             if (string.IsNullOrWhiteSpace(employeeId)) return liste;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -375,9 +375,9 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = s.EmployeeId " +
                     "WHERE s.EmployeeId = @emp " +
                     "ORDER BY s.Statut ASC, s.DateDebut DESC, s.Id DESC";
-                cmd.Parameters.AddWithValue("@emp", employeeId);
+                cmd.Parameters.AjouterValeur("@emp", employeeId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LireSaisie(reader));
@@ -401,7 +401,7 @@ namespace IUTSCalculator.Services
         /// validée (voir <see cref="AppliquerEtEnregistrerRetenuesMoisAsync"/>).
         /// </summary>
         private static async Task<List<SaisieOpposition>> ChargerActivesParEmployeAsync(
-            string employeeId, SQLiteConnection conn, SQLiteTransaction trans)
+            string employeeId, SqliteConnection conn, SqliteTransaction trans)
         {
             var liste = new List<SaisieOpposition>();
             if (string.IsNullOrWhiteSpace(employeeId)) return liste;
@@ -415,9 +415,9 @@ namespace IUTSCalculator.Services
                     "LEFT JOIN Employees e ON e.EmployeeId = s.EmployeeId " +
                     "WHERE s.EmployeeId = @emp " +
                     "ORDER BY s.Statut ASC, s.DateDebut DESC, s.Id DESC";
-                cmd.Parameters.AddWithValue("@emp", employeeId);
+                cmd.Parameters.AjouterValeur("@emp", employeeId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LireSaisie(reader));
@@ -429,7 +429,7 @@ namespace IUTSCalculator.Services
 
         public async Task<SaisieOpposition> ChargerParIdAsync(int id)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -437,9 +437,9 @@ namespace IUTSCalculator.Services
                     "FROM SaisiesOppositions s " +
                     "LEFT JOIN Employees e ON e.EmployeeId = s.EmployeeId " +
                     "WHERE s.Id = @id";
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AjouterValeur("@id", id);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                         return LireSaisie(reader);
@@ -459,7 +459,7 @@ namespace IUTSCalculator.Services
             if (saisie.RetenueMensuelleFixee <= 0m)
                 throw new InvalidOperationException("La retenue mensuelle fixée doit être strictement positive.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 if (saisie.Id <= 0)
@@ -512,7 +512,7 @@ namespace IUTSCalculator.Services
                             DateModification = @modif
                         WHERE Id = @id;";
 
-                    cmd.Parameters.AddWithValue("@id", saisie.Id);
+                    cmd.Parameters.AjouterValeur("@id", saisie.Id);
                     InjecterParametresSaisie(cmd, saisie);
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -521,18 +521,18 @@ namespace IUTSCalculator.Services
 
         public async Task SupprimerAsync(int id)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM SaisiesOppositions WHERE Id = @id";
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AjouterValeur("@id", id);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
 
         public async Task PrononcerMainleveeAsync(int id, DateTime dateMainlevee, string referenceMainlevee)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -543,11 +543,11 @@ namespace IUTSCalculator.Services
                         DateModification = @modif
                     WHERE Id = @id;";
 
-                cmd.Parameters.AddWithValue("@id", id);
-                cmd.Parameters.AddWithValue("@statut", (int)StatutSaisieOpposition.Mainlevee);
-                cmd.Parameters.AddWithValue("@date", DbValue.DateToDb(dateMainlevee));
-                cmd.Parameters.AddWithValue("@ref", (object)referenceMainlevee ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@modif", DbValue.DateToDb(DateTime.Now));
+                cmd.Parameters.AjouterValeur("@id", id);
+                cmd.Parameters.AjouterValeur("@statut", (int)StatutSaisieOpposition.Mainlevee);
+                cmd.Parameters.AjouterValeur("@date", DbValue.DateToDb(dateMainlevee));
+                cmd.Parameters.AjouterValeur("@ref", (object)referenceMainlevee ?? DBNull.Value);
+                cmd.Parameters.AjouterValeur("@modif", DbValue.DateToDb(DateTime.Now));
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -555,7 +555,7 @@ namespace IUTSCalculator.Services
 
         public async Task ChangerStatutAsync(int id, StatutSaisieOpposition nouveauStatut)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -564,9 +564,9 @@ namespace IUTSCalculator.Services
                         DateModification = @modif
                     WHERE Id = @id;";
 
-                cmd.Parameters.AddWithValue("@id", id);
-                cmd.Parameters.AddWithValue("@statut", (int)nouveauStatut);
-                cmd.Parameters.AddWithValue("@modif", DbValue.DateToDb(DateTime.Now));
+                cmd.Parameters.AjouterValeur("@id", id);
+                cmd.Parameters.AjouterValeur("@statut", (int)nouveauStatut);
+                cmd.Parameters.AjouterValeur("@modif", DbValue.DateToDb(DateTime.Now));
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -588,7 +588,7 @@ namespace IUTSCalculator.Services
         {
             ResultatCalculQuotite repartition;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var trans = conn.BeginTransaction())
             {
                 try
@@ -611,12 +611,12 @@ namespace IUTSCalculator.Services
                             SELECT SaisieOppositionId, MontantRetenu
                             FROM RetenuesSaisiesMensuelles
                             WHERE Annee = @annee AND Mois = @mois AND EmployeeId = @emp";
-                        cmdAncien.Parameters.AddWithValue("@annee", annee);
-                        cmdAncien.Parameters.AddWithValue("@mois", mois);
-                        cmdAncien.Parameters.AddWithValue("@emp", employeeId);
+                        cmdAncien.Parameters.AjouterValeur("@annee", annee);
+                        cmdAncien.Parameters.AjouterValeur("@mois", mois);
+                        cmdAncien.Parameters.AjouterValeur("@emp", employeeId);
 
                         var deltas = new List<Tuple<int, decimal>>();
-                        using (var reader = (SQLiteDataReader)await cmdAncien.ExecuteReaderAsync())
+                        using (var reader = (SqliteDataReader)await cmdAncien.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
@@ -636,9 +636,9 @@ namespace IUTSCalculator.Services
                                         Statut = CASE WHEN Statut = 2 THEN 0 ELSE Statut END,
                                         DateModification = @modif
                                     WHERE Id = @id";
-                                cmdRevert.Parameters.AddWithValue("@mnt", DbValue.MoneyToDb(d.Item2));
-                                cmdRevert.Parameters.AddWithValue("@modif", DbValue.DateToDb(DateTime.Now));
-                                cmdRevert.Parameters.AddWithValue("@id", d.Item1);
+                                cmdRevert.Parameters.AjouterValeur("@mnt", DbValue.MoneyToDb(d.Item2));
+                                cmdRevert.Parameters.AjouterValeur("@modif", DbValue.DateToDb(DateTime.Now));
+                                cmdRevert.Parameters.AjouterValeur("@id", d.Item1);
                                 await cmdRevert.ExecuteNonQueryAsync();
                             }
                         }
@@ -648,9 +648,9 @@ namespace IUTSCalculator.Services
                     using (var cmdDel = conn.CreateCommand())
                     {
                         cmdDel.CommandText = "DELETE FROM RetenuesSaisiesMensuelles WHERE Annee = @annee AND Mois = @mois AND EmployeeId = @emp";
-                        cmdDel.Parameters.AddWithValue("@annee", annee);
-                        cmdDel.Parameters.AddWithValue("@mois", mois);
-                        cmdDel.Parameters.AddWithValue("@emp", employeeId);
+                        cmdDel.Parameters.AjouterValeur("@annee", annee);
+                        cmdDel.Parameters.AjouterValeur("@mois", mois);
+                        cmdDel.Parameters.AjouterValeur("@emp", employeeId);
                         await cmdDel.ExecuteNonQueryAsync();
                     }
 
@@ -679,16 +679,16 @@ namespace IUTSCalculator.Services
                                     0, @comm
                                 );";
 
-                            cmdIns.Parameters.AddWithValue("@saisieId", ligne.SaisieOppositionId);
-                            cmdIns.Parameters.AddWithValue("@emp", employeeId);
-                            cmdIns.Parameters.AddWithValue("@annee", annee);
-                            cmdIns.Parameters.AddWithValue("@mois", mois);
-                            cmdIns.Parameters.AddWithValue("@retenu", DbValue.MoneyToDb(ligne.MontantRetenu));
-                            cmdIns.Parameters.AddWithValue("@baseNet", DbValue.MoneyToDb(salaireNetReference));
-                            cmdIns.Parameters.AddWithValue("@quotite", DbValue.MoneyToDb(repartition.QuotiteSaisissableLegale));
-                            cmdIns.Parameters.AddWithValue("@rang", ligne.RangPriorite);
-                            cmdIns.Parameters.AddWithValue("@datePrelev", DbValue.DateToDb(datePrelevement));
-                            cmdIns.Parameters.AddWithValue("@comm", (object)ligne.MotifPlafonnementOuNote ?? DBNull.Value);
+                            cmdIns.Parameters.AjouterValeur("@saisieId", ligne.SaisieOppositionId);
+                            cmdIns.Parameters.AjouterValeur("@emp", employeeId);
+                            cmdIns.Parameters.AjouterValeur("@annee", annee);
+                            cmdIns.Parameters.AjouterValeur("@mois", mois);
+                            cmdIns.Parameters.AjouterValeur("@retenu", DbValue.MoneyToDb(ligne.MontantRetenu));
+                            cmdIns.Parameters.AjouterValeur("@baseNet", DbValue.MoneyToDb(salaireNetReference));
+                            cmdIns.Parameters.AjouterValeur("@quotite", DbValue.MoneyToDb(repartition.QuotiteSaisissableLegale));
+                            cmdIns.Parameters.AjouterValeur("@rang", ligne.RangPriorite);
+                            cmdIns.Parameters.AjouterValeur("@datePrelev", DbValue.DateToDb(datePrelevement));
+                            cmdIns.Parameters.AjouterValeur("@comm", (object)ligne.MotifPlafonnementOuNote ?? DBNull.Value);
 
                             await cmdIns.ExecuteNonQueryAsync();
                         }
@@ -706,9 +706,9 @@ namespace IUTSCalculator.Services
                                     DateModification = @modif
                                 WHERE Id = @saisieId";
 
-                            cmdUpd.Parameters.AddWithValue("@retenu", DbValue.MoneyToDb(ligne.MontantRetenu));
-                            cmdUpd.Parameters.AddWithValue("@modif", DbValue.DateToDb(DateTime.Now));
-                            cmdUpd.Parameters.AddWithValue("@saisieId", ligne.SaisieOppositionId);
+                            cmdUpd.Parameters.AjouterValeur("@retenu", DbValue.MoneyToDb(ligne.MontantRetenu));
+                            cmdUpd.Parameters.AjouterValeur("@modif", DbValue.DateToDb(DateTime.Now));
+                            cmdUpd.Parameters.AjouterValeur("@saisieId", ligne.SaisieOppositionId);
 
                             await cmdUpd.ExecuteNonQueryAsync();
                         }
@@ -729,7 +729,7 @@ namespace IUTSCalculator.Services
         /// <summary>Dernier mois (1er du mois) pour lequel une retenue a été enregistrée, ou null.</summary>
         public async Task<DateTime?> DernierMoisAvecRetenuesAsync()
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT MAX(Annee * 100 + Mois) FROM RetenuesSaisiesMensuelles;";
@@ -745,7 +745,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<RetenueSaisieMensuelle>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -760,10 +760,10 @@ namespace IUTSCalculator.Services
                     LEFT JOIN SaisiesOppositions s ON s.Id = r.SaisieOppositionId
                     WHERE r.Annee = @annee AND r.Mois = @mois
                     ORDER BY e.LastName, e.FirstName, r.RangPriorite";
-                cmd.Parameters.AddWithValue("@annee", annee);
-                cmd.Parameters.AddWithValue("@mois", mois);
+                cmd.Parameters.AjouterValeur("@annee", annee);
+                cmd.Parameters.AjouterValeur("@mois", mois);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LireRetenue(reader));
@@ -777,7 +777,7 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<RetenueSaisieMensuelle>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -792,9 +792,9 @@ namespace IUTSCalculator.Services
                     LEFT JOIN SaisiesOppositions s ON s.Id = r.SaisieOppositionId
                     WHERE r.SaisieOppositionId = @id
                     ORDER BY r.Annee DESC, r.Mois DESC";
-                cmd.Parameters.AddWithValue("@id", saisieId);
+                cmd.Parameters.AjouterValeur("@id", saisieId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(LireRetenue(reader));
@@ -810,7 +810,7 @@ namespace IUTSCalculator.Services
             DateTime? dateReversement,
             string numeroChequeOuVirement)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -820,10 +820,10 @@ namespace IUTSCalculator.Services
                         NumeroChequeOuVirement = @ref
                     WHERE Id = @id";
 
-                cmd.Parameters.AddWithValue("@id", retenueId);
-                cmd.Parameters.AddWithValue("@statut", (int)statut);
-                cmd.Parameters.AddWithValue("@dateRev", dateReversement.HasValue ? (object)DbValue.DateToDb(dateReversement.Value) : DBNull.Value);
-                cmd.Parameters.AddWithValue("@ref", (object)numeroChequeOuVirement ?? DBNull.Value);
+                cmd.Parameters.AjouterValeur("@id", retenueId);
+                cmd.Parameters.AjouterValeur("@statut", (int)statut);
+                cmd.Parameters.AjouterValeur("@dateRev", dateReversement.HasValue ? (object)DbValue.DateToDb(dateReversement.Value) : DBNull.Value);
+                cmd.Parameters.AjouterValeur("@ref", (object)numeroChequeOuVirement ?? DBNull.Value);
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -964,16 +964,16 @@ namespace IUTSCalculator.Services
         private async Task<Dictionary<int, decimal>> RetenuesDuMoisParSaisieAsync(int annee, int mois, string employeeId)
         {
             var map = new Dictionary<int, decimal>();
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT SaisieOppositionId, SUM(MontantRetenu) AS M FROM RetenuesSaisiesMensuelles " +
                                   "WHERE Annee = @a AND Mois = @m" + (string.IsNullOrWhiteSpace(employeeId) ? "" : " AND EmployeeId = @e") +
                                   " GROUP BY SaisieOppositionId;";
-                cmd.Parameters.AddWithValue("@a", annee);
-                cmd.Parameters.AddWithValue("@m", mois);
-                if (!string.IsNullOrWhiteSpace(employeeId)) cmd.Parameters.AddWithValue("@e", employeeId);
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@a", annee);
+                cmd.Parameters.AjouterValeur("@m", mois);
+                if (!string.IsNullOrWhiteSpace(employeeId)) cmd.Parameters.AjouterValeur("@e", employeeId);
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         map[DbValue.IntFromDb(reader["SaisieOppositionId"])] = DbValue.MoneyFromDb(reader["M"]);
@@ -1014,7 +1014,7 @@ namespace IUTSCalculator.Services
 
         #region Helpers Mappage SQL
 
-        private static SaisieOpposition LireSaisie(SQLiteDataReader reader)
+        private static SaisieOpposition LireSaisie(SqliteDataReader reader)
         {
             string nom = DbValue.TextFromDb(reader["LastName"]);
             string prenom = DbValue.TextFromDb(reader["FirstName"]);
@@ -1046,7 +1046,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static RetenueSaisieMensuelle LireRetenue(SQLiteDataReader reader)
+        private static RetenueSaisieMensuelle LireRetenue(SqliteDataReader reader)
         {
             string nom = DbValue.TextFromDb(reader["LastName"]);
             string prenom = DbValue.TextFromDb(reader["FirstName"]);
@@ -1073,28 +1073,28 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static void InjecterParametresSaisie(SQLiteCommand cmd, SaisieOpposition s)
+        private static void InjecterParametresSaisie(SqliteCommand cmd, SaisieOpposition s)
         {
-            cmd.Parameters.AddWithValue("@emp", s.EmployeeId ?? string.Empty);
-            cmd.Parameters.AddWithValue("@type", (int)s.TypeSaisie);
-            cmd.Parameters.AddWithValue("@dossier", (object)s.NumeroDossier ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@creancier", s.Creancier ?? string.Empty);
-            cmd.Parameters.AddWithValue("@beneficiaire", (object)s.Beneficiaire ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@montant", DbValue.MoneyToDb(s.MontantTotalDu));
-            cmd.Parameters.AddWithValue("@retenue", DbValue.MoneyToDb(s.RetenueMensuelleFixee));
-            cmd.Parameters.AddWithValue("@amorti", DbValue.MoneyToDb(s.TotalAmorti));
-            cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(s.DateDebut));
-            cmd.Parameters.AddWithValue("@fin", s.DateFin.HasValue ? (object)DbValue.DateToDb(s.DateFin.Value) : DBNull.Value);
-            cmd.Parameters.AddWithValue("@notif", s.DateNotification.HasValue ? (object)DbValue.DateToDb(s.DateNotification.Value) : DBNull.Value);
-            cmd.Parameters.AddWithValue("@tribunal", (object)s.TribunalOuAutorite ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@refjug", (object)s.ReferenceJugement ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@statut", (int)s.Statut);
-            cmd.Parameters.AddWithValue("@priorite", s.PrioriteOrdre);
-            cmd.Parameters.AddWithValue("@mainlevee", s.DateMainlevee.HasValue ? (object)DbValue.DateToDb(s.DateMainlevee.Value) : DBNull.Value);
-            cmd.Parameters.AddWithValue("@refmainlevee", (object)s.ReferenceMainlevee ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@comm", (object)s.Commentaire ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@creation", DbValue.DateToDb(s.DateCreation));
-            cmd.Parameters.AddWithValue("@modif", DbValue.DateToDb(s.DateModification));
+            cmd.Parameters.AjouterValeur("@emp", s.EmployeeId ?? string.Empty);
+            cmd.Parameters.AjouterValeur("@type", (int)s.TypeSaisie);
+            cmd.Parameters.AjouterValeur("@dossier", (object)s.NumeroDossier ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@creancier", s.Creancier ?? string.Empty);
+            cmd.Parameters.AjouterValeur("@beneficiaire", (object)s.Beneficiaire ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@montant", DbValue.MoneyToDb(s.MontantTotalDu));
+            cmd.Parameters.AjouterValeur("@retenue", DbValue.MoneyToDb(s.RetenueMensuelleFixee));
+            cmd.Parameters.AjouterValeur("@amorti", DbValue.MoneyToDb(s.TotalAmorti));
+            cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(s.DateDebut));
+            cmd.Parameters.AjouterValeur("@fin", s.DateFin.HasValue ? (object)DbValue.DateToDb(s.DateFin.Value) : DBNull.Value);
+            cmd.Parameters.AjouterValeur("@notif", s.DateNotification.HasValue ? (object)DbValue.DateToDb(s.DateNotification.Value) : DBNull.Value);
+            cmd.Parameters.AjouterValeur("@tribunal", (object)s.TribunalOuAutorite ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@refjug", (object)s.ReferenceJugement ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@statut", (int)s.Statut);
+            cmd.Parameters.AjouterValeur("@priorite", s.PrioriteOrdre);
+            cmd.Parameters.AjouterValeur("@mainlevee", s.DateMainlevee.HasValue ? (object)DbValue.DateToDb(s.DateMainlevee.Value) : DBNull.Value);
+            cmd.Parameters.AjouterValeur("@refmainlevee", (object)s.ReferenceMainlevee ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@comm", (object)s.Commentaire ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@creation", DbValue.DateToDb(s.DateCreation));
+            cmd.Parameters.AjouterValeur("@modif", DbValue.DateToDb(s.DateModification));
         }
 
         #endregion

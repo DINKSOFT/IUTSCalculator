@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -37,7 +37,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -59,7 +59,7 @@ namespace IUTSCalculator.Services
                         if (statut.HasValue)
                         {
                             sql += " AND b.Statut = @statut ";
-                            cmd.Parameters.AddWithValue("@statut", (int)statut.Value);
+                            cmd.Parameters.AjouterValeur("@statut", (int)statut.Value);
                         }
 
                         if (!string.IsNullOrWhiteSpace(recherche))
@@ -68,7 +68,7 @@ namespace IUTSCalculator.Services
                                        OR b.IntitulePoste LIKE @recherche 
                                        OR b.Departement LIKE @recherche 
                                        OR b.ResponsableRecrutement LIKE @recherche) ";
-                            cmd.Parameters.AddWithValue("@recherche", "%" + recherche.Trim() + "%");
+                            cmd.Parameters.AjouterValeur("@recherche", "%" + recherche.Trim() + "%");
                         }
 
                         sql += @" GROUP BY b.Id, b.Reference, b.IntitulePoste, b.PosteId, b.Departement, b.Motif,
@@ -105,7 +105,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -131,7 +131,7 @@ namespace IUTSCalculator.Services
                                      b.Statut, b.ResponsableRecrutement, b.DescriptionProfil, b.DateCreation,
                                      p.Intitule;";
 
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -157,7 +157,7 @@ namespace IUTSCalculator.Services
                 int annee = DateTime.Today.Year;
                 string prefixe = $"REC-{annee}-";
 
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -165,7 +165,7 @@ namespace IUTSCalculator.Services
                             SELECT Reference FROM RecrutementBesoins 
                             WHERE Reference LIKE @pref 
                             ORDER BY Reference DESC LIMIT 1;";
-                        cmd.Parameters.AddWithValue("@pref", prefixe + "%");
+                        cmd.Parameters.AjouterValeur("@pref", prefixe + "%");
 
                         var result = cmd.ExecuteScalar() as string;
                         int sequence = 1;
@@ -195,7 +195,7 @@ namespace IUTSCalculator.Services
 
             return await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -206,7 +206,7 @@ namespace IUTSCalculator.Services
                                 int annee = DateTime.Today.Year;
                                 string prefixe = $"REC-{annee}-";
                                 cmd.CommandText = "SELECT Reference FROM RecrutementBesoins WHERE Reference LIKE @pref ORDER BY Reference DESC LIMIT 1;";
-                                cmd.Parameters.AddWithValue("@pref", prefixe + "%");
+                                cmd.Parameters.AjouterValeur("@pref", prefixe + "%");
                                 var res = cmd.ExecuteScalar() as string;
                                 int seq = 1;
                                 if (!string.IsNullOrEmpty(res) && res.Length >= prefixe.Length + 3)
@@ -237,7 +237,7 @@ namespace IUTSCalculator.Services
                                 SELECT last_insert_rowid();";
 
                             RemplirParametresBesoin(cmd, besoin);
-                            cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                            cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
                             besoin.Id = Convert.ToInt32(cmd.ExecuteScalar());
                             return besoin.Id;
@@ -267,7 +267,7 @@ namespace IUTSCalculator.Services
                                     DescriptionProfil = @Description
                                 WHERE Id = @Id;";
 
-                            cmd.Parameters.AddWithValue("@Id", besoin.Id);
+                            cmd.Parameters.AjouterValeur("@Id", besoin.Id);
                             RemplirParametresBesoin(cmd, besoin);
 
                             cmd.ExecuteNonQuery();
@@ -285,7 +285,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -297,8 +297,8 @@ namespace IUTSCalculator.Services
                                     WHEN @statut NOT IN (3, 4) THEN NULL
                                     ELSE DateCloture END
                             WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@statut", (int)nouveauStatut);
-                        cmd.Parameters.AddWithValue("@id", besoinId);
+                        cmd.Parameters.AjouterValeur("@statut", (int)nouveauStatut);
+                        cmd.Parameters.AjouterValeur("@id", besoinId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -314,7 +314,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // 1. Contrôle du verrou probatoire
                     using (var cmdVerif = conn.CreateCommand())
@@ -322,7 +322,7 @@ namespace IUTSCalculator.Services
                         cmdVerif.CommandText = @"
                             SELECT COUNT(*) FROM RecrutementCandidatures 
                             WHERE BesoinId = @besoinId AND (SalarieCreeMatricule IS NOT NULL OR Statut = 4);";
-                        cmdVerif.Parameters.AddWithValue("@besoinId", besoinId);
+                        cmdVerif.Parameters.AjouterValeur("@besoinId", besoinId);
                         long nbEmbauches = Convert.ToInt64(cmdVerif.ExecuteScalar());
                         if (nbEmbauches > 0)
                         {
@@ -344,7 +344,7 @@ namespace IUTSCalculator.Services
                                 cmdCascade1.CommandText = @"
                                     DELETE FROM RecrutementEntretiens 
                                     WHERE CandidatureId IN (SELECT Id FROM RecrutementCandidatures WHERE BesoinId = @besoinId);";
-                                cmdCascade1.Parameters.AddWithValue("@besoinId", besoinId);
+                                cmdCascade1.Parameters.AjouterValeur("@besoinId", besoinId);
                                 cmdCascade1.ExecuteNonQuery();
                             }
 
@@ -353,7 +353,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdCascade2.Transaction = tx;
                                 cmdCascade2.CommandText = "DELETE FROM RecrutementCandidatures WHERE BesoinId = @besoinId;";
-                                cmdCascade2.Parameters.AddWithValue("@besoinId", besoinId);
+                                cmdCascade2.Parameters.AjouterValeur("@besoinId", besoinId);
                                 cmdCascade2.ExecuteNonQuery();
                             }
 
@@ -362,7 +362,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelete.Transaction = tx;
                                 cmdDelete.CommandText = "DELETE FROM RecrutementBesoins WHERE Id = @besoinId;";
-                                cmdDelete.Parameters.AddWithValue("@besoinId", besoinId);
+                                cmdDelete.Parameters.AjouterValeur("@besoinId", besoinId);
                                 cmdDelete.ExecuteNonQuery();
                             }
 
@@ -391,7 +391,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -407,7 +407,7 @@ namespace IUTSCalculator.Services
                         if (vivierActif.HasValue)
                         {
                             sql += " AND c.VivierActif = @actif ";
-                            cmd.Parameters.AddWithValue("@actif", vivierActif.Value ? 1 : 0);
+                            cmd.Parameters.AjouterValeur("@actif", vivierActif.Value ? 1 : 0);
                         }
 
                         if (!string.IsNullOrWhiteSpace(recherche))
@@ -419,7 +419,7 @@ namespace IUTSCalculator.Services
                                        OR c.DiplomeLePlusEleve LIKE @recherche 
                                        OR c.CompetencesCles LIKE @recherche 
                                        OR c.DerniereFonction LIKE @recherche) ";
-                            cmd.Parameters.AddWithValue("@recherche", "%" + recherche.Trim() + "%");
+                            cmd.Parameters.AjouterValeur("@recherche", "%" + recherche.Trim() + "%");
                         }
 
                         sql += @" GROUP BY c.Id, c.Nom, c.Prenoms, c.Email, c.Telephone, c.DiplomeLePlusEleve,
@@ -452,7 +452,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -468,7 +468,7 @@ namespace IUTSCalculator.Services
                                      c.AnneesExperience, c.DerniereFonction, c.CompetencesCles,
                                      c.CvChemin, c.VivierActif, c.Commentaires, c.DateCreation;";
 
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -495,7 +495,7 @@ namespace IUTSCalculator.Services
 
             return await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     VerifierDoublonCandidat(conn, candidat);
 
@@ -516,7 +516,7 @@ namespace IUTSCalculator.Services
                                 SELECT last_insert_rowid();";
 
                             RemplirParametresCandidat(cmd, candidat);
-                            cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                            cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
                             candidat.Id = Convert.ToInt32(cmd.ExecuteScalar());
                             return candidat.Id;
@@ -538,7 +538,7 @@ namespace IUTSCalculator.Services
                                     Commentaires = @Commentaires
                                 WHERE Id = @Id;";
 
-                            cmd.Parameters.AddWithValue("@Id", candidat.Id);
+                            cmd.Parameters.AjouterValeur("@Id", candidat.Id);
                             RemplirParametresCandidat(cmd, candidat);
 
                             cmd.ExecuteNonQuery();
@@ -558,7 +558,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // 1. Contrôle du verrou probatoire
                     using (var cmdVerif = conn.CreateCommand())
@@ -566,7 +566,7 @@ namespace IUTSCalculator.Services
                         cmdVerif.CommandText = @"
                             SELECT COUNT(*) FROM RecrutementCandidatures
                             WHERE CandidatId = @candidatId AND (SalarieCreeMatricule IS NOT NULL OR Statut = 4);";
-                        cmdVerif.Parameters.AddWithValue("@candidatId", candidatId);
+                        cmdVerif.Parameters.AjouterValeur("@candidatId", candidatId);
                         long nbEmbauches = Convert.ToInt64(cmdVerif.ExecuteScalar());
                         if (nbEmbauches > 0)
                         {
@@ -582,7 +582,7 @@ namespace IUTSCalculator.Services
                     using (var cmdCv = conn.CreateCommand())
                     {
                         cmdCv.CommandText = "SELECT CvChemin FROM RecrutementCandidats WHERE Id = @candidatId;";
-                        cmdCv.Parameters.AddWithValue("@candidatId", candidatId);
+                        cmdCv.Parameters.AjouterValeur("@candidatId", candidatId);
                         var resultat = cmdCv.ExecuteScalar();
                         cvChemin = resultat as string;
                     }
@@ -598,7 +598,7 @@ namespace IUTSCalculator.Services
                                 cmdCascade1.CommandText = @"
                                     DELETE FROM RecrutementEntretiens 
                                     WHERE CandidatureId IN (SELECT Id FROM RecrutementCandidatures WHERE CandidatId = @candidatId);";
-                                cmdCascade1.Parameters.AddWithValue("@candidatId", candidatId);
+                                cmdCascade1.Parameters.AjouterValeur("@candidatId", candidatId);
                                 cmdCascade1.ExecuteNonQuery();
                             }
 
@@ -606,7 +606,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdCascade2.Transaction = tx;
                                 cmdCascade2.CommandText = "DELETE FROM RecrutementCandidatures WHERE CandidatId = @candidatId;";
-                                cmdCascade2.Parameters.AddWithValue("@candidatId", candidatId);
+                                cmdCascade2.Parameters.AjouterValeur("@candidatId", candidatId);
                                 cmdCascade2.ExecuteNonQuery();
                             }
 
@@ -614,7 +614,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelete.Transaction = tx;
                                 cmdDelete.CommandText = "DELETE FROM RecrutementCandidats WHERE Id = @candidatId;";
-                                cmdDelete.Parameters.AddWithValue("@candidatId", candidatId);
+                                cmdDelete.Parameters.AjouterValeur("@candidatId", candidatId);
                                 cmdDelete.ExecuteNonQuery();
                             }
 
@@ -651,7 +651,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -673,25 +673,25 @@ namespace IUTSCalculator.Services
                         if (besoinId.HasValue)
                         {
                             sql += " AND c.BesoinId = @besoinId ";
-                            cmd.Parameters.AddWithValue("@besoinId", besoinId.Value);
+                            cmd.Parameters.AjouterValeur("@besoinId", besoinId.Value);
                         }
 
                         if (candidatId.HasValue)
                         {
                             sql += " AND c.CandidatId = @candidatId ";
-                            cmd.Parameters.AddWithValue("@candidatId", candidatId.Value);
+                            cmd.Parameters.AjouterValeur("@candidatId", candidatId.Value);
                         }
 
                         if (etape.HasValue)
                         {
                             sql += " AND c.EtapeActuelle = @etape ";
-                            cmd.Parameters.AddWithValue("@etape", (int)etape.Value);
+                            cmd.Parameters.AjouterValeur("@etape", (int)etape.Value);
                         }
 
                         if (statut.HasValue)
                         {
                             sql += " AND c.Statut = @statut ";
-                            cmd.Parameters.AddWithValue("@statut", (int)statut.Value);
+                            cmd.Parameters.AjouterValeur("@statut", (int)statut.Value);
                         }
 
                         if (!string.IsNullOrWhiteSpace(recherche))
@@ -701,7 +701,7 @@ namespace IUTSCalculator.Services
                                        OR cand.Email LIKE @recherche 
                                        OR b.Reference LIKE @recherche 
                                        OR b.IntitulePoste LIKE @recherche) ";
-                            cmd.Parameters.AddWithValue("@recherche", "%" + recherche.Trim() + "%");
+                            cmd.Parameters.AjouterValeur("@recherche", "%" + recherche.Trim() + "%");
                         }
 
                         sql += " ORDER BY c.DatePostulation DESC, c.Id DESC;";
@@ -731,7 +731,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -750,7 +750,7 @@ namespace IUTSCalculator.Services
                             INNER JOIN RecrutementBesoins b ON c.BesoinId = b.Id
                             WHERE c.Id = @id;";
 
-                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.Parameters.AjouterValeur("@id", id);
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -779,7 +779,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // 1. Vérifier si une candidature existe déjà pour ce couple
                     using (var cmdVerif = conn.CreateCommand())
@@ -788,8 +788,8 @@ namespace IUTSCalculator.Services
                             SELECT Id, Statut, SalarieCreeMatricule 
                             FROM RecrutementCandidatures 
                             WHERE BesoinId = @besoinId AND CandidatId = @candidatId;";
-                        cmdVerif.Parameters.AddWithValue("@besoinId", besoinId);
-                        cmdVerif.Parameters.AddWithValue("@candidatId", candidatId);
+                        cmdVerif.Parameters.AjouterValeur("@besoinId", besoinId);
+                        cmdVerif.Parameters.AjouterValeur("@candidatId", candidatId);
 
                         using (var reader = cmdVerif.ExecuteReader())
                         {
@@ -816,9 +816,9 @@ namespace IUTSCalculator.Services
                                             PretentionSalariale = @pretention,
                                             DatePostulation = date('now')
                                         WHERE Id = @id;";
-                                    cmdReactiv.Parameters.AddWithValue("@canal", (int)canal);
-                                    cmdReactiv.Parameters.AddWithValue("@pretention", pretentionSalariale.HasValue ? (object)DbValue.MoneyToDb(pretentionSalariale.Value) : DBNull.Value);
-                                    cmdReactiv.Parameters.AddWithValue("@id", existingId);
+                                    cmdReactiv.Parameters.AjouterValeur("@canal", (int)canal);
+                                    cmdReactiv.Parameters.AjouterValeur("@pretention", pretentionSalariale.HasValue ? (object)DbValue.MoneyToDb(pretentionSalariale.Value) : DBNull.Value);
+                                    cmdReactiv.Parameters.AjouterValeur("@id", existingId);
                                     cmdReactiv.ExecuteNonQuery();
                                     return existingId;
                                 }
@@ -839,12 +839,12 @@ namespace IUTSCalculator.Services
                             );
                             SELECT last_insert_rowid();";
 
-                        cmd.Parameters.AddWithValue("@BesoinId", besoinId);
-                        cmd.Parameters.AddWithValue("@CandidatId", candidatId);
-                        cmd.Parameters.AddWithValue("@DatePostulation", DbValue.DateToDb(DateTime.Today));
-                        cmd.Parameters.AddWithValue("@CanalSource", (int)canal);
-                        cmd.Parameters.AddWithValue("@Pretention", pretentionSalariale.HasValue ? (object)DbValue.MoneyToDb(pretentionSalariale.Value) : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@BesoinId", besoinId);
+                        cmd.Parameters.AjouterValeur("@CandidatId", candidatId);
+                        cmd.Parameters.AjouterValeur("@DatePostulation", DbValue.DateToDb(DateTime.Today));
+                        cmd.Parameters.AjouterValeur("@CanalSource", (int)canal);
+                        cmd.Parameters.AjouterValeur("@Pretention", pretentionSalariale.HasValue ? (object)DbValue.MoneyToDb(pretentionSalariale.Value) : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
@@ -860,7 +860,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // Contrôle verrou
                     VerifierCandidatureNonVerrouillee(conn, candidatureId);
@@ -872,8 +872,8 @@ namespace IUTSCalculator.Services
                                 EtapeActuelle = @etape,
                                 Statut = CASE WHEN Statut = 0 THEN 1 ELSE Statut END
                             WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@etape", (int)nouvelleEtape);
-                        cmd.Parameters.AddWithValue("@id", candidatureId);
+                        cmd.Parameters.AjouterValeur("@etape", (int)nouvelleEtape);
+                        cmd.Parameters.AjouterValeur("@id", candidatureId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -891,7 +891,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     VerifierCandidatureNonVerrouillee(conn, candidatureId);
 
@@ -905,9 +905,9 @@ namespace IUTSCalculator.Services
                                     THEN COALESCE(CommentaireEvaluation || ' | ', '') || @motif
                                     ELSE CommentaireEvaluation END
                             WHERE Id = @id;";
-                        cmd.Parameters.AddWithValue("@statut", (int)nouveauStatut);
-                        cmd.Parameters.AddWithValue("@motif", (object)motif ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@id", candidatureId);
+                        cmd.Parameters.AjouterValeur("@statut", (int)nouveauStatut);
+                        cmd.Parameters.AjouterValeur("@motif", (object)motif ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@id", candidatureId);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -922,7 +922,7 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // Contrôle verrou probatoire
                     VerifierCandidatureNonVerrouillee(conn, candidatureId);
@@ -935,7 +935,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdCascade.Transaction = tx;
                                 cmdCascade.CommandText = "DELETE FROM RecrutementEntretiens WHERE CandidatureId = @id;";
-                                cmdCascade.Parameters.AddWithValue("@id", candidatureId);
+                                cmdCascade.Parameters.AjouterValeur("@id", candidatureId);
                                 cmdCascade.ExecuteNonQuery();
                             }
 
@@ -943,7 +943,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmdDelete.Transaction = tx;
                                 cmdDelete.CommandText = "DELETE FROM RecrutementCandidatures WHERE Id = @id;";
-                                cmdDelete.Parameters.AddWithValue("@id", candidatureId);
+                                cmdDelete.Parameters.AjouterValeur("@id", candidatureId);
                                 cmdDelete.ExecuteNonQuery();
                             }
 
@@ -972,7 +972,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     using (var cmd = conn.CreateCommand())
                     {
@@ -991,7 +991,7 @@ namespace IUTSCalculator.Services
                         if (candidatureId.HasValue)
                         {
                             sql += " AND e.CandidatureId = @candId ";
-                            cmd.Parameters.AddWithValue("@candId", candidatureId.Value);
+                            cmd.Parameters.AjouterValeur("@candId", candidatureId.Value);
                         }
 
                         sql += " ORDER BY e.DateEntretien DESC, e.Id DESC;";
@@ -1023,7 +1023,7 @@ namespace IUTSCalculator.Services
 
             return await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     VerifierCandidatureNonVerrouillee(conn, entretien.CandidatureId);
 
@@ -1051,7 +1051,7 @@ namespace IUTSCalculator.Services
                                         SELECT last_insert_rowid();";
 
                                     RemplirParametresEntretien(cmd, entretien);
-                                    cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                                    cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
                                     entretienId = Convert.ToInt32(cmd.ExecuteScalar());
                                     entretien.Id = entretienId;
@@ -1071,7 +1071,7 @@ namespace IUTSCalculator.Services
                                             Synthese = @Synthese
                                         WHERE Id = @Id;";
 
-                                    cmd.Parameters.AddWithValue("@Id", entretien.Id);
+                                    cmd.Parameters.AjouterValeur("@Id", entretien.Id);
                                     RemplirParametresEntretien(cmd, entretien);
 
                                     cmd.ExecuteNonQuery();
@@ -1088,8 +1088,8 @@ namespace IUTSCalculator.Services
                                         AvisGlobal = @dernierAvis,
                                         Statut = CASE WHEN Statut = 0 THEN 1 ELSE Statut END
                                     WHERE Id = @candId;";
-                                cmdScore.Parameters.AddWithValue("@candId", entretien.CandidatureId);
-                                cmdScore.Parameters.AddWithValue("@dernierAvis", (object)(entretien.Avis.HasValue ? (int)entretien.Avis.Value : (object)DBNull.Value));
+                                cmdScore.Parameters.AjouterValeur("@candId", entretien.CandidatureId);
+                                cmdScore.Parameters.AjouterValeur("@dernierAvis", (object)(entretien.Avis.HasValue ? (int)entretien.Avis.Value : (object)DBNull.Value));
                                 cmdScore.ExecuteNonQuery();
                             }
 
@@ -1113,13 +1113,13 @@ namespace IUTSCalculator.Services
         {
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     int candId = 0;
                     using (var cmdGetCand = conn.CreateCommand())
                     {
                         cmdGetCand.CommandText = "SELECT CandidatureId FROM RecrutementEntretiens WHERE Id = @id;";
-                        cmdGetCand.Parameters.AddWithValue("@id", entretienId);
+                        cmdGetCand.Parameters.AjouterValeur("@id", entretienId);
                         var obj = cmdGetCand.ExecuteScalar();
                         if (obj != null && obj != DBNull.Value)
                             candId = Convert.ToInt32(obj);
@@ -1136,7 +1136,7 @@ namespace IUTSCalculator.Services
                             {
                                 cmd.Transaction = tx;
                                 cmd.CommandText = "DELETE FROM RecrutementEntretiens WHERE Id = @id;";
-                                cmd.Parameters.AddWithValue("@id", entretienId);
+                                cmd.Parameters.AjouterValeur("@id", entretienId);
                                 cmd.ExecuteNonQuery();
                             }
 
@@ -1149,7 +1149,7 @@ namespace IUTSCalculator.Services
                                         UPDATE RecrutementCandidatures SET
                                             ScoreEvaluation = (SELECT AVG(NoteGlobale) FROM RecrutementEntretiens WHERE CandidatureId = @candId AND NoteGlobale IS NOT NULL)
                                         WHERE Id = @candId;";
-                                    cmdScore.Parameters.AddWithValue("@candId", candId);
+                                    cmdScore.Parameters.AjouterValeur("@candId", candId);
                                     cmdScore.ExecuteNonQuery();
                                 }
                             }
@@ -1227,7 +1227,7 @@ namespace IUTSCalculator.Services
 
             return await Task.Run(async () =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // 1. Charger et valider la candidature, le besoin (offre) et le poste RH-02 rattaché
                     BesoinRecrutement besoin = null;
@@ -1251,7 +1251,7 @@ namespace IUTSCalculator.Services
                             INNER JOIN RecrutementCandidats cand ON c.CandidatId = cand.Id
                             LEFT JOIN Postes p ON b.PosteId = p.Id
                             WHERE c.Id = @id;";
-                        cmdRead.Parameters.AddWithValue("@id", candidatureId);
+                        cmdRead.Parameters.AjouterValeur("@id", candidatureId);
 
                         using (var reader = cmdRead.ExecuteReader())
                         {
@@ -1362,8 +1362,8 @@ namespace IUTSCalculator.Services
                             {
                                 cmdContrat.Transaction = tx;
                                 cmdContrat.CommandText = "UPDATE Employees SET TypeContrat = @typeContrat WHERE EmployeeId = @matricule;";
-                                cmdContrat.Parameters.AddWithValue("@typeContrat", typeContrat);
-                                cmdContrat.Parameters.AddWithValue("@matricule", salarie.EmployeeId);
+                                cmdContrat.Parameters.AjouterValeur("@typeContrat", typeContrat);
+                                cmdContrat.Parameters.AjouterValeur("@matricule", salarie.EmployeeId);
                                 cmdContrat.ExecuteNonQuery();
                             }
 
@@ -1374,8 +1374,8 @@ namespace IUTSCalculator.Services
                                 {
                                     cmdPoste.Transaction = tx;
                                     cmdPoste.CommandText = "UPDATE Postes SET TitulaireMatricule = @matricule WHERE Id = @posteId;";
-                                    cmdPoste.Parameters.AddWithValue("@matricule", salarie.EmployeeId);
-                                    cmdPoste.Parameters.AddWithValue("@posteId", besoin.PosteId.Value);
+                                    cmdPoste.Parameters.AjouterValeur("@matricule", salarie.EmployeeId);
+                                    cmdPoste.Parameters.AjouterValeur("@posteId", besoin.PosteId.Value);
                                     cmdPoste.ExecuteNonQuery();
                                 }
                             }
@@ -1393,11 +1393,11 @@ namespace IUTSCalculator.Services
                                         SalarieCreeMatricule = @matricule,
                                         TypeContratEmbauche = @typeContrat
                                     WHERE Id = @id;";
-                                cmdCand.Parameters.AddWithValue("@dateEmbauche", DbValue.DateToDb(dateEntree));
-                                cmdCand.Parameters.AddWithValue("@salaire", DbValue.MoneyToDb(salaireNegocie));
-                                cmdCand.Parameters.AddWithValue("@matricule", salarie.EmployeeId);
-                                cmdCand.Parameters.AddWithValue("@typeContrat", typeContrat);
-                                cmdCand.Parameters.AddWithValue("@id", candidatureId);
+                                cmdCand.Parameters.AjouterValeur("@dateEmbauche", DbValue.DateToDb(dateEntree));
+                                cmdCand.Parameters.AjouterValeur("@salaire", DbValue.MoneyToDb(salaireNegocie));
+                                cmdCand.Parameters.AjouterValeur("@matricule", salarie.EmployeeId);
+                                cmdCand.Parameters.AjouterValeur("@typeContrat", typeContrat);
+                                cmdCand.Parameters.AjouterValeur("@id", candidatureId);
                                 cmdCand.ExecuteNonQuery();
                             }
 
@@ -1415,11 +1415,11 @@ namespace IUTSCalculator.Services
                                         Statut = @statut,
                                         DateCloture = CASE WHEN @estPourvu = 1 THEN @dateCloture ELSE DateCloture END
                                     WHERE Id = @id;";
-                                cmdBesoin.Parameters.AddWithValue("@nbRecrutes", nouveauTotalRecrutes);
-                                cmdBesoin.Parameters.AddWithValue("@statut", nouveauStatutBesoin);
-                                cmdBesoin.Parameters.AddWithValue("@estPourvu", estPourvu ? 1 : 0);
-                                cmdBesoin.Parameters.AddWithValue("@dateCloture", DbValue.DateToDb(dateEntree));
-                                cmdBesoin.Parameters.AddWithValue("@id", besoin.Id);
+                                cmdBesoin.Parameters.AjouterValeur("@nbRecrutes", nouveauTotalRecrutes);
+                                cmdBesoin.Parameters.AjouterValeur("@statut", nouveauStatutBesoin);
+                                cmdBesoin.Parameters.AjouterValeur("@estPourvu", estPourvu ? 1 : 0);
+                                cmdBesoin.Parameters.AjouterValeur("@dateCloture", DbValue.DateToDb(dateEntree));
+                                cmdBesoin.Parameters.AjouterValeur("@id", besoin.Id);
                                 cmdBesoin.ExecuteNonQuery();
                             }
 
@@ -1468,7 +1468,7 @@ namespace IUTSCalculator.Services
         {
             return await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     return ProposerMatriculeSuivant(LireMatriculesExistants(conn, null));
                 }
@@ -1547,7 +1547,7 @@ namespace IUTSCalculator.Services
         /// Matricules déjà employés dans le dossier : salariés, et historique de paie (un salarié
         /// supprimé garde ses bulletins archivés : réutiliser son matricule les rattacherait au nouvel embauché).
         /// </summary>
-        private static List<string> LireMatriculesExistants(SQLiteConnection conn, SQLiteTransaction tx)
+        private static List<string> LireMatriculesExistants(SqliteConnection conn, SqliteTransaction tx)
         {
             var liste = new List<string>();
             using (var cmd = conn.CreateCommand())
@@ -1577,13 +1577,13 @@ namespace IUTSCalculator.Services
                     $"et les séparateurs « - », « _ » ou « . » ({LongueurMaxMatricule} caractères au plus).");
         }
 
-        private static void VerifierMatriculeDisponible(SQLiteConnection conn, SQLiteTransaction tx, string matricule)
+        private static void VerifierMatriculeDisponible(SqliteConnection conn, SqliteTransaction tx, string matricule)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = "SELECT COUNT(*) FROM Employees WHERE TRIM(EmployeeId) = @matricule COLLATE NOCASE;";
-                cmd.Parameters.AddWithValue("@matricule", matricule);
+                cmd.Parameters.AjouterValeur("@matricule", matricule);
                 if (Convert.ToInt64(cmd.ExecuteScalar()) > 0)
                 {
                     throw new InvalidOperationException(
@@ -1596,7 +1596,7 @@ namespace IUTSCalculator.Services
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = "SELECT COUNT(*) FROM TaxCalculations WHERE TRIM(EmployeeId) = @matricule COLLATE NOCASE;";
-                cmd.Parameters.AddWithValue("@matricule", matricule);
+                cmd.Parameters.AjouterValeur("@matricule", matricule);
                 if (Convert.ToInt64(cmd.ExecuteScalar()) > 0)
                 {
                     throw new InvalidOperationException(
@@ -1627,7 +1627,7 @@ namespace IUTSCalculator.Services
 
             await Task.Run(() =>
             {
-                using (var conn = _sqliteService.CreateConnection())
+                using (var conn = _sqliteService.CreerConnexion())
                 {
                     // Métriques des besoins
                     using (var cmd = conn.CreateCommand())
@@ -1705,7 +1705,7 @@ namespace IUTSCalculator.Services
 
         #region Méthodes Utilitaires & Mappages
 
-        private static void VerifierCandidatureNonVerrouillee(SQLiteConnection conn, int candidatureId)
+        private static void VerifierCandidatureNonVerrouillee(SqliteConnection conn, int candidatureId)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -1713,7 +1713,7 @@ namespace IUTSCalculator.Services
                     SELECT Statut, SalarieCreeMatricule 
                     FROM RecrutementCandidatures 
                     WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", candidatureId);
+                cmd.Parameters.AjouterValeur("@id", candidatureId);
 
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -1733,43 +1733,43 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static void RemplirParametresBesoin(SQLiteCommand cmd, BesoinRecrutement b)
+        private static void RemplirParametresBesoin(SqliteCommand cmd, BesoinRecrutement b)
         {
-            cmd.Parameters.AddWithValue("@Reference", b.Reference ?? "");
-            cmd.Parameters.AddWithValue("@IntitulePoste", b.IntitulePoste ?? "");
-            cmd.Parameters.AddWithValue("@PosteId", (object)b.PosteId ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Departement", b.Departement ?? "");
-            cmd.Parameters.AddWithValue("@Motif", (int)b.Motif);
-            cmd.Parameters.AddWithValue("@NombrePostes", b.NombrePostes);
-            cmd.Parameters.AddWithValue("@NombreRecrutes", b.NombreRecrutes);
-            cmd.Parameters.AddWithValue("@TypeContratVise", b.TypeContratVise ?? "CDI");
-            cmd.Parameters.AddWithValue("@RemunMin", b.RemunerationProposeeMin.HasValue ? (object)DbValue.MoneyToDb(b.RemunerationProposeeMin.Value) : DBNull.Value);
-            cmd.Parameters.AddWithValue("@RemunMax", b.RemunerationProposeeMax.HasValue ? (object)DbValue.MoneyToDb(b.RemunerationProposeeMax.Value) : DBNull.Value);
-            cmd.Parameters.AddWithValue("@IndLogement", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteLogement)));
-            cmd.Parameters.AddWithValue("@IndTransport", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteTransport)));
-            cmd.Parameters.AddWithValue("@IndFonction", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteFonction)));
-            cmd.Parameters.AddWithValue("@IndSujetion", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteSujetion)));
-            cmd.Parameters.AddWithValue("@DateExpression", DbValue.DateToDb(b.DateExpression));
-            cmd.Parameters.AddWithValue("@DateEcheance", DbValue.DateNullableToDb(b.DateEcheanceSouhaitee));
-            cmd.Parameters.AddWithValue("@DateCloture", DbValue.DateNullableToDb(b.DateCloture));
-            cmd.Parameters.AddWithValue("@Statut", (int)b.Statut);
-            cmd.Parameters.AddWithValue("@Responsable", b.ResponsableRecrutement ?? "");
-            cmd.Parameters.AddWithValue("@Description", b.DescriptionProfil ?? "");
+            cmd.Parameters.AjouterValeur("@Reference", b.Reference ?? "");
+            cmd.Parameters.AjouterValeur("@IntitulePoste", b.IntitulePoste ?? "");
+            cmd.Parameters.AjouterValeur("@PosteId", (object)b.PosteId ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@Departement", b.Departement ?? "");
+            cmd.Parameters.AjouterValeur("@Motif", (int)b.Motif);
+            cmd.Parameters.AjouterValeur("@NombrePostes", b.NombrePostes);
+            cmd.Parameters.AjouterValeur("@NombreRecrutes", b.NombreRecrutes);
+            cmd.Parameters.AjouterValeur("@TypeContratVise", b.TypeContratVise ?? "CDI");
+            cmd.Parameters.AjouterValeur("@RemunMin", b.RemunerationProposeeMin.HasValue ? (object)DbValue.MoneyToDb(b.RemunerationProposeeMin.Value) : DBNull.Value);
+            cmd.Parameters.AjouterValeur("@RemunMax", b.RemunerationProposeeMax.HasValue ? (object)DbValue.MoneyToDb(b.RemunerationProposeeMax.Value) : DBNull.Value);
+            cmd.Parameters.AjouterValeur("@IndLogement", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteLogement)));
+            cmd.Parameters.AjouterValeur("@IndTransport", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteTransport)));
+            cmd.Parameters.AjouterValeur("@IndFonction", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteFonction)));
+            cmd.Parameters.AjouterValeur("@IndSujetion", DbValue.MoneyToDb(Math.Max(0m, b.IndemniteSujetion)));
+            cmd.Parameters.AjouterValeur("@DateExpression", DbValue.DateToDb(b.DateExpression));
+            cmd.Parameters.AjouterValeur("@DateEcheance", DbValue.DateNullableToDb(b.DateEcheanceSouhaitee));
+            cmd.Parameters.AjouterValeur("@DateCloture", DbValue.DateNullableToDb(b.DateCloture));
+            cmd.Parameters.AjouterValeur("@Statut", (int)b.Statut);
+            cmd.Parameters.AjouterValeur("@Responsable", b.ResponsableRecrutement ?? "");
+            cmd.Parameters.AjouterValeur("@Description", b.DescriptionProfil ?? "");
         }
 
-        private static void RemplirParametresCandidat(SQLiteCommand cmd, Candidat c)
+        private static void RemplirParametresCandidat(SqliteCommand cmd, Candidat c)
         {
-            cmd.Parameters.AddWithValue("@Nom", c.Nom?.Trim().ToUpperInvariant() ?? "");
-            cmd.Parameters.AddWithValue("@Prenoms", c.Prenoms?.Trim() ?? "");
-            cmd.Parameters.AddWithValue("@Email", c.Email?.Trim() ?? "");
-            cmd.Parameters.AddWithValue("@Telephone", c.Telephone?.Trim() ?? "");
-            cmd.Parameters.AddWithValue("@Diplome", c.DiplomeLePlusEleve ?? "");
-            cmd.Parameters.AddWithValue("@AnneesExperience", c.AnneesExperience);
-            cmd.Parameters.AddWithValue("@DerniereFonction", c.DerniereFonction ?? "");
-            cmd.Parameters.AddWithValue("@CompetencesCles", c.CompetencesCles ?? "");
-            cmd.Parameters.AddWithValue("@CvChemin", c.CvChemin ?? "");
-            cmd.Parameters.AddWithValue("@VivierActif", c.VivierActif ? 1 : 0);
-            cmd.Parameters.AddWithValue("@Commentaires", c.Commentaires ?? "");
+            cmd.Parameters.AjouterValeur("@Nom", c.Nom?.Trim().ToUpperInvariant() ?? "");
+            cmd.Parameters.AjouterValeur("@Prenoms", c.Prenoms?.Trim() ?? "");
+            cmd.Parameters.AjouterValeur("@Email", c.Email?.Trim() ?? "");
+            cmd.Parameters.AjouterValeur("@Telephone", c.Telephone?.Trim() ?? "");
+            cmd.Parameters.AjouterValeur("@Diplome", c.DiplomeLePlusEleve ?? "");
+            cmd.Parameters.AjouterValeur("@AnneesExperience", c.AnneesExperience);
+            cmd.Parameters.AjouterValeur("@DerniereFonction", c.DerniereFonction ?? "");
+            cmd.Parameters.AjouterValeur("@CompetencesCles", c.CompetencesCles ?? "");
+            cmd.Parameters.AjouterValeur("@CvChemin", c.CvChemin ?? "");
+            cmd.Parameters.AjouterValeur("@VivierActif", c.VivierActif ? 1 : 0);
+            cmd.Parameters.AjouterValeur("@Commentaires", c.Commentaires ?? "");
         }
 
         /// <summary>
@@ -1778,7 +1778,7 @@ namespace IUTSCalculator.Services
         /// téléphone (comparaison insensible à la casse et aux espaces superflus).
         /// Les candidats sans email ni téléphone renseigné ne sont pas comparés.
         /// </summary>
-        private static void VerifierDoublonCandidat(SQLiteConnection conn, Candidat candidat)
+        private static void VerifierDoublonCandidat(SqliteConnection conn, Candidat candidat)
         {
             bool aEmail = !string.IsNullOrWhiteSpace(candidat.Email);
             bool aTelephone = !string.IsNullOrWhiteSpace(candidat.Telephone);
@@ -1794,11 +1794,11 @@ namespace IUTSCalculator.Services
                          OR (@ATelephone = 1 AND TRIM(Telephone) = TRIM(@Telephone))
                       )
                     LIMIT 1;";
-                cmd.Parameters.AddWithValue("@Id", candidat.Id);
-                cmd.Parameters.AddWithValue("@AEmail", aEmail ? 1 : 0);
-                cmd.Parameters.AddWithValue("@Email", candidat.Email ?? "");
-                cmd.Parameters.AddWithValue("@ATelephone", aTelephone ? 1 : 0);
-                cmd.Parameters.AddWithValue("@Telephone", candidat.Telephone ?? "");
+                cmd.Parameters.AjouterValeur("@Id", candidat.Id);
+                cmd.Parameters.AjouterValeur("@AEmail", aEmail ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@Email", candidat.Email ?? "");
+                cmd.Parameters.AjouterValeur("@ATelephone", aTelephone ? 1 : 0);
+                cmd.Parameters.AjouterValeur("@Telephone", candidat.Telephone ?? "");
 
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -1884,21 +1884,21 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static void RemplirParametresEntretien(SQLiteCommand cmd, RecrutementEntretien e)
+        private static void RemplirParametresEntretien(SqliteCommand cmd, RecrutementEntretien e)
         {
-            cmd.Parameters.AddWithValue("@CandidatureId", e.CandidatureId);
-            cmd.Parameters.AddWithValue("@Etape", (int)e.Etape);
-            cmd.Parameters.AddWithValue("@DateEntretien", DbValue.DateToDb(e.DateEntretien));
-            cmd.Parameters.AddWithValue("@EvaluateurNom", e.EvaluateurNom ?? "");
-            cmd.Parameters.AddWithValue("@EvaluateurMatricule", (object)e.EvaluateurMatricule ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@NoteGlobale", (object)e.NoteGlobale ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Avis", (object)(e.Avis.HasValue ? (int)e.Avis.Value : (object)DBNull.Value));
-            cmd.Parameters.AddWithValue("@PointsForts", e.PointsForts ?? "");
-            cmd.Parameters.AddWithValue("@AxesAmelioration", e.AxesAmelioration ?? "");
-            cmd.Parameters.AddWithValue("@Synthese", e.Synthese ?? "");
+            cmd.Parameters.AjouterValeur("@CandidatureId", e.CandidatureId);
+            cmd.Parameters.AjouterValeur("@Etape", (int)e.Etape);
+            cmd.Parameters.AjouterValeur("@DateEntretien", DbValue.DateToDb(e.DateEntretien));
+            cmd.Parameters.AjouterValeur("@EvaluateurNom", e.EvaluateurNom ?? "");
+            cmd.Parameters.AjouterValeur("@EvaluateurMatricule", (object)e.EvaluateurMatricule ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@NoteGlobale", (object)e.NoteGlobale ?? DBNull.Value);
+            cmd.Parameters.AjouterValeur("@Avis", (object)(e.Avis.HasValue ? (int)e.Avis.Value : (object)DBNull.Value));
+            cmd.Parameters.AjouterValeur("@PointsForts", e.PointsForts ?? "");
+            cmd.Parameters.AjouterValeur("@AxesAmelioration", e.AxesAmelioration ?? "");
+            cmd.Parameters.AjouterValeur("@Synthese", e.Synthese ?? "");
         }
 
-        private static BesoinRecrutement LireBesoin(SQLiteDataReader r)
+        private static BesoinRecrutement LireBesoin(SqliteDataReader r)
         {
             return new BesoinRecrutement
             {
@@ -1930,7 +1930,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static Candidat LireCandidat(SQLiteDataReader r)
+        private static Candidat LireCandidat(SqliteDataReader r)
         {
             return new Candidat
             {
@@ -1951,7 +1951,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static Candidature LireCandidature(SQLiteDataReader r)
+        private static Candidature LireCandidature(SqliteDataReader r)
         {
             return new Candidature
             {
@@ -1983,7 +1983,7 @@ namespace IUTSCalculator.Services
             };
         }
 
-        private static RecrutementEntretien LireEntretien(SQLiteDataReader r)
+        private static RecrutementEntretien LireEntretien(SqliteDataReader r)
         {
             return new RecrutementEntretien
             {

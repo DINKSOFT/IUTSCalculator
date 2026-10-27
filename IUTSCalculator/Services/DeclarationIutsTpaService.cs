@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -84,7 +84,7 @@ namespace IUTSCalculator.Services
         /// </summary>
         private async Task RemplirLignesAsync(DeclarationIutsTpa declaration)
         {
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 // Jointure externe : un bulletin dont la fiche salarié a été supprimée doit
@@ -107,11 +107,11 @@ namespace IUTSCalculator.Services
                       AND c.IsRegularization = 0
                     ORDER BY e.LastName, e.FirstName, c.CalculationDate";
 
-                cmd.Parameters.AddWithValue("@debut", DbValue.DateToDb(declaration.DebutPeriode.Date));
-                cmd.Parameters.AddWithValue("@fin",
+                cmd.Parameters.AjouterValeur("@debut", DbValue.DateToDb(declaration.DebutPeriode.Date));
+                cmd.Parameters.AjouterValeur("@fin",
                     DbValue.DateToDb(declaration.FinPeriode.Date.AddDays(1).AddTicks(-1)));
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {

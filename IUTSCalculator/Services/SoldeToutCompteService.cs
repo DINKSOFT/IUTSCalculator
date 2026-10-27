@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -638,7 +638,7 @@ namespace IUTSCalculator.Services
 
             string now = DbValue.DateToDb(DateTime.Now);
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try
@@ -666,46 +666,46 @@ namespace IUTSCalculator.Services
                                 @TotalNet, @Commentaire, @DateCreation, @DateModification
                             );";
 
-                        cmd.Parameters.AddWithValue("@EmployeeId", stc.EmployeeId);
-                        cmd.Parameters.AddWithValue("@NomSalarie", stc.NomSalarie ?? "");
-                        cmd.Parameters.AddWithValue("@DateSortie", DbValue.DateToDb(stc.DateSortie));
-                        cmd.Parameters.AddWithValue("@Motif", (int)stc.Motif);
-                        cmd.Parameters.AddWithValue("@DateEntree", DbValue.DateToDb(stc.DateEntree));
-                        cmd.Parameters.AddWithValue("@AncienneteAnnees", stc.AncienneteAnnees);
-                        cmd.Parameters.AddWithValue("@AncienneteMois", stc.AncienneteMois);
-                        cmd.Parameters.AddWithValue("@Categorie", stc.Categorie ?? "");
-                        cmd.Parameters.AddWithValue("@Echelon", stc.Echelon ?? "");
-                        cmd.Parameters.AddWithValue("@Fonction", stc.Fonction ?? "");
-                        cmd.Parameters.AddWithValue("@SalaireReference", DbValue.MoneyToDb(stc.SalaireReference));
-                        cmd.Parameters.AddWithValue("@SalairePresence", DbValue.MoneyToDb(stc.SalairePresence));
-                        cmd.Parameters.AddWithValue("@JoursPresence", DbValue.DecimalToDb(stc.JoursPresence));
-                        cmd.Parameters.AddWithValue("@JoursCongesDus", DbValue.DecimalToDb(stc.JoursCongesDus));
-                        cmd.Parameters.AddWithValue("@IndemniteConges", DbValue.MoneyToDb(stc.IndemniteConges));
-                        cmd.Parameters.AddWithValue("@DureePreavisMois", stc.DureePreavisMois);
-                        cmd.Parameters.AddWithValue("@StatutPreavis", (int)stc.StatutPreavis);
-                        cmd.Parameters.AddWithValue("@IndemnitePreavis", DbValue.MoneyToDb(stc.IndemnitePreavis));
-                        cmd.Parameters.AddWithValue("@IndemniteLicenciement", DbValue.MoneyToDb(stc.IndemniteLicenciement));
-                        cmd.Parameters.AddWithValue("@TauxLicenciementApplique", DbValue.DecimalToDb(stc.TauxLicenciementApplique));
-                        cmd.Parameters.AddWithValue("@Indemnite13emeMois", DbValue.MoneyToDb(stc.Indemnite13emeMois));
-                        cmd.Parameters.AddWithValue("@Mois13emeMois", DbValue.DecimalToDb(stc.Mois13emeMois));
-                        cmd.Parameters.AddWithValue("@IndemnitesDiverses", DbValue.MoneyToDb(stc.IndemnitesDiverses));
-                        cmd.Parameters.AddWithValue("@LibelleIndemnitesDiverses", stc.LibelleIndemnitesDiverses ?? "");
-                        cmd.Parameters.AddWithValue("@DeductionsPrets", DbValue.MoneyToDb(stc.DeductionsPrets));
-                        cmd.Parameters.AddWithValue("@DeductionsAutres", DbValue.MoneyToDb(stc.DeductionsAutres));
-                        cmd.Parameters.AddWithValue("@LibelleDeductionsAutres", stc.LibelleDeductionsAutres ?? "");
-                        cmd.Parameters.AddWithValue("@EstimationIUTS", DbValue.MoneyToDb(stc.EstimationIUTS));
-                        cmd.Parameters.AddWithValue("@EstimationCNSS", DbValue.MoneyToDb(stc.EstimationCNSS));
-                        cmd.Parameters.AddWithValue("@TotalBrut", DbValue.MoneyToDb(stc.TotalBrut));
-                        cmd.Parameters.AddWithValue("@TotalExonere", DbValue.MoneyToDb(stc.TotalExonere));
-                        cmd.Parameters.AddWithValue("@TotalImposable", DbValue.MoneyToDb(stc.TotalImposable));
-                        cmd.Parameters.AddWithValue("@TotalRetenues", DbValue.MoneyToDb(stc.TotalRetenues));
-                        cmd.Parameters.AddWithValue("@TotalNet", DbValue.MoneyToDb(stc.TotalNet));
-                        cmd.Parameters.AddWithValue("@Commentaire", stc.Commentaire ?? "");
-                        cmd.Parameters.AddWithValue("@DateCreation", now);
-                        cmd.Parameters.AddWithValue("@DateModification", now);
+                        cmd.Parameters.AjouterValeur("@EmployeeId", stc.EmployeeId);
+                        cmd.Parameters.AjouterValeur("@NomSalarie", stc.NomSalarie ?? "");
+                        cmd.Parameters.AjouterValeur("@DateSortie", DbValue.DateToDb(stc.DateSortie));
+                        cmd.Parameters.AjouterValeur("@Motif", (int)stc.Motif);
+                        cmd.Parameters.AjouterValeur("@DateEntree", DbValue.DateToDb(stc.DateEntree));
+                        cmd.Parameters.AjouterValeur("@AncienneteAnnees", stc.AncienneteAnnees);
+                        cmd.Parameters.AjouterValeur("@AncienneteMois", stc.AncienneteMois);
+                        cmd.Parameters.AjouterValeur("@Categorie", stc.Categorie ?? "");
+                        cmd.Parameters.AjouterValeur("@Echelon", stc.Echelon ?? "");
+                        cmd.Parameters.AjouterValeur("@Fonction", stc.Fonction ?? "");
+                        cmd.Parameters.AjouterValeur("@SalaireReference", DbValue.MoneyToDb(stc.SalaireReference));
+                        cmd.Parameters.AjouterValeur("@SalairePresence", DbValue.MoneyToDb(stc.SalairePresence));
+                        cmd.Parameters.AjouterValeur("@JoursPresence", DbValue.DecimalToDb(stc.JoursPresence));
+                        cmd.Parameters.AjouterValeur("@JoursCongesDus", DbValue.DecimalToDb(stc.JoursCongesDus));
+                        cmd.Parameters.AjouterValeur("@IndemniteConges", DbValue.MoneyToDb(stc.IndemniteConges));
+                        cmd.Parameters.AjouterValeur("@DureePreavisMois", stc.DureePreavisMois);
+                        cmd.Parameters.AjouterValeur("@StatutPreavis", (int)stc.StatutPreavis);
+                        cmd.Parameters.AjouterValeur("@IndemnitePreavis", DbValue.MoneyToDb(stc.IndemnitePreavis));
+                        cmd.Parameters.AjouterValeur("@IndemniteLicenciement", DbValue.MoneyToDb(stc.IndemniteLicenciement));
+                        cmd.Parameters.AjouterValeur("@TauxLicenciementApplique", DbValue.DecimalToDb(stc.TauxLicenciementApplique));
+                        cmd.Parameters.AjouterValeur("@Indemnite13emeMois", DbValue.MoneyToDb(stc.Indemnite13emeMois));
+                        cmd.Parameters.AjouterValeur("@Mois13emeMois", DbValue.DecimalToDb(stc.Mois13emeMois));
+                        cmd.Parameters.AjouterValeur("@IndemnitesDiverses", DbValue.MoneyToDb(stc.IndemnitesDiverses));
+                        cmd.Parameters.AjouterValeur("@LibelleIndemnitesDiverses", stc.LibelleIndemnitesDiverses ?? "");
+                        cmd.Parameters.AjouterValeur("@DeductionsPrets", DbValue.MoneyToDb(stc.DeductionsPrets));
+                        cmd.Parameters.AjouterValeur("@DeductionsAutres", DbValue.MoneyToDb(stc.DeductionsAutres));
+                        cmd.Parameters.AjouterValeur("@LibelleDeductionsAutres", stc.LibelleDeductionsAutres ?? "");
+                        cmd.Parameters.AjouterValeur("@EstimationIUTS", DbValue.MoneyToDb(stc.EstimationIUTS));
+                        cmd.Parameters.AjouterValeur("@EstimationCNSS", DbValue.MoneyToDb(stc.EstimationCNSS));
+                        cmd.Parameters.AjouterValeur("@TotalBrut", DbValue.MoneyToDb(stc.TotalBrut));
+                        cmd.Parameters.AjouterValeur("@TotalExonere", DbValue.MoneyToDb(stc.TotalExonere));
+                        cmd.Parameters.AjouterValeur("@TotalImposable", DbValue.MoneyToDb(stc.TotalImposable));
+                        cmd.Parameters.AjouterValeur("@TotalRetenues", DbValue.MoneyToDb(stc.TotalRetenues));
+                        cmd.Parameters.AjouterValeur("@TotalNet", DbValue.MoneyToDb(stc.TotalNet));
+                        cmd.Parameters.AjouterValeur("@Commentaire", stc.Commentaire ?? "");
+                        cmd.Parameters.AjouterValeur("@DateCreation", now);
+                        cmd.Parameters.AjouterValeur("@DateModification", now);
 
                         await cmd.ExecuteNonQueryAsync();
-                        id = (int)conn.LastInsertRowId;
+                        id = (int)conn.DernierIdInsere();
                         stc.Id = id;
                     }
 
@@ -721,9 +721,9 @@ namespace IUTSCalculator.Services
                                        DateSortie = @DateSortie,
                                        MotifDepart = @MotifDepart
                                  WHERE EmployeeId = @EmployeeId;";
-                            cmd.Parameters.AddWithValue("@DateSortie", DbValue.DateToDb(stc.DateSortie));
-                            cmd.Parameters.AddWithValue("@MotifDepart", stc.MotifLibelle);
-                            cmd.Parameters.AddWithValue("@EmployeeId", stc.EmployeeId);
+                            cmd.Parameters.AjouterValeur("@DateSortie", DbValue.DateToDb(stc.DateSortie));
+                            cmd.Parameters.AjouterValeur("@MotifDepart", stc.MotifLibelle);
+                            cmd.Parameters.AjouterValeur("@EmployeeId", stc.EmployeeId);
                             await cmd.ExecuteNonQueryAsync();
                         }
                     }
@@ -799,11 +799,11 @@ namespace IUTSCalculator.Services
         {
             var liste = new List<SoldeToutCompte>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = $"SELECT {Colonnes} FROM SoldesToutCompte ORDER BY DateSortie DESC, Id DESC;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -822,12 +822,12 @@ namespace IUTSCalculator.Services
         {
             if (string.IsNullOrWhiteSpace(employeeId)) return null;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = $"SELECT {Colonnes} FROM SoldesToutCompte WHERE EmployeeId = @emp ORDER BY DateSortie DESC LIMIT 1;";
-                cmd.Parameters.AddWithValue("@emp", employeeId);
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                cmd.Parameters.AjouterValeur("@emp", employeeId);
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                         return LireSolde(reader);
@@ -843,11 +843,11 @@ namespace IUTSCalculator.Services
         {
             if (id <= 0) return false;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM SoldesToutCompte WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AjouterValeur("@id", id);
                 int rows = await cmd.ExecuteNonQueryAsync();
 
                 if (rows > 0)
@@ -866,7 +866,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static SoldeToutCompte LireSolde(SQLiteDataReader reader)
+        private static SoldeToutCompte LireSolde(SqliteDataReader reader)
         {
             return new SoldeToutCompte
             {

@@ -34,7 +34,7 @@ namespace IUTSCalculator.Tests
             _exportService = new FormationExportService();
 
             // Insérer quelques employés de test (connexion retournée déjà ouverte par SQLiteService)
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -69,7 +69,7 @@ namespace IUTSCalculator.Tests
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
         public async Task Schema_Migration32_TablesEtColonnesCrees()
         {
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -160,7 +160,7 @@ namespace IUTSCalculator.Tests
 
             // 2. Compétence pour test (RH-02)
             int competenceId = 0;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT Id FROM Competences LIMIT 1;";
@@ -352,23 +352,23 @@ namespace IUTSCalculator.Tests
             await _formationService.SupprimerPlanFormationAsync(plan.Id);
 
             // Vérification en base que tout a disparu
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT count(*) FROM PlansFormation WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", plan.Id);
+                cmd.Parameters.AjouterValeur("@id", plan.Id);
                 var nbPlans = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert.That(nbPlans, Is.EqualTo(0));
 
                 cmd.CommandText = "SELECT count(*) FROM SessionsFormation WHERE Id = @sid;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@sid", session.Id);
+                cmd.Parameters.AjouterValeur("@sid", session.Id);
                 var nbSessions = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert.That(nbSessions, Is.EqualTo(0), "La session doit être supprimée en cascade C#.");
 
                 cmd.CommandText = "SELECT count(*) FROM SessionInscriptions WHERE Id = @iid;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.AddWithValue("@iid", inscId);
+                cmd.Parameters.AjouterValeur("@iid", inscId);
                 var nbIns = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert.That(nbIns, Is.EqualTo(0), "L'inscription doit être supprimée en cascade C#.");
             }
@@ -398,7 +398,7 @@ namespace IUTSCalculator.Tests
 
             // Insérer un besoin de formation RH-03 (Brouillon/Demande)
             int besoinId = 0;
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -406,7 +406,7 @@ namespace IUTSCalculator.Tests
                     (EntretienId, CompetenceId, ThemeFormation, Priorite, Statut)
                     VALUES (@eid, NULL, 'Besoin de formation en IFRS', 1, 0);
                     SELECT last_insert_rowid();";
-                cmd.Parameters.AddWithValue("@eid", entretien.Id);
+                cmd.Parameters.AjouterValeur("@eid", entretien.Id);
                 besoinId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
             }
             Assert.That(besoinId, Is.GreaterThan(0));
@@ -432,11 +432,11 @@ namespace IUTSCalculator.Tests
             // 3. Assigner le besoin à la session -> Doit passer en Statut = 1 (Retenu) et lier SessionFormationId
             await _formationService.AssignerBesoinASessionAsync(besoinId, session.Id);
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT Statut, SessionFormationId FROM EntretienBesoinsFormation WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", besoinId);
+                cmd.Parameters.AjouterValeur("@id", besoinId);
                 using (var reader = await cmd.ExecuteReaderAsync())
                 {
                     Assert.That(await reader.ReadAsync(), Is.True);
@@ -448,11 +448,11 @@ namespace IUTSCalculator.Tests
             // 4. Supprimer la session -> La cascade C# doit détacher le besoin (SessionFormationId = NULL) sans supprimer la ligne du besoin
             await _formationService.SupprimerSessionFormationAsync(session.Id);
 
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT SessionFormationId FROM EntretienBesoinsFormation WHERE Id = @id;";
-                cmd.Parameters.AddWithValue("@id", besoinId);
+                cmd.Parameters.AjouterValeur("@id", besoinId);
                 var sidObj = await cmd.ExecuteScalarAsync();
                 Assert.That(sidObj == null || sidObj == DBNull.Value, Is.True, "Le besoin de formation doit être détaché et non supprimé.");
             }
@@ -463,7 +463,7 @@ namespace IUTSCalculator.Tests
         public async Task TableauBordTPA_CalculCorrectAvecFiltresEtPlafond()
         {
             // Insérer des calculs de taxes fictifs pour 2026
-            using (var conn = _sqlite.CreateConnection())
+            using (var conn = _sqlite.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 // Ligne 1 : bulletin normal janvier (AssietteTPA = 1 000 000 FCFA, TaxePatronale = 35 000 FCFA en centimes)

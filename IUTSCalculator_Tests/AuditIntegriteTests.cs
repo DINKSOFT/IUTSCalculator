@@ -1,5 +1,5 @@
 using System;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -26,7 +26,7 @@ namespace IUTSCalculator.Tests
 
         private static void Sql(string db, string sql)
         {
-            using (var c = new SQLiteConnection("Data Source=" + db + ";Version=3;"))
+            using (var c = new SqliteConnection("Data Source=" + db + ";Pooling=False"))
             {
                 c.Open();
                 using (var cmd = c.CreateCommand()) { cmd.CommandText = sql; cmd.ExecuteNonQuery(); }
@@ -43,7 +43,7 @@ namespace IUTSCalculator.Tests
             Directory.CreateDirectory(dir);
             string db = Path.Combine(dir, "dossier.db");
             new SQLiteService(db);
-            using (var c = new SQLiteConnection("Data Source=" + db + ";Version=3;"))
+            using (var c = new SqliteConnection("Data Source=" + db + ";Pooling=False"))
             {
                 c.Open();
                 bool present;

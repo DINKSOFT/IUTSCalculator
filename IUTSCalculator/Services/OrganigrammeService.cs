@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
@@ -31,7 +31,7 @@ namespace IUTSCalculator.Services
         {
             var unites = new List<UniteOrganisationnelle>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -47,7 +47,7 @@ namespace IUTSCalculator.Services
                     LEFT JOIN Employees e ON u.ResponsableMatricule = e.EmployeeId
                     ORDER BY u.Ordre ASC, u.Libelle ASC;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -126,7 +126,7 @@ namespace IUTSCalculator.Services
         {
             if (unite == null) throw new ArgumentNullException(nameof(unite));
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 await EnregistrerUniteAsync(conn, tx, unite);
@@ -139,7 +139,7 @@ namespace IUTSCalculator.Services
         /// seul (ci-dessus) ou par l'initialisation de la structure, qui crée toutes ses
         /// unités et tous ses postes dans UNE transaction (tout ou rien).
         /// </summary>
-        private async Task EnregistrerUniteAsync(SQLiteConnection conn, SQLiteTransaction tx, UniteOrganisationnelle unite)
+        private async Task EnregistrerUniteAsync(SqliteConnection conn, SqliteTransaction tx, UniteOrganisationnelle unite)
         {
             if (unite == null) throw new ArgumentNullException(nameof(unite));
             if (string.IsNullOrWhiteSpace(unite.Code)) throw new InvalidOperationException("Le code de l'unité est obligatoire.");
@@ -154,8 +154,8 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "SELECT Id FROM UnitesOrganisationnelles WHERE Code = @Code AND Id <> @Id;";
-                    cmd.Parameters.AddWithValue("@Code", unite.Code);
-                    cmd.Parameters.AddWithValue("@Id", unite.Id);
+                    cmd.Parameters.AjouterValeur("@Code", unite.Code);
+                    cmd.Parameters.AjouterValeur("@Id", unite.Id);
                     var existant = await cmd.ExecuteScalarAsync();
                     if (existant != null && existant != DBNull.Value)
                     {
@@ -188,15 +188,15 @@ namespace IUTSCalculator.Services
                             (@Code, @Libelle, @TypeUnite, @ParentId, @ResponsableMatricule, @Description, @Couleur, @Ordre, @DateCreation);
                             SELECT last_insert_rowid();";
 
-                        cmd.Parameters.AddWithValue("@Code", unite.Code);
-                        cmd.Parameters.AddWithValue("@Libelle", unite.Libelle);
-                        cmd.Parameters.AddWithValue("@TypeUnite", (int)unite.TypeUnite);
-                        cmd.Parameters.AddWithValue("@ParentId", unite.ParentId.HasValue ? (object)unite.ParentId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ResponsableMatricule", (object)unite.ResponsableMatricule ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Description", (object)unite.Description ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Couleur", string.IsNullOrWhiteSpace(unite.Couleur) ? "#14675A" : unite.Couleur);
-                        cmd.Parameters.AddWithValue("@Ordre", unite.Ordre);
-                        cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@Code", unite.Code);
+                        cmd.Parameters.AjouterValeur("@Libelle", unite.Libelle);
+                        cmd.Parameters.AjouterValeur("@TypeUnite", (int)unite.TypeUnite);
+                        cmd.Parameters.AjouterValeur("@ParentId", unite.ParentId.HasValue ? (object)unite.ParentId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ResponsableMatricule", (object)unite.ResponsableMatricule ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Description", (object)unite.Description ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Couleur", string.IsNullOrWhiteSpace(unite.Couleur) ? "#14675A" : unite.Couleur);
+                        cmd.Parameters.AjouterValeur("@Ordre", unite.Ordre);
+                        cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
                         var newId = await cmd.ExecuteScalarAsync();
                         unite.Id = Convert.ToInt32(newId);
@@ -220,15 +220,15 @@ namespace IUTSCalculator.Services
                                 Ordre = @Ordre
                             WHERE Id = @Id;";
 
-                        cmd.Parameters.AddWithValue("@Code", unite.Code);
-                        cmd.Parameters.AddWithValue("@Libelle", unite.Libelle);
-                        cmd.Parameters.AddWithValue("@TypeUnite", (int)unite.TypeUnite);
-                        cmd.Parameters.AddWithValue("@ParentId", unite.ParentId.HasValue ? (object)unite.ParentId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ResponsableMatricule", (object)unite.ResponsableMatricule ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Description", (object)unite.Description ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Couleur", string.IsNullOrWhiteSpace(unite.Couleur) ? "#14675A" : unite.Couleur);
-                        cmd.Parameters.AddWithValue("@Ordre", unite.Ordre);
-                        cmd.Parameters.AddWithValue("@Id", unite.Id);
+                        cmd.Parameters.AjouterValeur("@Code", unite.Code);
+                        cmd.Parameters.AjouterValeur("@Libelle", unite.Libelle);
+                        cmd.Parameters.AjouterValeur("@TypeUnite", (int)unite.TypeUnite);
+                        cmd.Parameters.AjouterValeur("@ParentId", unite.ParentId.HasValue ? (object)unite.ParentId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ResponsableMatricule", (object)unite.ResponsableMatricule ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Description", (object)unite.Description ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Couleur", string.IsNullOrWhiteSpace(unite.Couleur) ? "#14675A" : unite.Couleur);
+                        cmd.Parameters.AjouterValeur("@Ordre", unite.Ordre);
+                        cmd.Parameters.AjouterValeur("@Id", unite.Id);
 
                         await cmd.ExecuteNonQueryAsync();
                     }
@@ -236,7 +236,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private async Task<bool> EstDescendantUniteAsync(SQLiteConnection conn, SQLiteTransaction tx, int idParent, int idCandidat)
+        private async Task<bool> EstDescendantUniteAsync(SqliteConnection conn, SqliteTransaction tx, int idParent, int idCandidat)
         {
             int? courantId = idCandidat;
             var visites = new HashSet<int>();
@@ -250,7 +250,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "SELECT ParentId FROM UnitesOrganisationnelles WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", courantId.Value);
+                    cmd.Parameters.AjouterValeur("@Id", courantId.Value);
                     var parentObj = await cmd.ExecuteScalarAsync();
                     courantId = DbValue.IntNullableFromDb(parentObj);
                 }
@@ -266,7 +266,7 @@ namespace IUTSCalculator.Services
         {
             if (uniteId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 // Obtenir le parent de l'unité à supprimer pour y rattacher ses sous-unités
@@ -275,7 +275,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "SELECT ParentId FROM UnitesOrganisationnelles WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", uniteId);
+                    cmd.Parameters.AjouterValeur("@Id", uniteId);
                     grandParentId = DbValue.IntNullableFromDb(await cmd.ExecuteScalarAsync());
                 }
 
@@ -284,8 +284,8 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "UPDATE UnitesOrganisationnelles SET ParentId = @GrandParentId WHERE ParentId = @Id;";
-                    cmd.Parameters.AddWithValue("@GrandParentId", grandParentId.HasValue ? (object)grandParentId.Value : DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Id", uniteId);
+                    cmd.Parameters.AjouterValeur("@GrandParentId", grandParentId.HasValue ? (object)grandParentId.Value : DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@Id", uniteId);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -294,7 +294,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "UPDATE Postes SET UniteId = NULL WHERE UniteId = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", uniteId);
+                    cmd.Parameters.AjouterValeur("@Id", uniteId);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -303,7 +303,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "DELETE FROM UnitesOrganisationnelles WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", uniteId);
+                    cmd.Parameters.AjouterValeur("@Id", uniteId);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -322,7 +322,7 @@ namespace IUTSCalculator.Services
         {
             var postes = new List<Poste>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -348,7 +348,7 @@ namespace IUTSCalculator.Services
                     GROUP BY pos.Id
                     ORDER BY pos.Ordre ASC, pos.Intitule ASC;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -403,7 +403,7 @@ namespace IUTSCalculator.Services
         {
             if (poste == null) throw new ArgumentNullException(nameof(poste));
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 await EnregistrerPosteAsync(conn, tx, poste);
@@ -412,7 +412,7 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>Enregistrement d'un poste dans une transaction fournie par l'appelant.</summary>
-        private async Task EnregistrerPosteAsync(SQLiteConnection conn, SQLiteTransaction tx, Poste poste)
+        private async Task EnregistrerPosteAsync(SqliteConnection conn, SqliteTransaction tx, Poste poste)
         {
             if (poste == null) throw new ArgumentNullException(nameof(poste));
             if (string.IsNullOrWhiteSpace(poste.Code)) throw new InvalidOperationException("Le code du poste est obligatoire.");
@@ -427,8 +427,8 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "SELECT Id FROM Postes WHERE Code = @Code AND Id <> @Id;";
-                    cmd.Parameters.AddWithValue("@Code", poste.Code);
-                    cmd.Parameters.AddWithValue("@Id", poste.Id);
+                    cmd.Parameters.AjouterValeur("@Code", poste.Code);
+                    cmd.Parameters.AjouterValeur("@Id", poste.Id);
                     var existant = await cmd.ExecuteScalarAsync();
                     if (existant != null && existant != DBNull.Value)
                     {
@@ -469,30 +469,30 @@ namespace IUTSCalculator.Services
                              @SalaireMinimumConventionnel, @SalaireMinBudgete, @SalaireMaxBudgete);
                             SELECT last_insert_rowid();";
 
-                        cmd.Parameters.AddWithValue("@Code", poste.Code);
-                        cmd.Parameters.AddWithValue("@Intitule", poste.Intitule);
-                        cmd.Parameters.AddWithValue("@UniteId", poste.UniteId.HasValue ? (object)poste.UniteId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@SuperieurPosteId", poste.SuperieurPosteId.HasValue ? (object)poste.SuperieurPosteId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@TitulaireMatricule", (object)poste.TitulaireMatricule ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Classification", (object)poste.Classification ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Missions", (object)poste.Missions ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@EffectifRequis", Math.Max(1, poste.EffectifRequis));
-                        cmd.Parameters.AddWithValue("@Actif", poste.Actif ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@Ordre", poste.Ordre);
-                        cmd.Parameters.AddWithValue("@DateCreation", DbValue.DateToDb(DateTime.Now));
+                        cmd.Parameters.AjouterValeur("@Code", poste.Code);
+                        cmd.Parameters.AjouterValeur("@Intitule", poste.Intitule);
+                        cmd.Parameters.AjouterValeur("@UniteId", poste.UniteId.HasValue ? (object)poste.UniteId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@SuperieurPosteId", poste.SuperieurPosteId.HasValue ? (object)poste.SuperieurPosteId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@TitulaireMatricule", (object)poste.TitulaireMatricule ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Classification", (object)poste.Classification ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Missions", (object)poste.Missions ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@EffectifRequis", Math.Max(1, poste.EffectifRequis));
+                        cmd.Parameters.AjouterValeur("@Actif", poste.Actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Ordre", poste.Ordre);
+                        cmd.Parameters.AjouterValeur("@DateCreation", DbValue.DateToDb(DateTime.Now));
 
-                        cmd.Parameters.AddWithValue("@FinalitePrincipale", (object)poste.FinalitePrincipale ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ActivitesCles", (object)poste.ActivitesCles ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@NiveauEtudeRequis", (object)poste.NiveauEtudeRequis ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DiplomeRequis", (object)poste.DiplomeRequis ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ExperienceMinimaleAnnees", poste.ExperienceMinimaleAnnees);
-                        cmd.Parameters.AddWithValue("@ConditionsTravail", (object)poste.ConditionsTravail ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ConventionId", poste.ConventionId.HasValue ? (object)poste.ConventionId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@CategorieConventionnelle", (object)poste.CategorieConventionnelle ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@EchelonConventionnel", (object)poste.EchelonConventionnel ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@SalaireMinimumConventionnel", DbValue.MoneyToDb(poste.SalaireMinimumConventionnel));
-                        cmd.Parameters.AddWithValue("@SalaireMinBudgete", DbValue.MoneyToDb(poste.SalaireMinBudgete));
-                        cmd.Parameters.AddWithValue("@SalaireMaxBudgete", DbValue.MoneyToDb(poste.SalaireMaxBudgete));
+                        cmd.Parameters.AjouterValeur("@FinalitePrincipale", (object)poste.FinalitePrincipale ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ActivitesCles", (object)poste.ActivitesCles ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@NiveauEtudeRequis", (object)poste.NiveauEtudeRequis ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DiplomeRequis", (object)poste.DiplomeRequis ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ExperienceMinimaleAnnees", poste.ExperienceMinimaleAnnees);
+                        cmd.Parameters.AjouterValeur("@ConditionsTravail", (object)poste.ConditionsTravail ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ConventionId", poste.ConventionId.HasValue ? (object)poste.ConventionId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@CategorieConventionnelle", (object)poste.CategorieConventionnelle ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@EchelonConventionnel", (object)poste.EchelonConventionnel ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@SalaireMinimumConventionnel", DbValue.MoneyToDb(poste.SalaireMinimumConventionnel));
+                        cmd.Parameters.AjouterValeur("@SalaireMinBudgete", DbValue.MoneyToDb(poste.SalaireMinBudgete));
+                        cmd.Parameters.AjouterValeur("@SalaireMaxBudgete", DbValue.MoneyToDb(poste.SalaireMaxBudgete));
 
                         var newId = await cmd.ExecuteScalarAsync();
                         poste.Id = Convert.ToInt32(newId);
@@ -530,31 +530,31 @@ namespace IUTSCalculator.Services
                                 SalaireMaxBudgete = @SalaireMaxBudgete
                             WHERE Id = @Id;";
 
-                        cmd.Parameters.AddWithValue("@Code", poste.Code);
-                        cmd.Parameters.AddWithValue("@Intitule", poste.Intitule);
-                        cmd.Parameters.AddWithValue("@UniteId", poste.UniteId.HasValue ? (object)poste.UniteId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@SuperieurPosteId", poste.SuperieurPosteId.HasValue ? (object)poste.SuperieurPosteId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@TitulaireMatricule", (object)poste.TitulaireMatricule ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Classification", (object)poste.Classification ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Missions", (object)poste.Missions ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@EffectifRequis", Math.Max(1, poste.EffectifRequis));
-                        cmd.Parameters.AddWithValue("@Actif", poste.Actif ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@Ordre", poste.Ordre);
+                        cmd.Parameters.AjouterValeur("@Code", poste.Code);
+                        cmd.Parameters.AjouterValeur("@Intitule", poste.Intitule);
+                        cmd.Parameters.AjouterValeur("@UniteId", poste.UniteId.HasValue ? (object)poste.UniteId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@SuperieurPosteId", poste.SuperieurPosteId.HasValue ? (object)poste.SuperieurPosteId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@TitulaireMatricule", (object)poste.TitulaireMatricule ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Classification", (object)poste.Classification ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@Missions", (object)poste.Missions ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@EffectifRequis", Math.Max(1, poste.EffectifRequis));
+                        cmd.Parameters.AjouterValeur("@Actif", poste.Actif ? 1 : 0);
+                        cmd.Parameters.AjouterValeur("@Ordre", poste.Ordre);
 
-                        cmd.Parameters.AddWithValue("@FinalitePrincipale", (object)poste.FinalitePrincipale ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ActivitesCles", (object)poste.ActivitesCles ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@NiveauEtudeRequis", (object)poste.NiveauEtudeRequis ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@DiplomeRequis", (object)poste.DiplomeRequis ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ExperienceMinimaleAnnees", poste.ExperienceMinimaleAnnees);
-                        cmd.Parameters.AddWithValue("@ConditionsTravail", (object)poste.ConditionsTravail ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@ConventionId", poste.ConventionId.HasValue ? (object)poste.ConventionId.Value : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@CategorieConventionnelle", (object)poste.CategorieConventionnelle ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@EchelonConventionnel", (object)poste.EchelonConventionnel ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@SalaireMinimumConventionnel", DbValue.MoneyToDb(poste.SalaireMinimumConventionnel));
-                        cmd.Parameters.AddWithValue("@SalaireMinBudgete", DbValue.MoneyToDb(poste.SalaireMinBudgete));
-                        cmd.Parameters.AddWithValue("@SalaireMaxBudgete", DbValue.MoneyToDb(poste.SalaireMaxBudgete));
+                        cmd.Parameters.AjouterValeur("@FinalitePrincipale", (object)poste.FinalitePrincipale ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ActivitesCles", (object)poste.ActivitesCles ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@NiveauEtudeRequis", (object)poste.NiveauEtudeRequis ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@DiplomeRequis", (object)poste.DiplomeRequis ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ExperienceMinimaleAnnees", poste.ExperienceMinimaleAnnees);
+                        cmd.Parameters.AjouterValeur("@ConditionsTravail", (object)poste.ConditionsTravail ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@ConventionId", poste.ConventionId.HasValue ? (object)poste.ConventionId.Value : DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@CategorieConventionnelle", (object)poste.CategorieConventionnelle ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@EchelonConventionnel", (object)poste.EchelonConventionnel ?? DBNull.Value);
+                        cmd.Parameters.AjouterValeur("@SalaireMinimumConventionnel", DbValue.MoneyToDb(poste.SalaireMinimumConventionnel));
+                        cmd.Parameters.AjouterValeur("@SalaireMinBudgete", DbValue.MoneyToDb(poste.SalaireMinBudgete));
+                        cmd.Parameters.AjouterValeur("@SalaireMaxBudgete", DbValue.MoneyToDb(poste.SalaireMaxBudgete));
 
-                        cmd.Parameters.AddWithValue("@Id", poste.Id);
+                        cmd.Parameters.AjouterValeur("@Id", poste.Id);
 
                         await cmd.ExecuteNonQueryAsync();
                     }
@@ -567,16 +567,16 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "UPDATE Employees SET PosteId = @PosteId, Fonction = @Fonction WHERE EmployeeId = @EmployeeId;";
-                        cmd.Parameters.AddWithValue("@PosteId", poste.Id);
-                        cmd.Parameters.AddWithValue("@Fonction", poste.Intitule);
-                        cmd.Parameters.AddWithValue("@EmployeeId", poste.TitulaireMatricule);
+                        cmd.Parameters.AjouterValeur("@PosteId", poste.Id);
+                        cmd.Parameters.AjouterValeur("@Fonction", poste.Intitule);
+                        cmd.Parameters.AjouterValeur("@EmployeeId", poste.TitulaireMatricule);
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
             }
         }
 
-        private async Task<bool> EstDescendantPosteAsync(SQLiteConnection conn, SQLiteTransaction tx, int idPosteParent, int idPosteCandidat)
+        private async Task<bool> EstDescendantPosteAsync(SqliteConnection conn, SqliteTransaction tx, int idPosteParent, int idPosteCandidat)
         {
             int? courantId = idPosteCandidat;
             var visites = new HashSet<int>();
@@ -590,7 +590,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "SELECT SuperieurPosteId FROM Postes WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", courantId.Value);
+                    cmd.Parameters.AjouterValeur("@Id", courantId.Value);
                     var supObj = await cmd.ExecuteScalarAsync();
                     courantId = DbValue.IntNullableFromDb(supObj);
                 }
@@ -606,7 +606,7 @@ namespace IUTSCalculator.Services
         {
             if (posteId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 // Obtenir le supérieur du poste supprimé
@@ -615,7 +615,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "SELECT SuperieurPosteId FROM Postes WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", posteId);
+                    cmd.Parameters.AjouterValeur("@Id", posteId);
                     supId = DbValue.IntNullableFromDb(await cmd.ExecuteScalarAsync());
                 }
 
@@ -624,8 +624,8 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "UPDATE Postes SET SuperieurPosteId = @SupId WHERE SuperieurPosteId = @Id;";
-                    cmd.Parameters.AddWithValue("@SupId", supId.HasValue ? (object)supId.Value : DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Id", posteId);
+                    cmd.Parameters.AjouterValeur("@SupId", supId.HasValue ? (object)supId.Value : DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@Id", posteId);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -634,7 +634,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "UPDATE Employees SET PosteId = NULL WHERE PosteId = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", posteId);
+                    cmd.Parameters.AjouterValeur("@Id", posteId);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -643,7 +643,7 @@ namespace IUTSCalculator.Services
                 {
                     cmd.Transaction = tx;
                     cmd.CommandText = "DELETE FROM Postes WHERE Id = @Id;";
-                    cmd.Parameters.AddWithValue("@Id", posteId);
+                    cmd.Parameters.AjouterValeur("@Id", posteId);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
@@ -663,7 +663,7 @@ namespace IUTSCalculator.Services
             var liste = new List<PosteCompetence>();
             if (posteId <= 0) return liste;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 // Colonne ajoutée par la migration 38 : lue seulement si elle existe, pour
                 // qu'une base pas encore mise à niveau continue de fonctionner.
@@ -679,9 +679,9 @@ namespace IUTSCalculator.Services
                         INNER JOIN Competences c ON pc.CompetenceId = c.Id
                         WHERE pc.PosteId = @PosteId
                         ORDER BY pc.EstObligatoire DESC, c.Domaine ASC, c.Libelle ASC;";
-                    cmd.Parameters.AddWithValue("@PosteId", posteId);
+                    cmd.Parameters.AjouterValeur("@PosteId", posteId);
 
-                    using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                    using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
@@ -727,7 +727,7 @@ namespace IUTSCalculator.Services
             if (niveau < 1 || niveau > 4)
                 throw new InvalidOperationException("Le niveau de maîtrise requis doit être compris entre 1 et 4.");
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             {
                 bool avecControle = ColonneExiste(conn, null, "PosteCompetences", ColonneNiveauAVerifier);
 
@@ -736,8 +736,8 @@ namespace IUTSCalculator.Services
                     using (var cmdExistant = conn.CreateCommand())
                     {
                         cmdExistant.CommandText = "SELECT Id FROM PosteCompetences WHERE PosteId = @PosteId AND CompetenceId = @CompetenceId ORDER BY Id LIMIT 1;";
-                        cmdExistant.Parameters.AddWithValue("@PosteId", pc.PosteId);
-                        cmdExistant.Parameters.AddWithValue("@CompetenceId", pc.CompetenceId);
+                        cmdExistant.Parameters.AjouterValeur("@PosteId", pc.PosteId);
+                        cmdExistant.Parameters.AjouterValeur("@CompetenceId", pc.CompetenceId);
                         var existant = await cmdExistant.ExecuteScalarAsync();
                         if (existant != null && existant != DBNull.Value)
                             pc.Id = Convert.ToInt32(existant);
@@ -763,14 +763,14 @@ namespace IUTSCalculator.Services
                             SET NiveauRequis = @NiveauRequis, EstObligatoire = @EstObligatoire, Commentaire = @Commentaire" +
                             (avecControle ? ", " + ColonneNiveauAVerifier + " = 0" : "") + @"
                             WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", pc.Id);
+                        cmd.Parameters.AjouterValeur("@Id", pc.Id);
                     }
 
-                    cmd.Parameters.AddWithValue("@PosteId", pc.PosteId);
-                    cmd.Parameters.AddWithValue("@CompetenceId", pc.CompetenceId);
-                    cmd.Parameters.AddWithValue("@NiveauRequis", niveau);
-                    cmd.Parameters.AddWithValue("@EstObligatoire", pc.EstObligatoire ? 1 : 0);
-                    cmd.Parameters.AddWithValue("@Commentaire", (object)pc.Commentaire ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@PosteId", pc.PosteId);
+                    cmd.Parameters.AjouterValeur("@CompetenceId", pc.CompetenceId);
+                    cmd.Parameters.AjouterValeur("@NiveauRequis", niveau);
+                    cmd.Parameters.AjouterValeur("@EstObligatoire", pc.EstObligatoire ? 1 : 0);
+                    cmd.Parameters.AjouterValeur("@Commentaire", (object)pc.Commentaire ?? DBNull.Value);
 
                     if (pc.Id == 0)
                     {
@@ -787,7 +787,7 @@ namespace IUTSCalculator.Services
             pc.NiveauAVerifier = false;
         }
 
-        private static bool ColonneExiste(SQLiteConnection conn, SQLiteTransaction tx, string table, string colonne)
+        private static bool ColonneExiste(SqliteConnection conn, SqliteTransaction tx, string table, string colonne)
         {
             using (var cmd = conn.CreateCommand())
             {
@@ -813,11 +813,11 @@ namespace IUTSCalculator.Services
         {
             if (posteCompetenceId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM PosteCompetences WHERE Id = @Id;";
-                cmd.Parameters.AddWithValue("@Id", posteCompetenceId);
+                cmd.Parameters.AjouterValeur("@Id", posteCompetenceId);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -829,12 +829,12 @@ namespace IUTSCalculator.Services
         {
             if (posteId <= 0 || competenceId <= 0) return;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "DELETE FROM PosteCompetences WHERE PosteId = @PosteId AND CompetenceId = @CompetenceId;";
-                cmd.Parameters.AddWithValue("@PosteId", posteId);
-                cmd.Parameters.AddWithValue("@CompetenceId", competenceId);
+                cmd.Parameters.AjouterValeur("@PosteId", posteId);
+                cmd.Parameters.AjouterValeur("@CompetenceId", competenceId);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -847,7 +847,7 @@ namespace IUTSCalculator.Services
             var titulaires = new List<TitulairePosteLigne>();
             if (posteId <= 0) return titulaires;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -855,9 +855,9 @@ namespace IUTSCalculator.Services
                     FROM Employees
                     WHERE PosteId = @PosteId
                     ORDER BY StatutSalarie ASC, LastName ASC, FirstName ASC;";
-                cmd.Parameters.AddWithValue("@PosteId", posteId);
+                cmd.Parameters.AjouterValeur("@PosteId", posteId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -899,7 +899,7 @@ namespace IUTSCalculator.Services
         {
             var lignes = new List<AffectationSalarieLigne>();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -913,7 +913,7 @@ namespace IUTSCalculator.Services
                     LEFT JOIN Employees m ON e.ManagerMatricule = m.EmployeeId
                     ORDER BY e.StatutSalarie ASC, e.LastName ASC, e.FirstName ASC;";
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -949,7 +949,7 @@ namespace IUTSCalculator.Services
             if (string.IsNullOrWhiteSpace(matricule))
                 throw new ArgumentException("Matricule salarié manquant.", nameof(matricule));
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 // Obtenir le titre du poste si posteId est fourni
@@ -960,7 +960,7 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "SELECT Intitule FROM Postes WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Id", posteId.Value);
+                        cmd.Parameters.AjouterValeur("@Id", posteId.Value);
                         posteIntitule = DbValue.TextFromDb(await cmd.ExecuteScalarAsync());
                     }
                 }
@@ -977,11 +977,11 @@ namespace IUTSCalculator.Services
                             ManagerMatricule = @ManagerMatricule
                         WHERE EmployeeId = @EmployeeId;";
 
-                    cmd.Parameters.AddWithValue("@Service", (object)serviceNom ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@PosteId", posteId.HasValue ? (object)posteId.Value : DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Fonction", (object)posteIntitule ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ManagerMatricule", (object)managerMatricule ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@EmployeeId", matricule);
+                    cmd.Parameters.AjouterValeur("@Service", (object)serviceNom ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@PosteId", posteId.HasValue ? (object)posteId.Value : DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@Fonction", (object)posteIntitule ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@ManagerMatricule", (object)managerMatricule ?? DBNull.Value);
+                    cmd.Parameters.AjouterValeur("@EmployeeId", matricule);
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -993,8 +993,8 @@ namespace IUTSCalculator.Services
                     {
                         cmd.Transaction = tx;
                         cmd.CommandText = "UPDATE Postes SET TitulaireMatricule = @Matricule WHERE Id = @Id;";
-                        cmd.Parameters.AddWithValue("@Matricule", matricule);
-                        cmd.Parameters.AddWithValue("@Id", posteId.Value);
+                        cmd.Parameters.AjouterValeur("@Matricule", matricule);
+                        cmd.Parameters.AjouterValeur("@Id", posteId.Value);
                         await cmd.ExecuteNonQueryAsync();
                     }
                 }
@@ -1134,7 +1134,7 @@ namespace IUTSCalculator.Services
             var servicesPresents = await ChargerServicesDesSalariesAsync();
             int creees = 0;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 var codesUnites = await ChargerCodesAsync(conn, tx, "UnitesOrganisationnelles");
@@ -1245,11 +1245,11 @@ namespace IUTSCalculator.Services
         private async Task<List<string>> ChargerServicesDesSalariesAsync()
         {
             var servicesPresents = new List<string>();
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "SELECT DISTINCT Service FROM Employees WHERE Service IS NOT NULL AND TRIM(Service) <> '' ORDER BY Service ASC;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
@@ -1261,7 +1261,7 @@ namespace IUTSCalculator.Services
             return servicesPresents;
         }
 
-        private static async Task<HashSet<string>> ChargerCodesAsync(SQLiteConnection conn, SQLiteTransaction tx, string table)
+        private static async Task<HashSet<string>> ChargerCodesAsync(SqliteConnection conn, SqliteTransaction tx, string table)
         {
             var codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using (var cmd = conn.CreateCommand())
@@ -1269,7 +1269,7 @@ namespace IUTSCalculator.Services
                 cmd.Transaction = tx;
                 // Nom de table : constante interne (UnitesOrganisationnelles ou Postes).
                 cmd.CommandText = "SELECT Code FROM " + table + " WHERE Code IS NOT NULL;";
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = (SqliteDataReader)await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
