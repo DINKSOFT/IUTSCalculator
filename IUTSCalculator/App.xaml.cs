@@ -85,6 +85,12 @@ namespace IUTSCalculator
                 return;
             }
 
+            if (!ActiverChiffrementDesBases())
+            {
+                Shutdown();
+                return;
+            }
+
             // ─────────────────────────────────────────────────────────────────────
             //  CONTRÔLE DE LICENCE (module d'activation)
             //  L'application ne démarre que si elle est activée ou en période
@@ -189,6 +195,37 @@ namespace IUTSCalculator
         // var loginResult = loginWindow.ShowDialog();
         // if (loginResult == true && UserSession.Instance.IsAuthenticated) { loginWindow.Close(); }
         // else { Shutdown(); }
+
+        /// <summary>
+        /// Chiffre les bases encore en clair avec la clé du poste, puis la branche pour toutes les
+        /// connexions. Renvoie false si la clé est illisible ou absente : aucune clé n'est alors
+        /// régénérée, car elle rendrait les bases chiffrées définitivement inaccessibles.
+        /// </summary>
+        private bool ActiverChiffrementDesBases()
+        {
+            string dossier = Helpers.Constants.AppDataFolder;
+            string cle;
+            try
+            {
+                cle = Services.ChiffrementBases.ObtenirCleDuPoste(dossier);
+            }
+            catch (Exception ex) when (ex is Services.CleDonneesIllisibleException || ex is Services.CleDonneesAbsenteException)
+            {
+                MessageBox.Show(ex.Message, "Clé de chiffrement des données", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            var resultat = Services.ChiffrementBases.ChiffrerDossierDonnees(dossier, cle);
+            Services.SQLiteService.FournisseurCle = () => cle;
+
+            // Une base restée en clair n'est pas perdue : son ouverture retentera le chiffrement.
+            if (resultat.Echecs.Count > 0)
+                MessageBox.Show(
+                    "Certaines bases n'ont pas pu être chiffrées ; elles restent intactes, en clair :\n\n• " +
+                    string.Join("\n• ", resultat.Echecs),
+                    "Chiffrement des données", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return true;
+        }
 
         /// <summary>
         /// Évalue la licence au démarrage. Renvoie true si l'accès est permis (licence

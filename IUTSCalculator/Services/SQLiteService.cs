@@ -46,17 +46,20 @@ namespace IUTSCalculator.Services
 
         /// <summary>
         /// Fournit la clé de chiffrement des bases (voir <see cref="CleDonnees"/>) ; null : bases
-        /// en clair. Lue une fois par instance, à sa construction.
-        ///
-        /// L'application ne le branche pas encore : les bases existantes doivent d'abord être
-        /// chiffrées au premier lancement, et les sauvegardes protégées par le mot de passe de
-        /// sauvegarde (étapes suivantes du chiffrement).
+        /// en clair. Lue une fois par instance, à sa construction. Branché par l'application au
+        /// démarrage, une fois les bases existantes chiffrées (<see cref="ChiffrementBases"/>).
         /// </summary>
         public static Func<string> FournisseurCle;
 
+        /// <summary>Clé active des bases (hexadécimal), ou null si les bases sont en clair.</summary>
+        public static string CleActive()
+        {
+            return FournisseurCle?.Invoke();
+        }
+
         public SQLiteService(string dbFileName = "iuts_data.db")
         {
-            _cle = FournisseurCle?.Invoke();
+            _cle = CleActive();
 
             if (Path.IsPathRooted(dbFileName))
             {
@@ -74,6 +77,11 @@ namespace IUTSCalculator.Services
             // BusyTimeout : si une autre opération de l'application écrit au même moment,
             // on patiente au lieu de lever immédiatement SQLITE_BUSY.
             _connectionString = ChaineConnexion(_dbPath);
+
+            // Base restée en clair (rangée à part, restaurée d'une ancienne sauvegarde, échec au
+            // démarrage) : chiffrée avant usage, sans quoi la clé la rendrait illisible.
+            if (_cle != null)
+                ChiffrementBases.ChiffrerSiEnClair(_dbPath, _cle);
 
             EnsureSchema();
             _schemaPret = true;
@@ -448,7 +456,7 @@ namespace IUTSCalculator.Services
         /// Foreign Keys = false : comportement de System.Data.SQLite, sur lequel reposent les
         /// services existants (SQLite3MC les active par défaut).
         /// </summary>
-        private static string ChaineConnexion(string chemin, bool lectureSeule = false)
+        internal static string ChaineConnexion(string chemin, bool lectureSeule = false)
         {
             var builder = new SqliteConnectionStringBuilder
             {
@@ -465,7 +473,7 @@ namespace IUTSCalculator.Services
         /// Ouvre une connexion et, si <paramref name="cle"/> est fournie, la déverrouille : format
         /// SQLCipher 4 (« legacy=4 ») pour rester lisible par les outils SQLCipher standard.
         /// </summary>
-        private static SqliteConnection OuvrirConnexion(string chaine, string cle)
+        internal static SqliteConnection OuvrirConnexion(string chaine, string cle)
         {
             var connection = new SqliteConnection(chaine);
             try
@@ -489,7 +497,21 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private static string VerifierCle(string cle)
+        /// <summary>
+        /// Désignation d'un fichier de base pour <c>VACUUM INTO</c>, sous forme d'URI SQLite : avec
+        /// <paramref name="cle"/>, la copie est chiffrée par cette clé (format SQLCipher 4) ; sans,
+        /// elle est en clair. Le résultat est un littéral SQL complet (guillemets compris).
+        /// </summary>
+        internal static string CibleVacuum(string chemin, string cle)
+        {
+            // Dans une URI, « % », « ? » et « # » ont un sens : ils sont échappés dans le chemin.
+            string uri = "file:" + chemin.Replace('\\', '/').Replace("%", "%25").Replace("?", "%3f").Replace("#", "%23");
+            if (cle != null)
+                uri += "?cipher=sqlcipher&legacy=4&hexkey=" + VerifierCle(cle);
+            return "'" + uri.Replace("'", "''") + "'";
+        }
+
+        internal static string VerifierCle(string cle)
         {
             if (cle.Length != 64)
                 throw new ArgumentException("Clé de base invalide.");
@@ -554,13 +576,15 @@ namespace IUTSCalculator.Services
 
         /// <summary>
         /// Version du schéma d'un fichier de base, lue sans rien modifier ni migrer
-        /// (0 : base sans table de version, -1 : fichier illisible).
+        /// (0 : base sans table de version, -1 : fichier illisible). Une base en clair est lue
+        /// sans clé, une base chiffrée avec <paramref name="cle"/>.
         /// </summary>
         public static int LireVersionFichier(string chemin, string cle = null)
         {
             try
             {
                 if (!File.Exists(chemin)) return -1;
+                if (ChiffrementBases.EstEnClair(chemin)) cle = null;
                 using (var connection = OuvrirConnexion(ChaineConnexion(chemin, lectureSeule: true), cle))
                 {
                     using (var cmd = connection.CreateCommand())

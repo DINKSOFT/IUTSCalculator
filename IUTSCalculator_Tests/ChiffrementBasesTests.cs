@@ -132,6 +132,183 @@ namespace IUTSCalculator.Tests
             }
         }
 
+        /// <summary>Base en clair, telle que l'ont laissée les versions précédentes, avec un salarié à charge.</summary>
+        private static string BaseEnClair(string dir, string relatif, string prenom)
+        {
+            string db = Path.Combine(dir, relatif);
+            Directory.CreateDirectory(Path.GetDirectoryName(db));
+            new PersonneAChargeService(new SQLiteService(db)).EnregistrerToutAsync("M100", new[] { Enfant(prenom) }).GetAwaiter().GetResult();
+            Assert.That(EnteteEnClair(db), Is.True);
+            return db;
+        }
+
+        private static string PrenomLu(string db, string cle)
+        {
+            SQLiteService.FournisseurCle = () => cle;
+            try
+            {
+                return new PersonneAChargeService(new SQLiteService(db)).ChargerAsync("M100").GetAwaiter().GetResult().Single().Prenom;
+            }
+            finally
+            {
+                SQLiteService.FournisseurCle = null;
+            }
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void BasesEnClair_ChiffreesAuDemarrage()
+        {
+            string dir = NouveauDossier();
+            string dossier = BaseEnClair(dir, Path.Combine("Dossiers", "dossier_1.db"), "AWA");
+            string heritee = BaseEnClair(dir, "iuts_data.db", "ISSA");
+            string copieMigration = dossier + ".avant-v37.bak";
+            File.Copy(dossier, copieMigration);
+            File.WriteAllText(Path.Combine(dir, "dossiers.json"), "[]");
+
+            string cle = ChiffrementBases.ObtenirCleDuPoste(dir);
+            var resultat = ChiffrementBases.ChiffrerDossierDonnees(dir, cle);
+
+            Assert.That(resultat.Echecs, Is.Empty);
+            Assert.That(resultat.Chiffrees, Is.EquivalentTo(new[] { dossier, heritee, copieMigration }));
+            foreach (var db in new[] { dossier, heritee, copieMigration })
+            {
+                Assert.That(EnteteEnClair(db), Is.False, db);
+                Assert.That(SQLiteService.LireVersionFichier(db, cle), Is.EqualTo(SQLiteService.SchemaCible), db);
+                Assert.That(Encoding.UTF8.GetString(File.ReadAllBytes(db)), Does.Not.Contain("OUEDRAOGO"), db);
+            }
+            // Sans la clé, plus rien n'est lisible ; avec, les données sont intactes.
+            Assert.That(SQLiteService.LireVersionFichier(dossier), Is.EqualTo(-1));
+            Assert.That(PrenomLu(dossier, cle), Is.EqualTo("AWA"));
+            Assert.That(PrenomLu(heritee, cle), Is.EqualTo("ISSA"));
+            // Ni copie de travail ni copie de sécurité en clair laissées derrière.
+            Assert.That(Directory.GetFiles(dir, "*" + ChiffrementBases.SuffixeCopie, SearchOption.AllDirectories), Is.Empty);
+            Assert.That(Directory.GetFiles(dir, "*" + ChiffrementBases.SuffixeSecurite, SearchOption.AllDirectories), Is.Empty);
+            Assert.That(File.ReadAllText(Path.Combine(dir, "dossiers.json")), Is.EqualTo("[]"));
+
+            // Deuxième lancement : rien à refaire.
+            Assert.That(ChiffrementBases.ChiffrerDossierDonnees(dir, ChiffrementBases.ObtenirCleDuPoste(dir)).Chiffrees, Is.Empty);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void BaseDejaChiffree_LaisseeTelleQuelle()
+        {
+            string dir = NouveauDossier();
+            string cle = CleDonnees.ObtenirOuCreer(dir);
+            string db = Path.Combine(dir, "Dossiers", "dossier_2.db");
+            Directory.CreateDirectory(Path.GetDirectoryName(db));
+            SQLiteService.FournisseurCle = () => cle;
+            try { new SQLiteService(db); }
+            finally { SQLiteService.FournisseurCle = null; }
+            byte[] avant = File.ReadAllBytes(db);
+            DateTime modifie = File.GetLastWriteTimeUtc(db);
+
+            var resultat = ChiffrementBases.ChiffrerDossierDonnees(dir, ChiffrementBases.ObtenirCleDuPoste(dir));
+
+            Assert.That(resultat.Chiffrees, Is.Empty);
+            Assert.That(resultat.Echecs, Is.Empty);
+            Assert.That(File.ReadAllBytes(db), Is.EqualTo(avant));
+            Assert.That(File.GetLastWriteTimeUtc(db), Is.EqualTo(modifie));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void CleIllisible_AucuneBaseTouchee()
+        {
+            string dir = NouveauDossier();
+            string db = BaseEnClair(dir, Path.Combine("Dossiers", "dossier_3.db"), "FATI");
+            byte[] avant = File.ReadAllBytes(db);
+            File.WriteAllBytes(CleDonnees.Chemin(dir), new byte[] { 9, 9, 9 });
+
+            Assert.Throws<CleDonneesIllisibleException>(() => ChiffrementBases.ObtenirCleDuPoste(dir));
+            Assert.That(File.ReadAllBytes(CleDonnees.Chemin(dir)), Is.EqualTo(new byte[] { 9, 9, 9 }));
+            Assert.That(File.ReadAllBytes(db), Is.EqualTo(avant));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void CleDisparue_AvecBasesChiffrees_PasDeNouvelleCle()
+        {
+            string dir = NouveauDossier();
+            BaseEnClair(dir, "iuts_data.db", "ALI");
+            ChiffrementBases.ChiffrerDossierDonnees(dir, ChiffrementBases.ObtenirCleDuPoste(dir));
+            File.Delete(CleDonnees.Chemin(dir));
+
+            Assert.Throws<CleDonneesAbsenteException>(() => ChiffrementBases.ObtenirCleDuPoste(dir));
+            Assert.That(CleDonnees.Existe(dir), Is.False);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void BaseEndommagee_ResteeIntacte_EtSignalee()
+        {
+            string dir = NouveauDossier();
+            string saine = BaseEnClair(dir, Path.Combine("Dossiers", "dossier_4.db"), "AWA");
+            string abimee = Path.Combine(dir, "Dossiers", "dossier_5.db");
+            var contenu = Encoding.ASCII.GetBytes("SQLite format 3\0").Concat(Enumerable.Repeat((byte)0xAB, 4096)).ToArray();
+            File.WriteAllBytes(abimee, contenu);
+
+            var resultat = ChiffrementBases.ChiffrerDossierDonnees(dir, ChiffrementBases.ObtenirCleDuPoste(dir));
+
+            Assert.That(resultat.Chiffrees, Is.EquivalentTo(new[] { saine }));
+            Assert.That(resultat.Echecs, Has.Count.EqualTo(1));
+            Assert.That(resultat.Echecs[0], Does.Contain("dossier_5.db"));
+            Assert.That(File.ReadAllBytes(abimee), Is.EqualTo(contenu));
+            Assert.That(Directory.GetFiles(dir, "*.tmp", SearchOption.AllDirectories), Is.Empty);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void BaseEnClair_OuverteAvecLaCle_ChiffreeAuPassage()
+        {
+            // Base restaurée d'une ancienne sauvegarde après le démarrage, par exemple.
+            string dir = NouveauDossier();
+            string db = BaseEnClair(dir, "dossier.db", "ISSA");
+            string cle = CleDonnees.ObtenirOuCreer(dir);
+
+            Assert.That(PrenomLu(db, cle), Is.EqualTo("ISSA"));
+            Assert.That(EnteteEnClair(db), Is.False);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void Sauvegarde_AvecCleActive_BasesCopieesChiffrees()
+        {
+            string dir = NouveauDossier();
+            BaseEnClair(dir, Path.Combine("Dossiers", "dossier_6.db"), "AWA");
+            File.WriteAllText(Path.Combine(dir, "dossiers.json"), "[{\"RaisonSociale\":\"SOCIETE TEST\",\"DbFileName\":\"Dossiers\\\\dossier_6.db\"}]");
+            string cle = ChiffrementBases.ObtenirCleDuPoste(dir);
+            ChiffrementBases.ChiffrerDossierDonnees(dir, cle);
+
+            string zip = Path.Combine(NouveauDossier(), "sauvegarde.zip");
+            SQLiteService.FournisseurCle = () => cle;
+            try
+            {
+                var service = new SauvegardeService(dir);
+                var resultat = service.Sauvegarder(zip, "test");
+                Assert.That(resultat.Avertissements, Is.Empty, string.Join(" | ", resultat.Avertissements));
+
+                var contenu = service.Analyser(zip);
+                Assert.That(contenu.Dossiers.Single().Niveau, Is.EqualTo(SQLiteService.SchemaCible));
+                Assert.That(SauvegardeService.Obstacle(contenu), Is.Null);
+            }
+            finally
+            {
+                SQLiteService.FournisseurCle = null;
+            }
+
+            // Dans l'archive, la base est chiffrée, et la clé du poste n'y figure pas.
+            using (var archive = System.IO.Compression.ZipFile.OpenRead(zip))
+            {
+                Assert.That(archive.Entries.Any(e => e.Name == CleDonnees.NomFichier), Is.False);
+                var entree = archive.Entries.Single(e => e.Name == "dossier_6.db");
+                var b = new byte[16];
+                using (var s = entree.Open()) s.Read(b, 0, 16);
+                Assert.That(Encoding.ASCII.GetString(b).StartsWith("SQLite format 3"), Is.False);
+            }
+        }
+
         [Test]
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
         public void GardeLectureSeule_BloqueLesEcrituresDuPilote()

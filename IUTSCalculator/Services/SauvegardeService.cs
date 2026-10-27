@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using IUTSCalculator.Helpers;
-using Microsoft.Data.Sqlite;
 
 namespace IUTSCalculator.Services
 {
@@ -123,6 +122,7 @@ namespace IUTSCalculator.Services
             try
             {
                 var bases = new List<DossierSauvegarde>();
+                string cle = SQLiteService.CleActive();
                 foreach (var fichier in Directory.GetFiles(_racine, "*", SearchOption.AllDirectories))
                 {
                     if (EstExclu(fichier)) continue;
@@ -132,9 +132,9 @@ namespace IUTSCalculator.Services
 
                     if (string.Equals(Path.GetExtension(fichier), ".db", StringComparison.OrdinalIgnoreCase))
                     {
-                        CopierBase(fichier, cible, resultat);
+                        CopierBase(fichier, cible, cle, resultat);
                         resultat.Bases++;
-                        bases.Add(new DossierSauvegarde { Fichier = relatif, Niveau = SQLiteService.LireVersionFichier(cible) });
+                        bases.Add(new DossierSauvegarde { Fichier = relatif, Niveau = SQLiteService.LireVersionFichier(cible, cle) });
                     }
                     else
                     {
@@ -174,22 +174,21 @@ namespace IUTSCalculator.Services
             }
         }
 
-        /// <summary>Copie cohérente d'une base, faite par SQLite (le programme peut être ouvert).</summary>
-        private static void CopierBase(string source, string cible, ResultatSauvegarde resultat)
+        /// <summary>
+        /// Copie cohérente d'une base, faite par SQLite (le programme peut être ouvert). Une base
+        /// chiffrée est ouverte avec <paramref name="cle"/> et copiée chiffrée par la même clé.
+        /// </summary>
+        private static void CopierBase(string source, string cible, string cle, ResultatSauvegarde resultat)
         {
             try
             {
                 SupprimerSiPresent(cible);
-                SqliteNatif.Initialiser();
-                var chaine = new SqliteConnectionStringBuilder { DataSource = source, Pooling = false, DefaultTimeout = 10 };
-                using (var connection = new SqliteConnection(chaine.ToString()))
+                if (ChiffrementBases.EstEnClair(source)) cle = null;
+                using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(source), cle))
+                using (var cmd = connection.CreateCommand())
                 {
-                    connection.Open();
-                    using (var cmd = connection.CreateCommand())
-                    {
-                        cmd.CommandText = "VACUUM INTO '" + cible.Replace("'", "''") + "';";
-                        cmd.ExecuteNonQuery();
-                    }
+                    cmd.CommandText = "VACUUM INTO " + SQLiteService.CibleVacuum(cible, cle) + ";";
+                    cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
@@ -294,12 +293,13 @@ namespace IUTSCalculator.Services
             var noms = registre.Where(d => d.Fichier != null)
                 .GroupBy(d => Normaliser(d.Fichier), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().RaisonSociale, StringComparer.OrdinalIgnoreCase);
+            string cleBases = SQLiteService.CleActive();
             foreach (var db in Directory.GetFiles(temp, "*.db", SearchOption.AllDirectories))
             {
                 string relatif = Normaliser(db.Substring(temp.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 string nom;
                 noms.TryGetValue(relatif, out nom);
-                contenu.Dossiers.Add(new DossierSauvegarde { RaisonSociale = nom, Fichier = relatif, Niveau = SQLiteService.LireVersionFichier(db) });
+                contenu.Dossiers.Add(new DossierSauvegarde { RaisonSociale = nom, Fichier = relatif, Niveau = SQLiteService.LireVersionFichier(db, cleBases) });
             }
             contenu.Dossiers.Sort((a, b) => string.Compare(a.Libelle, b.Libelle, StringComparison.CurrentCultureIgnoreCase));
             return contenu;

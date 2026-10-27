@@ -303,6 +303,7 @@
     <Compile Include="Services\SauvegardeService.cs" />
     <Compile Include="Services\SanteSecuriteExportService.cs" />
     <Compile Include="Services\RattrapageCnssService.cs" />
+    <Compile Include="Services\ChiffrementBases.cs" />
     <Compile Include="Services\CleDonnees.cs" />
     <Compile Include="Services\SqliteExtensions.cs" />
     <Compile Include="Services\SQLiteService.cs" />
