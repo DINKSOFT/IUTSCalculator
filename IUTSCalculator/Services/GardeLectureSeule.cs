@@ -33,6 +33,7 @@ namespace IUTSCalculator.Services
         public static void Activer()
         {
             SQLiteService.GardeConnexion = Appliquer;
+            SQLiteService.GardeConnexionSqlite = AppliquerSqlite;
         }
 
         /// <summary>
@@ -45,6 +46,9 @@ namespace IUTSCalculator.Services
             {
                 var sqlite = e as SQLiteException;
                 if (sqlite != null && sqlite.ResultCode == SQLiteErrorCode.Auth)
+                    return true;
+                var sqliteMds = e as Microsoft.Data.Sqlite.SqliteException;
+                if (sqliteMds != null && sqliteMds.SqliteErrorCode == SQLitePCL.raw.SQLITE_AUTH)
                     return true;
                 if (e.Message != null && e.Message.IndexOf("not authorized", StringComparison.OrdinalIgnoreCase) >= 0)
                     return true;
@@ -103,6 +107,49 @@ namespace IUTSCalculator.Services
                 default:
                     // Lecture, transactions, PRAGMA, fonctions, objets temporaires.
                     return;
+            }
+        }
+
+        // Microsoft.Data.Sqlite n'expose pas l'autorisateur : il est posé directement sur la
+        // connexion native. Le délégué est gardé dans un champ statique pour que le ramasse-miettes
+        // ne le libère pas tant que des connexions l'utilisent.
+        private static readonly SQLitePCL.strdelegate_authorizer AutoriserNatif = AutoriserSqlite;
+
+        private static void AppliquerSqlite(Microsoft.Data.Sqlite.SqliteConnection connexion)
+        {
+            if (connexion == null || !UserSession.Instance.IsReadOnly) return;
+            int rc = SQLitePCL.raw.sqlite3_set_authorizer(connexion.Handle, AutoriserNatif, null);
+            if (rc != SQLitePCL.raw.SQLITE_OK)
+                throw new InvalidOperationException("La garde « Lecture seule » n'a pas pu être posée (code SQLite " + rc + ").");
+        }
+
+        private static int AutoriserSqlite(object userData, int action, string argument1, string argument2, string baseCible, string declencheur)
+        {
+            switch (action)
+            {
+                case SQLitePCL.raw.SQLITE_INSERT:
+                case SQLitePCL.raw.SQLITE_UPDATE:
+                case SQLitePCL.raw.SQLITE_DELETE:
+                    return EstTemporaire(baseCible) || EstTableAutorisee(argument1) ? SQLitePCL.raw.SQLITE_OK : SQLitePCL.raw.SQLITE_DENY;
+
+                case SQLitePCL.raw.SQLITE_CREATE_TABLE:
+                case SQLitePCL.raw.SQLITE_CREATE_INDEX:
+                case SQLitePCL.raw.SQLITE_CREATE_TRIGGER:
+                case SQLitePCL.raw.SQLITE_CREATE_VIEW:
+                case SQLitePCL.raw.SQLITE_CREATE_VTABLE:
+                case SQLitePCL.raw.SQLITE_DROP_TABLE:
+                case SQLitePCL.raw.SQLITE_DROP_INDEX:
+                case SQLitePCL.raw.SQLITE_DROP_TRIGGER:
+                case SQLitePCL.raw.SQLITE_DROP_VIEW:
+                case SQLitePCL.raw.SQLITE_DROP_VTABLE:
+                case SQLitePCL.raw.SQLITE_ALTER_TABLE:
+                case SQLitePCL.raw.SQLITE_REINDEX:
+                case SQLitePCL.raw.SQLITE_ATTACH:
+                    return SQLitePCL.raw.SQLITE_DENY;
+
+                default:
+                    // Lecture, transactions, PRAGMA, fonctions, objets temporaires.
+                    return SQLitePCL.raw.SQLITE_OK;
             }
         }
 

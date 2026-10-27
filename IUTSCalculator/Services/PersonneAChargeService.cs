@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
 using System.Linq;
 using System.Threading.Tasks;
 using IUTSCalculator.Models;
+using Microsoft.Data.Sqlite;
 
 namespace IUTSCalculator.Services
 {
@@ -44,7 +44,7 @@ namespace IUTSCalculator.Services
             var liste = new List<PersonneACharge>();
             if (string.IsNullOrWhiteSpace(employeeId)) return liste;
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
@@ -52,7 +52,7 @@ namespace IUTSCalculator.Services
                     "ORDER BY Lien, DateNaissance, Nom";
                 cmd.Parameters.AddWithValue("@id", employeeId);
 
-                using (var reader = (SQLiteDataReader)await cmd.ExecuteReaderAsync())
+                using (var reader = await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                         liste.Add(Lire(reader));
@@ -62,7 +62,7 @@ namespace IUTSCalculator.Services
             return liste;
         }
 
-        private static PersonneACharge Lire(SQLiteDataReader reader)
+        private static PersonneACharge Lire(SqliteDataReader reader)
         {
             return new PersonneACharge
             {
@@ -92,7 +92,7 @@ namespace IUTSCalculator.Services
                 .Where(p => p != null && !string.IsNullOrWhiteSpace(p.NomComplet))
                 .ToList();
 
-            using (var conn = _sqliteService.CreateConnection())
+            using (var conn = _sqliteService.CreerConnexion())
             using (var tx = conn.BeginTransaction())
             {
                 try

@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.IO;
+using IUTSCalculator.Helpers;
 using IUTSCalculator.Models;
 
 namespace IUTSCalculator.Services
@@ -14,7 +15,7 @@ namespace IUTSCalculator.Services
     /// Deux principes :
     ///
     ///   • <b>Une connexion par opération.</b> Cette classe ne conserve plus de connexion
-    ///     ouverte partagée : <see cref="SQLiteConnection"/> n'est pas thread-safe, et la
+    ///     ouverte partagée : <see cref="SqliteConnection"/> n'est pas thread-safe, et la
     ///     partager entre des méthodes <c>async</c> exposait l'application à des lectures
     ///     entrelacées et à des transactions imbriquées. Chaque appelant ouvre la sienne
     ///     dans un <c>using</c>. L'ouverture d'une connexion SQLite est très peu coûteuse.
@@ -35,8 +36,29 @@ namespace IUTSCalculator.Services
         private readonly string _dbPath;
         private readonly string _connectionString;
 
+        /// <summary>Clé des bases (hexadécimal) ; null : bases en clair.</summary>
+        private readonly string _cle;
+
+        static SQLiteService()
+        {
+            SqliteNatif.Initialiser();
+        }
+
+        /// <summary>
+        /// Fournit la clé de chiffrement des bases (voir <see cref="CleDonnees"/>) ; null : bases
+        /// en clair. Lue une fois par instance, à sa construction.
+        ///
+        /// TRANSITION : tant que des services utilisent encore <see cref="CreateConnection"/>
+        /// (System.Data.SQLite, qui ne sait pas lire une base chiffrée), l'application ne branche
+        /// pas ce fournisseur. Il est branché une fois tous les services passés à
+        /// <see cref="CreerConnexion"/>.
+        /// </summary>
+        public static Func<string> FournisseurCle;
+
         public SQLiteService(string dbFileName = "iuts_data.db")
         {
+            _cle = FournisseurCle?.Invoke();
+
             if (Path.IsPathRooted(dbFileName))
             {
                 _dbPath = dbFileName;
@@ -65,15 +87,38 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
-        /// Ouvre une NOUVELLE connexion, déjà ouverte. L'appelant en est propriétaire et
-        /// doit la libérer — typiquement avec <c>using (var conn = ...CreateConnection())</c>.
+        /// Ouvre une NOUVELLE connexion (Microsoft.Data.Sqlite, moteur chiffrant SQLite3MC),
+        /// déjà ouverte et déverrouillée par la clé des bases si elle est active. L'appelant en
+        /// est propriétaire et doit la libérer — typiquement avec
+        /// <c>using (var conn = ...CreerConnexion())</c>.
         /// </summary>
-        public SQLiteConnection CreateConnection()
+        public SqliteConnection CreerConnexion()
         {
-            var connection = new SQLiteConnection(_connectionString);
+            var connection = OuvrirConnexion(_connectionString, _cle);
 
             // Garde du profil « Lecture seule » (défaut n° 10) : posée par l'application,
             // une fois le schéma prêt — la mise à niveau doit toujours pouvoir écrire.
+            var garde = GardeConnexionSqlite;
+            if (_schemaPret && garde != null)
+            {
+                try { garde(connection); }
+                catch { connection.Dispose(); throw; }
+            }
+            return connection;
+        }
+
+        /// <summary>
+        /// TRANSITION — connexion System.Data.SQLite, pour les services pas encore passés à
+        /// <see cref="CreerConnexion"/>. Refusée quand le chiffrement est actif : ce fournisseur
+        /// ne sait pas lire une base chiffrée. À supprimer avec la référence System.Data.SQLite.
+        /// </summary>
+        public System.Data.SQLite.SQLiteConnection CreateConnection()
+        {
+            if (_cle != null)
+                throw new InvalidOperationException("Accès System.Data.SQLite impossible : les bases sont chiffrées. Ce service doit utiliser CreerConnexion().");
+
+            var connection = new System.Data.SQLite.SQLiteConnection(ChaineConnexionHeritee(_dbPath));
+
             var garde = GardeConnexion;
             if (_schemaPret && garde != null)
                 garde(connection);
@@ -83,11 +128,14 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
-        /// Contrôle appliqué à chaque connexion ouverte par <see cref="CreateConnection"/> une
-        /// fois le schéma du dossier prêt. L'application WPF y branche la garde du profil
+        /// Contrôle appliqué à chaque connexion ouverte par <see cref="CreerConnexion"/> une fois
+        /// le schéma du dossier prêt. L'application WPF y branche la garde du profil
         /// « Lecture seule » (GardeLectureSeule) ; nul dans les outils et les tests.
         /// </summary>
-        public static Action<SQLiteConnection> GardeConnexion;
+        public static Action<SqliteConnection> GardeConnexionSqlite;
+
+        /// <summary>TRANSITION — même garde, pour les connexions de <see cref="CreateConnection"/>.</summary>
+        public static Action<System.Data.SQLite.SQLiteConnection> GardeConnexion;
 
         /// <summary>Vrai une fois la vérification / mise à niveau du schéma terminée.</summary>
         private bool _schemaPret;
@@ -102,7 +150,7 @@ namespace IUTSCalculator.Services
             // Premier temps : déterminer l'état de la base, puis refermer la connexion
             // pour pouvoir copier le fichier en toute sécurité si une migration est due.
             // (Ouvrir la base rejoue aussi un éventuel journal laissé par une coupure.)
-            using (var connection = CreateConnection())
+            using (var connection = CreerConnexion())
             {
                 CreerTableVersion(connection);
                 baseVierge = !TableExiste(connection, "Employees");
@@ -132,7 +180,7 @@ namespace IUTSCalculator.Services
                 SupprimerSiPresent(copie + "-journal");
                 File.Copy(_dbPath, copie);
 
-                using (var connection = OuvrirConnexion(copie))
+                using (var connection = OuvrirConnexion(ChaineConnexion(copie), _cle))
                 {
                     if (baseVierge)
                     {
@@ -173,7 +221,7 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>Chaîne des migrations, de la version lue jusqu'à <see cref="SchemaCible"/>.</summary>
-        private void AppliquerMigrations(SQLiteConnection connection, int version)
+        private void AppliquerMigrations(SqliteConnection connection, int version)
         {
             if (version < 1)
             {
@@ -416,19 +464,71 @@ namespace IUTSCalculator.Services
         /// <summary>Suffixe de la copie de travail d'une mise à niveau (exclue des sauvegardes).</summary>
         public const string SuffixeCopieMigration = ".migration.tmp";
 
-        private static string ChaineConnexion(string chemin)
+        /// <summary>
+        /// Pooling désactivé : une connexion gardée en réserve retiendrait le fichier, et la mise
+        /// à niveau, la sauvegarde et la restauration remplacent les fichiers des bases.
+        /// Default Timeout : si une autre opération écrit au même moment, on patiente (5 s) au
+        /// lieu d'échouer aussitôt sur SQLITE_BUSY.
+        /// Foreign Keys = false : comportement de System.Data.SQLite, sur lequel reposent les
+        /// services existants (SQLite3MC les active par défaut).
+        /// </summary>
+        private static string ChaineConnexion(string chemin, bool lectureSeule = false)
+        {
+            var builder = new SqliteConnectionStringBuilder
+            {
+                DataSource = chemin,
+                Pooling = false,
+                DefaultTimeout = 5,
+                ForeignKeys = false,
+                Mode = lectureSeule ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate
+            };
+            return builder.ToString();
+        }
+
+        private static string ChaineConnexionHeritee(string chemin)
         {
             return string.Format(CultureInfo.InvariantCulture, "Data Source={0};Version=3;BusyTimeout=5000;", chemin);
         }
 
-        private static SQLiteConnection OuvrirConnexion(string chemin)
+        /// <summary>
+        /// Ouvre une connexion et, si <paramref name="cle"/> est fournie, la déverrouille : format
+        /// SQLCipher 4 (« legacy=4 ») pour rester lisible par les outils SQLCipher standard.
+        /// </summary>
+        private static SqliteConnection OuvrirConnexion(string chaine, string cle)
         {
-            var connection = new SQLiteConnection(ChaineConnexion(chemin));
-            connection.Open();
-            return connection;
+            var connection = new SqliteConnection(chaine);
+            try
+            {
+                connection.Open();
+                if (cle != null)
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        // La clé n'est faite que de chiffres hexadécimaux : aucune injection possible.
+                        cmd.CommandText = "PRAGMA cipher = 'sqlcipher'; PRAGMA legacy = 4; PRAGMA hexkey = '" + VerifierCle(cle) + "';";
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
         }
 
-        private static bool EstIntegre(SQLiteConnection connection)
+        private static string VerifierCle(string cle)
+        {
+            if (cle.Length != 64)
+                throw new ArgumentException("Clé de base invalide.");
+            foreach (char c in cle)
+                if (!Uri.IsHexDigit(c))
+                    throw new ArgumentException("Clé de base invalide.");
+            return cle;
+        }
+
+        private static bool EstIntegre(SqliteConnection connection)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -485,13 +585,13 @@ namespace IUTSCalculator.Services
         /// Version du schéma d'un fichier de base, lue sans rien modifier ni migrer
         /// (0 : base sans table de version, -1 : fichier illisible).
         /// </summary>
-        public static int LireVersionFichier(string chemin)
+        public static int LireVersionFichier(string chemin, string cle = null)
         {
             try
             {
-                using (var connection = new SQLiteConnection(ChaineConnexion(chemin) + "Read Only=True;"))
+                if (!File.Exists(chemin)) return -1;
+                using (var connection = OuvrirConnexion(ChaineConnexion(chemin, lectureSeule: true), cle))
                 {
-                    connection.Open();
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'SchemaVersion';";
@@ -530,7 +630,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private void CreerTableVersion(SQLiteConnection connection)
+        private void CreerTableVersion(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS SchemaVersion (
@@ -539,7 +639,7 @@ namespace IUTSCalculator.Services
                 );");
         }
 
-        private int LireVersion(SQLiteConnection connection)
+        private int LireVersion(SqliteConnection connection)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -549,7 +649,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private void EnregistrerVersion(SQLiteConnection connection, int version)
+        private void EnregistrerVersion(SqliteConnection connection, int version)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -567,7 +667,7 @@ namespace IUTSCalculator.Services
         /// CENTIMES (voir <see cref="DbValue"/>). Un salaire de base de 250 000 FCFA y
         /// est stocké sous la forme 25 000 000.
         /// </summary>
-        private void CreerSchemaComplet(SQLiteConnection connection)
+        private void CreerSchemaComplet(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS Employees (
@@ -729,7 +829,7 @@ namespace IUTSCalculator.Services
         /// Conventions : montants en INTEGER de centimes, quantités en TEXT invariant
         /// (une quantité porte des décimales significatives : 7,5 heures).
         /// </summary>
-        private void CreerTableVariablesPaie(SQLiteConnection connection)
+        private void CreerTableVariablesPaie(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS VariablesPaie (
@@ -757,7 +857,7 @@ namespace IUTSCalculator.Services
         /// dossier n'ont plus d'objet, et les laisser orphelines fausserait tout décompte
         /// ultérieur.
         /// </summary>
-        private void CreerTablePersonnesACharge(SQLiteConnection connection)
+        private void CreerTablePersonnesACharge(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS PersonnesACharge (
@@ -785,7 +885,7 @@ namespace IUTSCalculator.Services
         ///
         /// Les totaux sont des INTEGER en centimes, comme partout ailleurs.
         /// </summary>
-        private void CreerTablePeriodes(SQLiteConnection connection)
+        private void CreerTablePeriodes(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS PeriodesPaie (
@@ -819,7 +919,7 @@ namespace IUTSCalculator.Services
         /// les clôture pas explicitement. Le comportement de l'application ne change donc
         /// pas tant qu'elle ne s'est pas servie du module.
         /// </summary>
-        private void Migration5_PeriodesPaie(SQLiteConnection connection)
+        private void Migration5_PeriodesPaie(SqliteConnection connection)
         {
             CreerTablePeriodes(connection);
         }
@@ -832,7 +932,7 @@ namespace IUTSCalculator.Services
         /// La colonne est ajoutée vide : les matricules se saisissent ensuite sur la fiche
         /// du salarié, et l'écran de déclaration signale les lignes encore incomplètes.
         /// </summary>
-        private void Migration6_MatriculeCnss(SQLiteConnection connection)
+        private void Migration6_MatriculeCnss(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "Employees", "NumeroCnss", "TEXT");
         }
@@ -850,7 +950,7 @@ namespace IUTSCalculator.Services
         /// deviner quel plafond et quels taux étaient en vigueur à l'époque. Le bordereau
         /// sait déjà déduire l'assiette du brut ; pour ces lignes-là, il continue.
         /// </summary>
-        private void Migration7_VentilationCnss(SQLiteConnection connection)
+        private void Migration7_VentilationCnss(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "TaxCalculations", "AssietteCnss", "INTEGER NOT NULL DEFAULT 0");
             AjouterColonneSiAbsente(connection, "TaxCalculations", "CnssPrestationsFamiliales", "INTEGER NOT NULL DEFAULT 0");
@@ -870,7 +970,7 @@ namespace IUTSCalculator.Services
         /// un décompte de rien mettrait toutes les charges à zéro. Les deux coexistent,
         /// et l'écran signale l'écart quand il apparaît.
         /// </summary>
-        private void Migration8_DossierSalarie(SQLiteConnection connection)
+        private void Migration8_DossierSalarie(SqliteConnection connection)
         {
             foreach (var colonne in new[]
             {
@@ -894,7 +994,7 @@ namespace IUTSCalculator.Services
         /// salaire de base ou dans une indemnité, et la retrouver après coup relèverait de
         /// la divination.
         /// </summary>
-        private void Migration9_VariablesPaie(SQLiteConnection connection)
+        private void Migration9_VariablesPaie(SqliteConnection connection)
         {
             CreerTableVariablesPaie(connection);
         }
@@ -909,7 +1009,7 @@ namespace IUTSCalculator.Services
         /// Les calculs déjà enregistrés gardent zéro : ils ont été établis avant que les
         /// variables n'existent, et leur net à payer reste donc exact.
         /// </summary>
-        private void Migration10_ApportVariables(SQLiteConnection connection)
+        private void Migration10_ApportVariables(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "TaxCalculations", "RetenuesDiverses", "INTEGER NOT NULL DEFAULT 0");
             AjouterColonneSiAbsente(connection, "TaxCalculations", "GainsVariables", "INTEGER NOT NULL DEFAULT 0");
@@ -983,7 +1083,7 @@ namespace IUTSCalculator.Services
         /// réafficher des années plus tard exactement comme il a été remis. Le document
         /// est donc archivé en clair à côté de son calcul.
         /// </summary>
-        private void Migration15_ArchiveBulletin(SQLiteConnection connection)
+        private void Migration15_ArchiveBulletin(SqliteConnection connection)
         {
             if (!TableExiste(connection, "TaxCalculations"))
                 return;
@@ -1000,7 +1100,7 @@ namespace IUTSCalculator.Services
         /// qu'un montant et une durée obligerait à recalculer à chaque lecture un
         /// calendrier que les évènements du dossier ont déjà démenti.
         /// </summary>
-        private void Migration16_Prets(SQLiteConnection connection)
+        private void Migration16_Prets(SqliteConnection connection)
         {
             CreerTablesPrets(connection);
         }
@@ -1014,7 +1114,7 @@ namespace IUTSCalculator.Services
         /// d'employé sur ses bulletins de janvier à mars. Une colonne n'aurait retenu que
         /// la situation du jour, et aurait fait mentir tout recalcul antérieur.
         /// </summary>
-        private void Migration17_ProfilsPaie(SQLiteConnection connection)
+        private void Migration17_ProfilsPaie(SqliteConnection connection)
         {
             CreerTablesProfils(connection);
         }
@@ -1027,7 +1127,7 @@ namespace IUTSCalculator.Services
         /// le sont pas, et le service refuse d'ailleurs de supprimer un profil qui a été
         /// affecté — c'est la pièce qui explique un bulletin passé.
         /// </summary>
-        private void CreerTablesProfils(SQLiteConnection connection)
+        private void CreerTablesProfils(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS ProfilsPaie (
@@ -1085,7 +1185,7 @@ namespace IUTSCalculator.Services
         /// L'échéancier est supprimé en cascade avec son prêt : un calendrier sans accord
         /// ne se rattache à rien et fausserait tout décompte de solde.
         /// </summary>
-        private void CreerTablesPrets(SQLiteConnection connection)
+        private void CreerTablesPrets(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS Prets (
@@ -1127,7 +1227,7 @@ namespace IUTSCalculator.Services
                 "CREATE INDEX IF NOT EXISTS IX_EcheancesPret_Periode ON EcheancesPret (Annee, Mois);");
         }
 
-        private void Migration14_NetsManquants(SQLiteConnection connection)
+        private void Migration14_NetsManquants(SqliteConnection connection)
         {
             if (!TableExiste(connection, "TaxCalculations"))
                 return;
@@ -1161,7 +1261,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private void Migration13_Absences(SQLiteConnection connection)
+        private void Migration13_Absences(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS Absences (
@@ -1188,7 +1288,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private void Migration12_AffichageDevise(SQLiteConnection connection)
+        private void Migration12_AffichageDevise(SqliteConnection connection)
         {
             if (!TableExiste(connection, "AppSettings"))
                 return;
@@ -1206,7 +1306,7 @@ namespace IUTSCalculator.Services
         /// brut, exactement ce que reproduit une colonne où toute rubrique reste
         /// soumise tant que personne ne l'en exonère explicitement.
         /// </summary>
-        private void Migration18_TaxePatronale(SQLiteConnection connection)
+        private void Migration18_TaxePatronale(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "Rubriques", "SoumisTPA", "INTEGER NOT NULL DEFAULT 1");
         }
@@ -1225,7 +1325,7 @@ namespace IUTSCalculator.Services
         /// la reconstitue depuis le brut, comme elle le fait déjà pour l'assiette CNSS
         /// des bulletins antérieurs à la migration 7.
         /// </summary>
-        private void Migration19_AssietteTPA(SQLiteConnection connection)
+        private void Migration19_AssietteTPA(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "TaxCalculations", "AssietteTPA", "INTEGER NOT NULL DEFAULT 0");
         }
@@ -1236,7 +1336,7 @@ namespace IUTSCalculator.Services
         /// Crée la table JournalAudit et ses index pour tracer les modifications sensibles
         /// de paie : qui a changé quel salaire, quand, et quelle était la valeur précédente.
         /// </summary>
-        private void Migration20_JournalAudit(SQLiteConnection connection)
+        private void Migration20_JournalAudit(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS JournalAudit (
@@ -1267,7 +1367,7 @@ namespace IUTSCalculator.Services
         /// Crée la table HeuresSupplementaires et ses index pour décompter et valoriser
         /// les heures supplémentaires mensuelles par tranche de majoration (115%, 130%, 150%, 200%).
         /// </summary>
-        private void Migration21_HeuresSupplementaires(SQLiteConnection connection)
+        private void Migration21_HeuresSupplementaires(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS HeuresSupplementaires (
@@ -1307,7 +1407,7 @@ namespace IUTSCalculator.Services
         /// Initialise la Convention Collective Interprofessionnelle du Burkina Faso (CCI-BF)
         /// avec sa grille de salaires minima et son barème légal de prime d'ancienneté.
         /// </summary>
-        private void Migration22_ConventionsEtGrilles(SQLiteConnection connection)
+        private void Migration22_ConventionsEtGrilles(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS ConventionsCollectives (
@@ -1362,7 +1462,7 @@ namespace IUTSCalculator.Services
             InitialiserConventionCciBfSiAbsente(connection);
         }
 
-        private void InitialiserConventionCciBfSiAbsente(SQLiteConnection connection)
+        private void InitialiserConventionCciBfSiAbsente(SqliteConnection connection)
         {
             long convId = 0;
             using (var cmd = connection.CreateCommand())
@@ -1392,7 +1492,7 @@ namespace IUTSCalculator.Services
                         );";
                     cmd.Parameters.AddWithValue("@now", now);
                     cmd.ExecuteNonQuery();
-                    convId = connection.LastInsertRowId;
+                    convId = SQLitePCL.raw.sqlite3_last_insert_rowid(connection.Handle);
                 }
             }
 
@@ -1495,7 +1595,7 @@ namespace IUTSCalculator.Services
         /// Crée la table SoldesToutCompte pour conserver l'historique opposable de chaque
         /// solde de tout compte calculé, validé et remis au salarié.
         /// </summary>
-        private void Migration23_SoldeToutCompteEtSortie(SQLiteConnection connection)
+        private void Migration23_SoldeToutCompteEtSortie(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "Employees", "DateSortie", "TEXT");
             AjouterColonneSiAbsente(connection, "Employees", "MotifDepart", "TEXT");
@@ -1550,7 +1650,7 @@ namespace IUTSCalculator.Services
                 "CREATE INDEX IF NOT EXISTS IX_SoldesToutCompte_DateSortie ON SoldesToutCompte (DateSortie);");
         }
 
-        private void Migration24_SaisiesOppositionsEtCessions(SQLiteConnection connection)
+        private void Migration24_SaisiesOppositionsEtCessions(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS SaisiesOppositions (
@@ -1609,7 +1709,7 @@ namespace IUTSCalculator.Services
                 "CREATE INDEX IF NOT EXISTS IX_RetenuesSaisies_SaisieId ON RetenuesSaisiesMensuelles (SaisieOppositionId);");
         }
 
-        private void Migration25_RappelsEtRegularisations(SQLiteConnection connection)
+        private void Migration25_RappelsEtRegularisations(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS RappelsPaie (
@@ -1707,7 +1807,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private void Migration26_AvantagesEnNature(SQLiteConnection connection)
+        private void Migration26_AvantagesEnNature(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS AvantagesEnNature (
@@ -1792,7 +1892,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private void Migration11_RubriquesDeSaisie(SQLiteConnection connection)
+        private void Migration11_RubriquesDeSaisie(SqliteConnection connection)
         {
             if (!TableExiste(connection, "Rubriques"))
                 return;
@@ -1912,7 +2012,7 @@ namespace IUTSCalculator.Services
         /// Le compte de contrepartie (4270) est une proposition, pas un compte imposé : il
         /// se corrige comme tout autre, depuis l'écran « Plan de paie ».
         /// </summary>
-        private void Migration27_RubriqueAvance(SQLiteConnection connection)
+        private void Migration27_RubriqueAvance(SqliteConnection connection)
         {
             if (!TableExiste(connection, "Rubriques"))
                 return;
@@ -1943,7 +2043,7 @@ namespace IUTSCalculator.Services
         /// une erreur SQL « no such column ». <c>AjouterColonneSiAbsente</c> ne fait rien
         /// sur un dossier migré où elles existent déjà.
         /// </summary>
-        private void Migration28_ServiceEtColonnesManquantes(SQLiteConnection connection)
+        private void Migration28_ServiceEtColonnesManquantes(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "Employees", "Service", "TEXT");
             AjouterColonneSiAbsente(connection, "Employees", "DateSortie", "TEXT");
@@ -1954,7 +2054,7 @@ namespace IUTSCalculator.Services
         /// <summary>
         /// Migration 29 — Organigramme d'entreprise : Directions, services, postes et rattachements hiérarchiques (module RH-01).
         /// </summary>
-        private void Migration29_OrganigrammeEtPostes(SQLiteConnection connection)
+        private void Migration29_OrganigrammeEtPostes(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS UnitesOrganisationnelles (
@@ -2011,7 +2111,7 @@ namespace IUTSCalculator.Services
         /// <summary>
         /// Migration 30 — Postes & fiches de poste : missions, compétences requises, classification conventionnelle, effectif budgété vs pourvu (module RH-02).
         /// </summary>
-        private void Migration30_FichesDePostesEtCompetences(SQLiteConnection connection)
+        private void Migration30_FichesDePostesEtCompetences(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS Competences (
@@ -2067,7 +2167,7 @@ namespace IUTSCalculator.Services
             InsererCompetenceInitiale(connection, "RIGUEUR", "Rigueur, Discrétion & Confidentialité", 2, "Respect scrupuleux du secret professionnel et fiabilité dans l'exécution.");
         }
 
-        private void InsererCompetenceInitiale(SQLiteConnection connection, string code, string libelle, int domaine, string description)
+        private void InsererCompetenceInitiale(SqliteConnection connection, string code, string libelle, int domaine, string description)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -2086,7 +2186,7 @@ namespace IUTSCalculator.Services
         /// <summary>
         /// Migration 31 — Entretiens & évaluations : campagnes annuelles, grilles d'évaluation, objectifs, notation et suivi des entretiens individuels (module RH-03).
         /// </summary>
-        private void Migration31_EntretiensEtEvaluations(SQLiteConnection connection)
+        private void Migration31_EntretiensEtEvaluations(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS CampagnesEvaluation (
@@ -2197,7 +2297,7 @@ namespace IUTSCalculator.Services
         /// Migration 32 — Gestion de la formation : plan annuel, sessions, participants, coûts et organismes,
         /// avec liaison naturelle vers la TPA (Taxe Patronale et d'Apprentissage) et passerelle RH-03 (module RH-04).
         /// </summary>
-        private void Migration32_FormationEtTPA(SQLiteConnection connection)
+        private void Migration32_FormationEtTPA(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS PlansFormation (
@@ -2346,7 +2446,7 @@ namespace IUTSCalculator.Services
         /// RecrutementEntretiens, les index de performance et d'unicité, ainsi qu'un jeu
         /// d'amorçage initial.
         /// </summary>
-        private void Migration33_Recrutement(SQLiteConnection connection)
+        private void Migration33_Recrutement(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS RecrutementBesoins (
@@ -2497,7 +2597,7 @@ namespace IUTSCalculator.Services
         /// de la base : INTEGER en centimes. Les taux, eux, sont des proportions à
         /// nombreuses décimales et sont donc stockés en TEXT, comme TaxRate.
         /// </summary>
-        private void CreerTableRubriques(SQLiteConnection connection)
+        private void CreerTableRubriques(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS Rubriques (
@@ -2547,7 +2647,7 @@ namespace IUTSCalculator.Services
         /// Idempotente (CREATE IF NOT EXISTS, ajout de colonne si absente, amorçage si
         /// vide) : elle est aussi rejouée par <see cref="CreerSchemaComplet"/>.
         /// </summary>
-        private void Migration34_GestionDesTemps(SQLiteConnection connection)
+        private void Migration34_GestionDesTemps(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS BaremesHeuresSup (
@@ -2677,7 +2777,7 @@ namespace IUTSCalculator.Services
         /// y compris celui d'un dossier neuf (voir ETAT-DEVELOPPEMENT.md, dette RH-08).
         /// Soumise à l'IUTS et à la CNSS par prudence : se corrige depuis « Plan de paie ».
         /// </summary>
-        private void Migration34_RubriquePanier(SQLiteConnection connection)
+        private void Migration34_RubriquePanier(SqliteConnection connection)
         {
             if (!TableExiste(connection, "Rubriques"))
                 return;
@@ -2708,7 +2808,7 @@ namespace IUTSCalculator.Services
         /// TEXT vide, comme ailleurs ; le nombre de jours de mise à pied en TEXT invariant.
         /// Aucune donnée existante n'est transformée.
         /// </summary>
-        private void Migration35_Discipline(SQLiteConnection connection)
+        private void Migration35_Discipline(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS ParametresDiscipline (
@@ -2855,7 +2955,7 @@ namespace IUTSCalculator.Services
         /// inséré en INSERT OR IGNORE : une rubrique déjà présente, éventuellement modifiée
         /// par l'utilisateur, est conservée telle quelle.
         /// </summary>
-        private void Migration36_PlanDePaieComplet(SQLiteConnection connection)
+        private void Migration36_PlanDePaieComplet(SqliteConnection connection)
         {
             if (!TableExiste(connection, "Rubriques"))
                 return;
@@ -2930,7 +3030,7 @@ namespace IUTSCalculator.Services
         /// protégé se cochait à la main sur chaque procédure — un oubli suffisait à laisser
         /// passer un licenciement irrégulier. Le registre la rend automatique.
         /// </summary>
-        private void Migration36_MandatsRepresentatifs(SQLiteConnection connection)
+        private void Migration36_MandatsRepresentatifs(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS MandatsRepresentatifs (
@@ -2955,7 +3055,7 @@ namespace IUTSCalculator.Services
         /// n'est transformée. La rémunération journalière d'un accident est un montant :
         /// INTEGER en centimes, comme ailleurs.
         /// </summary>
-        private void Migration37_SanteSecurite(SQLiteConnection connection)
+        private void Migration37_SanteSecurite(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS ParametresSST (
@@ -3070,7 +3170,7 @@ namespace IUTSCalculator.Services
         /// Migration 38 — corrections de la paie relevées en préparant le guide de formation
         /// (version 1.4.37.1). Idempotente : la rejouer ne change rien.
         /// </summary>
-        private void Migration38_CorrectionsPaie(SQLiteConnection connection)
+        private void Migration38_CorrectionsPaie(SqliteConnection connection)
         {
             // Défaut 7 — reprise du solde de congés à l'ouverture du dossier.
             if (TableExiste(connection, "Employees"))
@@ -3150,7 +3250,7 @@ namespace IUTSCalculator.Services
         /// l'écran, par <c>RubriqueService</c>, à partir des éléments déjà gérés par le
         /// moteur de calcul.
         /// </summary>
-        private void Migration3_PlanDePaie(SQLiteConnection connection)
+        private void Migration3_PlanDePaie(SqliteConnection connection)
         {
             CreerTableRubriques(connection);
         }
@@ -3166,7 +3266,7 @@ namespace IUTSCalculator.Services
         /// BORNES sont des INTEGER en centimes ; les TAUX, qui portent des décimales
         /// significatives, sont des TEXT en culture invariante.
         /// </summary>
-        private void CreerTablesBaremes(SQLiteConnection connection)
+        private void CreerTablesBaremes(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS Baremes (
@@ -3231,7 +3331,7 @@ namespace IUTSCalculator.Services
         /// alimenté à la première ouverture de l'écran, par <c>BaremeService</c>, avec
         /// exactement les valeurs que le moteur applique aujourd'hui.
         /// </summary>
-        private void Migration4_BaremesDates(SQLiteConnection connection)
+        private void Migration4_BaremesDates(SqliteConnection connection)
         {
             CreerTablesBaremes(connection);
         }
@@ -3248,7 +3348,7 @@ namespace IUTSCalculator.Services
         /// Les colonnes sont créées ici avec la convention de la version 1 (montants en
         /// REAL) ; la migration 2 les convertit ensuite comme toutes les autres.
         /// </summary>
-        private void Migration1_ColonnesManquantes(SQLiteConnection connection)
+        private void Migration1_ColonnesManquantes(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "Employees", "SujetionAllowance", "REAL");
             AjouterColonneSiAbsente(connection, "Employees", "Fonction", "TEXT");
@@ -3272,7 +3372,7 @@ namespace IUTSCalculator.Services
         /// <c>TaxRate</c> échappe à la conversion : c'est un pourcentage à nombreuses
         /// décimales, pas un montant. Il passe en TEXT, qui préserve sa valeur exacte.
         /// </summary>
-        private void Migration2_MontantsExacts(SQLiteConnection connection)
+        private void Migration2_MontantsExacts(SqliteConnection connection)
         {
             // Ces deux PRAGMA doivent être posés HORS transaction.
             //
@@ -3413,7 +3513,7 @@ namespace IUTSCalculator.Services
         /// par la CNSS : dépôt du dossier, montant et date du remboursement, sur la fiche de
         /// l'accident. Idempotente ; base neuve : la table vient d'être créée par la migration 37.
         /// </summary>
-        private void Migration38_SanteSecurite(SQLiteConnection connection)
+        private void Migration38_SanteSecurite(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "AccidentsTravail", "DateDepotIJ", "TEXT");
             AjouterColonneSiAbsente(connection, "AccidentsTravail", "MontantRembourseIJ", "INTEGER NOT NULL DEFAULT 0");
@@ -3426,7 +3526,7 @@ namespace IUTSCalculator.Services
         /// Idempotente. Les entretiens validés avant cette version gardent une date et un auteur
         /// vides : aucune source fiable ne permet de les reconstituer, rien n'est réécrit.
         /// </summary>
-        private void Migration38_Entretiens(SQLiteConnection connection)
+        private void Migration38_Entretiens(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "EntretiensEvaluation", "ValidePar", "TEXT");
         }
@@ -3436,7 +3536,7 @@ namespace IUTSCalculator.Services
         /// (type de contrat, indemnités proposées par l'offre, en centimes comme tous les montants).
         /// Idempotente ; aucune donnée existante n'est modifiée.
         /// </summary>
-        private void Migration38_Recrutement(SQLiteConnection connection)
+        private void Migration38_Recrutement(SqliteConnection connection)
         {
             AjouterColonneSiAbsente(connection, "Employees", "TypeContrat", "TEXT");
             AjouterColonneSiAbsente(connection, "RecrutementCandidatures", "TypeContratEmbauche", "TEXT");
@@ -3451,7 +3551,7 @@ namespace IUTSCalculator.Services
         /// enregistrés avant la correction du sélecteur, SANS les réécrire (une valeur 1 pouvait
         /// venir de « Niv 1 » comme de « Niv 2 »). Idempotente.
         /// </summary>
-        private void Migration38_FichesDePostes(SQLiteConnection connection)
+        private void Migration38_FichesDePostes(SqliteConnection connection)
         {
             if (!TableExiste(connection, "PosteCompetences"))
                 return;
@@ -3474,7 +3574,7 @@ namespace IUTSCalculator.Services
         /// par dossier. Valeurs initiales = anciennes valeurs codées en dur (aucun résultat ne
         /// change tant que l'utilisateur ne modifie rien). Idempotente.
         /// </summary>
-        private void Migration38_ParametresComptables(SQLiteConnection connection)
+        private void Migration38_ParametresComptables(SqliteConnection connection)
         {
             Executer(connection, @"
                 CREATE TABLE IF NOT EXISTS ParametresComptables (
@@ -3498,7 +3598,7 @@ namespace IUTSCalculator.Services
         /// postérieures à la migration, borne des entrées antérieures (« non scellées »), et
         /// déclencheurs interdisant la modification ou la suppression d'une entrée. Idempotente.
         /// </summary>
-        private void Migration38_AuditScelle(SQLiteConnection connection)
+        private void Migration38_AuditScelle(SqliteConnection connection)
         {
             if (!TableExiste(connection, "JournalAudit"))
                 Migration20_JournalAudit(connection);
@@ -3537,12 +3637,12 @@ namespace IUTSCalculator.Services
 
         #region Utilitaires de schéma
 
-        private void Executer(SQLiteConnection connection, string sql)
+        private void Executer(SqliteConnection connection, string sql)
         {
             Executer(connection, null, sql);
         }
 
-        private void Executer(SQLiteConnection connection, SQLiteTransaction tx, string sql)
+        private void Executer(SqliteConnection connection, SqliteTransaction tx, string sql)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -3553,7 +3653,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private bool TableExiste(SQLiteConnection connection, string nomTable)
+        private bool TableExiste(SqliteConnection connection, string nomTable)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -3563,7 +3663,7 @@ namespace IUTSCalculator.Services
             }
         }
 
-        private List<string> ColonnesDe(SQLiteConnection connection, string nomTable)
+        private List<string> ColonnesDe(SqliteConnection connection, string nomTable)
         {
             var colonnes = new List<string>();
             using (var cmd = connection.CreateCommand())
@@ -3580,7 +3680,7 @@ namespace IUTSCalculator.Services
             return colonnes;
         }
 
-        private void AjouterColonneSiAbsente(SQLiteConnection connection, string nomTable, string nomColonne, string type)
+        private void AjouterColonneSiAbsente(SqliteConnection connection, string nomTable, string nomColonne, string type)
         {
             if (!TableExiste(connection, nomTable))
                 return;

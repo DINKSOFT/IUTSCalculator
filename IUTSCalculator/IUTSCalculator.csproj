@@ -93,6 +93,18 @@
     <Reference Include="SixLabors.Fonts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=d998eea7b14cab13, processorArchitecture=MSIL">
       <HintPath>..\packages\SixLabors.Fonts.1.0.0\lib\netstandard2.0\SixLabors.Fonts.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Data.Sqlite">
+      <HintPath>..\packages\Microsoft.Data.Sqlite.Core.10.0.14\lib\netstandard2.0\Microsoft.Data.Sqlite.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLite3MC.PCLRaw.provider">
+      <HintPath>..\packages\SQLite3MC.PCLRaw.provider.2.6.1\lib\netstandard2.0\SQLite3MC.PCLRaw.provider.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.batteries_v2">
+      <HintPath>..\packages\SQLite3MC.PCLRaw.bundle.2.6.1\lib\netstandard2.0\SQLitePCLRaw.batteries_v2.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.core">
+      <HintPath>..\packages\SQLitePCLRaw.core.3.0.2\lib\netstandard2.0\SQLitePCLRaw.core.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Buffers.4.6.1\lib\net462\System.Buffers.dll</HintPath>
@@ -175,6 +187,7 @@
     <Compile Include="Helpers\CheminsDossier.cs" />
     <Compile Include="Helpers\Constants.cs" />
     <Compile Include="Helpers\SauvegardeInteractive.cs" />
+    <Compile Include="Helpers\SqliteNatif.cs" />
     <Compile Include="Helpers\VersionApplication.cs" />
     <Compile Include="Helpers\EditionTranches.cs" />
     <Compile Include="Helpers\RelayCommand.cs" />
@@ -294,6 +307,7 @@
     <Compile Include="Services\SanteSecuriteExportService.cs" />
     <Compile Include="Services\RattrapageCnssService.cs" />
     <Compile Include="Services\SQLiteService.cs" />
+    <Compile Include="Services\CleDonnees.cs" />
     <Compile Include="Services\TaxCalculatorService.cs" />
     <Compile Include="Services\TaxDataService.cs" />
     <Compile Include="Services\TaxParametersUpdatedEventArgs.cs" />
@@ -718,6 +732,15 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+    <!-- SQLite3MC.PCLRaw.lib ne copie pas ses DLL natives sous .NET Framework : rangées en x86\ et x64\, chargées par SqliteNatif. -->
+    <None Include="..\packages\SQLite3MC.PCLRaw.lib.2.6.1\runtimes\win-x64\native\sqlite3mc.dll">
+      <Link>x64\sqlite3mc.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\packages\SQLite3MC.PCLRaw.lib.2.6.1\runtimes\win-x86\native\sqlite3mc.dll">
+      <Link>x86\sqlite3mc.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   <ItemGroup>
     <Resource Include="Icon-Sigma-Paie-et-RH.-svg.ico" />
   </ItemGroup>

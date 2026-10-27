@@ -349,6 +349,7 @@ namespace IUTSCalculator.Services
                 {
                     string relatif = fichier.Substring(temp.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                     if (string.Equals(relatif, NomManifeste, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (EstExclu(fichier)) continue;   // dont la clé du poste : une archive ne la remplace jamais
                     string cible = Path.GetFullPath(Path.Combine(_racine, relatif));
                     if (!EstSous(cible, _racine)) continue;
                     Directory.CreateDirectory(Path.GetDirectoryName(cible));
@@ -383,6 +384,8 @@ namespace IUTSCalculator.Services
         private bool EstExclu(string fichier)
         {
             string nom = Path.GetFileName(fichier);
+            // La clé des bases est propre au poste (DPAPI) : jamais sauvegardée ni restaurée.
+            if (nom.StartsWith(CleDonnees.NomFichier, StringComparison.OrdinalIgnoreCase)) return true;
             if (ExtensionsExclues.Any(e => nom.EndsWith(e, StringComparison.OrdinalIgnoreCase))) return true;
             if (SuffixesExclus.Any(s => nom.EndsWith(s, StringComparison.OrdinalIgnoreCase))) return true;
             return nom.EndsWith(".partiel", StringComparison.OrdinalIgnoreCase);
