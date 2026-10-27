@@ -126,6 +126,15 @@ namespace IUTSCalculator.ViewModels
                 StatusMessage = Dossiers.Count > 0
                     ? $"{Dossiers.Count} dossier(s) disponible(s)."
                     : "Aucun dossier pour l'instant. Créez-en un pour commencer.";
+
+                if (_registryService.DossiersRejetes.Count > 0)
+                {
+                    MessageBox.Show(
+                        "Ces dossiers ont été écartés : le registre désigne leur base hors du dossier de données du programme, ce qui est refusé par sécurité.\n\n• "
+                        + string.Join("\n• ", _registryService.DossiersRejetes)
+                        + (_registryService.CopieRegistreRejete != null ? "\n\nLe registre d'origine est conservé dans :\n" + _registryService.CopieRegistreRejete : ""),
+                        "Dossiers écartés", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
             catch (Exception ex)
             {
@@ -267,6 +276,14 @@ namespace IUTSCalculator.ViewModels
 
             if (dialog.ShowDialog() == true)
             {
+                // Même règle qu'au chargement de dossiers.json : sinon le logo serait retiré au prochain démarrage.
+                if (!CheminsDossier.EstLogoValide(dialog.FileName))
+                {
+                    MessageBox.Show(
+                        "Choisissez une image PNG, JPG, BMP ou GIF rangée sur un lecteur de ce poste (pas un chemin réseau « \\\\serveur\\… »).",
+                        "Logo refusé", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
                 EditingDossier.LogoPath = dialog.FileName;
             }
         }

@@ -55,19 +55,77 @@ namespace IUTSCalculator.Services
             return dossiers.OrderBy(d => d.RaisonSociale).ToList();
         }
 
+        /// <summary>
+        /// Raisons sociales des dossiers écartés au dernier chargement parce que leur base était
+        /// désignée hors du dossier de données (voir <see cref="CheminsDossier"/>).
+        /// </summary>
+        public IReadOnlyList<string> DossiersRejetes { get; private set; } = new List<string>();
+
+        /// <summary>Copie du registre d'origine, conservée quand des entrées ont été écartées ou corrigées.</summary>
+        public string CopieRegistreRejete { get; private set; }
+
         private async Task<List<Dossier>> ReadRegistryAsync()
         {
+            DossiersRejetes = new List<string>();
+            CopieRegistreRejete = null;
+
             if (!File.Exists(RegistryFilePath))
                 return new List<Dossier>();
 
+            List<Dossier> lus;
             try
             {
                 var json = await Task.Run(() => File.ReadAllText(RegistryFilePath));
-                return JsonSerializer.Deserialize<List<Dossier>>(json) ?? new List<Dossier>();
+                lus = JsonSerializer.Deserialize<List<Dossier>>(json) ?? new List<Dossier>();
             }
             catch
             {
                 return new List<Dossier>();
+            }
+
+            // dossiers.json n'est pas chiffré : un chemin de base hors du dossier de données
+            // écarte le dossier, un logo douteux est simplement retiré.
+            var valides = new List<Dossier>();
+            var rejetes = new List<string>();
+            bool corrige = false;
+            foreach (var d in lus.Where(d => d != null))
+            {
+                if (!CheminsDossier.EstBaseValide(d.DbFileName, Constants.AppDataFolder))
+                {
+                    rejetes.Add(string.IsNullOrWhiteSpace(d.RaisonSociale) ? d.DbFileName ?? "(sans nom)" : d.RaisonSociale);
+                    continue;
+                }
+                if (!CheminsDossier.EstLogoValide(d.LogoPath))
+                {
+                    d.LogoPath = null;
+                    corrige = true;
+                }
+                valides.Add(d);
+            }
+
+            if (rejetes.Count > 0 || corrige)
+            {
+                // Le registre d'origine est gardé à côté, puis réécrit sans les chemins refusés.
+                CopieRegistreRejete = SauvegarderCopie(".rejete");
+                await SaveDossiersAsync(valides);
+            }
+            DossiersRejetes = rejetes;
+            return valides;
+        }
+
+        /// <summary>Copie <c>dossiers.json</c> en <c>dossiers.json&lt;suffixe&gt;</c> (puis suffixe2, suffixe3…) sans jamais écraser une copie.</summary>
+        private static string SauvegarderCopie(string suffixe)
+        {
+            try
+            {
+                string cible = RegistryFilePath + suffixe;
+                for (int i = 2; File.Exists(cible); i++) cible = RegistryFilePath + suffixe + i;
+                File.Copy(RegistryFilePath, cible);
+                return cible;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 
@@ -149,7 +207,7 @@ namespace IUTSCalculator.Services
             dossiers.Remove(existing);
             await SaveDossiersAsync(dossiers);
 
-            if (deleteDatabaseFile)
+            if (deleteDatabaseFile && CheminsDossier.EstBaseValide(existing.DbFileName, Constants.AppDataFolder))
             {
                 try
                 {

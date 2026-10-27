@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using IUTSCalculator.Helpers;
 
 namespace IUTSCalculator.Services
 {
@@ -38,6 +39,12 @@ namespace IUTSCalculator.Services
         public string Poste { get; set; }
         public int Fichiers { get; set; }
         public List<DossierSauvegarde> Dossiers { get; } = new List<DossierSauvegarde>();
+
+        /// <summary>
+        /// Dossiers dont le registre de la sauvegarde désigne la base hors du dossier de données
+        /// (chemin absolu, « .. »…) : leur présence interdit la restauration.
+        /// </summary>
+        public List<string> DossiersInvalides { get; } = new List<string>();
 
         /// <summary>Niveau de schéma le plus élevé parmi les bases de la sauvegarde.</summary>
         public int NiveauMax { get { return Dossiers.Count == 0 ? 0 : Dossiers.Max(d => d.Niveau); } }
@@ -277,8 +284,14 @@ namespace IUTSCalculator.Services
             }
 
             // Les niveaux sont relus dans les bases elles-mêmes, pas dans le manifeste.
-            var noms = LireRegistre(Path.Combine(temp, "dossiers.json")).Where(d => d.Fichier != null)
-                .ToDictionary(d => Normaliser(d.Fichier), d => d.RaisonSociale, StringComparer.OrdinalIgnoreCase);
+            var registre = LireRegistre(Path.Combine(temp, "dossiers.json"));
+            // Même contrôle qu'au chargement du registre : une base désignée hors du dossier de
+            // données (archive fabriquée ou modifiée) bloque la restauration.
+            foreach (var d in registre.Where(d => !CheminsDossier.EstBaseValide(d.Fichier, temp)))
+                contenu.DossiersInvalides.Add((string.IsNullOrWhiteSpace(d.RaisonSociale) ? "(sans nom)" : d.RaisonSociale) + " → " + (d.Fichier ?? "(aucun fichier)"));
+            var noms = registre.Where(d => d.Fichier != null)
+                .GroupBy(d => Normaliser(d.Fichier), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().RaisonSociale, StringComparer.OrdinalIgnoreCase);
             foreach (var db in Directory.GetFiles(temp, "*.db", SearchOption.AllDirectories))
             {
                 string relatif = Normaliser(db.Substring(temp.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -298,6 +311,9 @@ namespace IUTSCalculator.Services
         public static string Obstacle(ContenuSauvegarde c)
         {
             if (c == null || !c.EstSauvegardeSigma) return "Ce fichier n'est pas une sauvegarde de Sigma Paie & RH.";
+            if (c.DossiersInvalides.Count > 0)
+                return "Le registre des dossiers de cette sauvegarde désigne des bases hors du dossier de données du programme : restauration refusée par sécurité.\n• "
+                       + string.Join("\n• ", c.DossiersInvalides);
             if (c.Dossiers.Any(d => d.Niveau < 0)) return "Une base de la sauvegarde est illisible : restauration refusée.";
             if (c.NiveauMax > SQLiteService.SchemaCible)
                 return string.Format(CultureInfo.InvariantCulture,

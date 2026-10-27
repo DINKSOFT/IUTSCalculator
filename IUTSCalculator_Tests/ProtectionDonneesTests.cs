@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using NUnit.Framework;
+using IUTSCalculator.Helpers;
 using IUTSCalculator.Services;
 
 namespace IUTSCalculator.Tests
@@ -131,6 +132,51 @@ namespace IUTSCalculator.Tests
                 w.Write("autre chose");
             var service = new SauvegardeService(Path.Combine(dir, "donnees"));
             Assert.That(SauvegardeService.Obstacle(service.Analyser(zip)), Does.Contain("n'est pas une sauvegarde"));
+            Assert.Throws<InvalidOperationException>(() => service.Restaurer(zip, Path.Combine(dir, "s.zip"), "test"));
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void CheminsDossier_RefuseLesChemins_HorsDonnees()
+        {
+            string racine = @"C:\Donnees\IUTSCalculator";
+            Assert.That(CheminsDossier.EstBaseValide(@"Dossiers\dossier_a.db", racine), Is.True);
+            Assert.That(CheminsDossier.EstBaseValide("iuts_data.db", racine), Is.True);
+            Assert.That(CheminsDossier.EstBaseValide(@"C:\Users\x\Documents\compta.db", racine), Is.False);
+            Assert.That(CheminsDossier.EstBaseValide(@"..\..\autre.db", racine), Is.False);
+            Assert.That(CheminsDossier.EstBaseValide(@"Dossiers\..\..\autre.db", racine), Is.False);
+            Assert.That(CheminsDossier.EstBaseValide(@"\\serveur\partage\a.db", racine), Is.False);
+            Assert.That(CheminsDossier.EstBaseValide(@"C:autre.db", racine), Is.False);
+            Assert.That(CheminsDossier.EstBaseValide(@"Dossiers\compta.xlsx", racine), Is.False);
+            Assert.That(CheminsDossier.EstBaseValide(null, racine), Is.False);
+
+            Assert.That(CheminsDossier.EstLogoValide(null), Is.True);
+            Assert.That(CheminsDossier.EstLogoValide(@"C:\Images\logo.PNG"), Is.True);
+            Assert.That(CheminsDossier.EstLogoValide(@"\\serveur\partage\logo.png"), Is.False);
+            Assert.That(CheminsDossier.EstLogoValide(@"C:\Images\logo.exe"), Is.False);
+            Assert.That(CheminsDossier.EstLogoValide(@"C:\Images\logo.png:flux"), Is.False);
+            Assert.That(CheminsDossier.EstLogoValide("logo.png"), Is.False);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void Sauvegarde_RegistreHorsDonnees_Refusee()
+        {
+            string dir = NouveauDossier();
+            string racine = Path.Combine(dir, "donnees");
+            Directory.CreateDirectory(Path.Combine(racine, "Dossiers"));
+            new SQLiteService(Path.Combine(racine, "Dossiers", "dossier_a.db"));
+            File.WriteAllText(Path.Combine(racine, "dossiers.json"),
+                "[{\"RaisonSociale\":\"ENTREPRISE A\",\"DbFileName\":\"Dossiers\\\\dossier_a.db\"}," +
+                "{\"RaisonSociale\":\"PIEGE\",\"DbFileName\":\"..\\\\..\\\\victime.db\"}]");
+
+            var service = new SauvegardeService(racine);
+            string zip = Path.Combine(dir, "sauvegarde.zip");
+            service.Sauvegarder(zip, "test");
+
+            var contenu = service.Analyser(zip);
+            Assert.That(contenu.DossiersInvalides.Single(), Does.Contain("PIEGE"));
+            Assert.That(SauvegardeService.Obstacle(contenu), Does.Contain("restauration refusée"));
             Assert.Throws<InvalidOperationException>(() => service.Restaurer(zip, Path.Combine(dir, "s.zip"), "test"));
         }
     }
