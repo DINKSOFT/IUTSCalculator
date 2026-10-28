@@ -27,6 +27,18 @@ namespace IUTSCalculator.Services
             //LoadUsersAsync().Wait();
         }
 
+        /// <summary>Chiffre le contenu de <c>users.json</c> pour le profil Windows courant (DPAPI).</summary>
+        public static byte[] ProtegerPourCePoste(byte[] clair)
+        {
+            return ProtectedData.Protect(clair, null, DataProtectionScope.CurrentUser);
+        }
+
+        /// <summary>Déchiffre un <c>users.json</c> protégé pour le profil Windows courant ; lève CryptographicException sinon.</summary>
+        public static byte[] DeprotegerPourCePoste(byte[] protege)
+        {
+            return ProtectedData.Unprotect(protege, null, DataProtectionScope.CurrentUser);
+        }
+
         /// <summary>
         /// Vrai si <c>users.json</c> existe mais n'a pu être lu (ni chiffré pour ce profil Windows, ni
         /// JSON valide). Le programme ne doit alors PAS présenter l'écran comme un premier lancement
@@ -50,7 +62,7 @@ namespace IUTSCalculator.Services
             List<UserAccount> comptes = null;
             try
             {
-                byte[] clair = ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser);
+                byte[] clair = DeprotegerPourCePoste(data);
                 comptes = JsonSerializer.Deserialize<List<UserAccount>>(Encoding.UTF8.GetString(clair), _jsonOptions);
             }
             catch (Exception) { /* pas (ou plus) lisible avec DPAPI : on essaie l'ancien format */ }
@@ -108,7 +120,7 @@ namespace IUTSCalculator.Services
             _cachedUsers = users ?? new List<UserAccount>();
             string json = JsonSerializer.Serialize(_cachedUsers, _jsonOptions);
             byte[] plainData = Encoding.UTF8.GetBytes(json);
-            byte[] encryptedData = ProtectedData.Protect(plainData, null, DataProtectionScope.CurrentUser);
+            byte[] encryptedData = ProtegerPourCePoste(plainData);
 
             // Créer le dossier de données s'il n'existe pas encore (premier démarrage).
             string dossier = Path.GetDirectoryName(_usersFilePath);

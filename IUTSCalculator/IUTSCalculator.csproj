@@ -183,6 +183,7 @@
     <Compile Include="Converters\StringEqualsConverter.cs" />
     <Compile Include="Helpers\CheminsDossier.cs" />
     <Compile Include="Helpers\Constants.cs" />
+    <Compile Include="Helpers\DemandeMotDePasse.cs" />
     <Compile Include="Helpers\SqliteNatif.cs" />
     <Compile Include="Helpers\SauvegardeInteractive.cs" />
     <Compile Include="Helpers\VersionApplication.cs" />
@@ -304,6 +305,8 @@
     <Compile Include="Services\SanteSecuriteExportService.cs" />
     <Compile Include="Services\RattrapageCnssService.cs" />
     <Compile Include="Services\ChiffrementBases.cs" />
+    <Compile Include="Services\CoffreSauvegarde.cs" />
+    <Compile Include="Services\MotDePasseSauvegarde.cs" />
     <Compile Include="Services\CleDonnees.cs" />
     <Compile Include="Services\SqliteExtensions.cs" />
     <Compile Include="Services\SQLiteService.cs" />

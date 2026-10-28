@@ -17,6 +17,8 @@ namespace IUTSCalculator.Tests
     [Microsoft.VisualStudio.TestTools.UnitTesting.TestClass]
     public class ChiffrementBasesTests
     {
+        private const string MotDePasse = "Sauvegarde-2026";
+
         private static string NouveauDossier()
         {
             string d = Path.Combine(Path.GetTempPath(), "SigmaChiffrement_" + Guid.NewGuid().ToString("N"));
@@ -286,10 +288,10 @@ namespace IUTSCalculator.Tests
             try
             {
                 var service = new SauvegardeService(dir);
-                var resultat = service.Sauvegarder(zip, "test");
+                var resultat = service.Sauvegarder(zip, MotDePasse, "test");
                 Assert.That(resultat.Avertissements, Is.Empty, string.Join(" | ", resultat.Avertissements));
 
-                var contenu = service.Analyser(zip);
+                var contenu = service.Analyser(zip, MotDePasse);
                 Assert.That(contenu.Dossiers.Single().Niveau, Is.EqualTo(SQLiteService.SchemaCible));
                 Assert.That(SauvegardeService.Obstacle(contenu), Is.Null);
             }

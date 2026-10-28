@@ -103,6 +103,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChiffrementBasesTests.cs" />
+    <Compile Include="SauvegardeProtegeeTests.cs" />
     <Compile Include="MainViewModelTests.cs" />
     <Compile Include="SoldeToutCompteTests.cs" />
     <Compile Include="CompteUtilisateursTests.cs" />

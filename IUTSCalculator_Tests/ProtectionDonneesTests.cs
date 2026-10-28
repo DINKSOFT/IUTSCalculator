@@ -19,6 +19,8 @@ namespace IUTSCalculator.Tests
     [Microsoft.VisualStudio.TestTools.UnitTesting.TestClass]
     public class ProtectionDonneesTests
     {
+        private const string MotDePasse = "Sauvegarde-2026";
+
         private static string NouveauDossier()
         {
             string d = Path.Combine(Path.GetTempPath(), "SigmaTests_" + Guid.NewGuid().ToString("N"));
@@ -96,9 +98,9 @@ namespace IUTSCalculator.Tests
 
             var service = new SauvegardeService(racine);
             string zip = Path.Combine(dir, "sauvegarde.zip");
-            var r = service.Sauvegarder(zip, "test");
+            var r = service.Sauvegarder(zip, MotDePasse, "test");
             Assert.That(r.Bases, Is.EqualTo(1));
-            var contenu = service.Analyser(zip);
+            var contenu = service.Analyser(zip, MotDePasse);
             Assert.That(contenu.EstSauvegardeSigma, Is.True);
             Assert.That(contenu.Dossiers.Single().RaisonSociale, Is.EqualTo("ENTREPRISE A"));
             Assert.That(SauvegardeService.Obstacle(contenu), Is.Null);
@@ -106,7 +108,7 @@ namespace IUTSCalculator.Tests
             Sql(db, "DELETE FROM Employees;");
             File.WriteAllText(Path.Combine(racine, "users.json"), "après");
             string securite = Path.Combine(dir, "securite.zip");
-            service.Restaurer(zip, securite, "test");
+            service.Restaurer(zip, MotDePasse, securite, null, "test");
 
             Assert.That(File.Exists(securite), Is.True);
             Assert.That(File.ReadAllText(Path.Combine(racine, "users.json")), Is.EqualTo("avant"));
@@ -131,8 +133,8 @@ namespace IUTSCalculator.Tests
             using (var w = new StreamWriter(z.CreateEntry("note.txt").Open()))
                 w.Write("autre chose");
             var service = new SauvegardeService(Path.Combine(dir, "donnees"));
-            Assert.That(SauvegardeService.Obstacle(service.Analyser(zip)), Does.Contain("n'est pas une sauvegarde"));
-            Assert.Throws<InvalidOperationException>(() => service.Restaurer(zip, Path.Combine(dir, "s.zip"), "test"));
+            Assert.That(SauvegardeService.Obstacle(service.Analyser(zip, MotDePasse)), Does.Contain("n'est pas une sauvegarde"));
+            Assert.Throws<InvalidOperationException>(() => service.Restaurer(zip, MotDePasse, Path.Combine(dir, "s.zip"), null, "test"));
         }
 
         [Test]
@@ -172,12 +174,12 @@ namespace IUTSCalculator.Tests
 
             var service = new SauvegardeService(racine);
             string zip = Path.Combine(dir, "sauvegarde.zip");
-            service.Sauvegarder(zip, "test");
+            service.Sauvegarder(zip, MotDePasse, "test");
 
-            var contenu = service.Analyser(zip);
+            var contenu = service.Analyser(zip, MotDePasse);
             Assert.That(contenu.DossiersInvalides.Single(), Does.Contain("PIEGE"));
             Assert.That(SauvegardeService.Obstacle(contenu), Does.Contain("restauration refusée"));
-            Assert.Throws<InvalidOperationException>(() => service.Restaurer(zip, Path.Combine(dir, "s.zip"), "test"));
+            Assert.Throws<InvalidOperationException>(() => service.Restaurer(zip, MotDePasse, Path.Combine(dir, "s.zip"), null, "test"));
         }
     }
 }
