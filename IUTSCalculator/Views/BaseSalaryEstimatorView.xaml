@@ -108,6 +108,15 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{Binding ExportToExcelCommand}"/>
                     </StackPanel>
+
+                    <!-- Reprend le résultat dans une fiche de création : actif seulement
+                         après une estimation réussie (et pour un compte autorisé à saisir). -->
+                    <Button Content="Créer la fiche employé" Tag="{StaticResource IconEmploye}"
+                            Margin="0,10,0,0" HorizontalAlignment="Left"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            ToolTip="Ouvre une nouvelle fiche employé pré-remplie avec la catégorie, les charges, le salaire de base et les indemnités estimés"
+                            ToolTipService.ShowOnDisabled="True"
+                            Command="{Binding CreerFicheEmployeCommand}"/>
                 </StackPanel>
             </Border>
 

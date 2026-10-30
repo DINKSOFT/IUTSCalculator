@@ -124,6 +124,7 @@
     <Compile Include="SanteSecuriteTests.cs" />
     <Compile Include="ProtectionDonneesTests.cs" />
     <Compile Include="SearchAndFilterTests.cs" />
+    <Compile Include="EstimationFicheEmployeTests.cs" />
     <Compile Include="EcriturePaieTests.cs" />
     <Compile Include="AuditIntegriteTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

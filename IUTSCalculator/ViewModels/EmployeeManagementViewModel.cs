@@ -702,6 +702,24 @@ namespace IUTSCalculator.ViewModels
             RafraichirConformite();
         }
 
+        /// <summary>
+        /// Ouvre la fiche de création déjà garnie (par exemple depuis l'estimation du
+        /// salaire de base). Rien n'est enregistré ici : la fiche suit ensuite le
+        /// parcours normal, « Ajouter » compris, avec ses contrôles et son audit.
+        /// </summary>
+        public void PreparerCreation(Employee modele)
+        {
+            if (modele == null) throw new ArgumentNullException(nameof(modele));
+
+            SelectedEmployee = null;
+            NewEmployee = modele;
+            PersonnesACharge.Clear();
+            PersonneSelectionnee = null;
+            RafraichirDecompte();
+            RafraichirConformite();
+            StatusMessage = "Fiche pré-remplie depuis l'estimation : complétez l'identité puis cliquez sur « Ajouter ».";
+        }
+
         public bool EstNonConformeSalaireMinimum
         {
             get

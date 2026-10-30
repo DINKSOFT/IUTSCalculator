@@ -942,6 +942,14 @@ namespace IUTSCalculator.ViewModels
                 StatusMessage = $"Calcul chargé: {calculation.Employee.LastName} {calculation.Employee.FirstName}";
             };
 
+            // Estimation → fiche employé : la création elle-même reste à l'écran de
+            // gestion des employés, qui reçoit seulement la fiche pré-remplie.
+            _baseSalaryEstimatorViewModel.CreationFicheDemandee += (sender, fiche) =>
+            {
+                var gestion = OuvrirGestionEmployes();
+                gestion?.PreparerCreation(fiche);
+            };
+
             _settingsViewModel.SettingsSaved += (sender, e) =>
             {
                 StatusMessage = $"Paramètres enregistrés le {DateTime.Now:g}";
@@ -1078,11 +1086,20 @@ namespace IUTSCalculator.ViewModels
 
         private void NavigateToEmployeeManagement()
         {
+            OuvrirGestionEmployes();
+        }
+
+        /// <summary>
+        /// Ouvre l'écran de gestion des employés et le renvoie, ou null si la licence
+        /// ne couvre pas le module.
+        /// </summary>
+        private EmployeeManagementViewModel OuvrirGestionEmployes()
+        {
             if (!Licensing.LicenceService.Instance.EstModuleAutorise("EmployeeManagementViewModel"))
             {
                 Licensing.GardeIntegrite.Sonder();
                 StatusMessage = "Module non inclus dans votre licence.";
-                return;
+                return null;
             }
 
             // Contrairement aux autres écrans, celui-ci est reconstruit à chaque visite (et
@@ -1098,11 +1115,13 @@ namespace IUTSCalculator.ViewModels
             // Le service des personnes à charge (SAL-01) ouvre la base du dossier :
             // le constructeur de SQLiteService porte le schéma à la version qui contient
             // la table, y compris pour un dossier antérieur au module.
-            CurrentViewModel = new EmployeeManagementViewModel(
+            var gestion = new EmployeeManagementViewModel(
                 _dataService,
                 new PersonneAChargeService(new SQLiteService(_currentDossier.DbFileName)),
                 _auditService,
                 _conventionCollectiveService);
+            CurrentViewModel = gestion;
+            return gestion;
         }
 
         #region Logique de Recherche et Navigation

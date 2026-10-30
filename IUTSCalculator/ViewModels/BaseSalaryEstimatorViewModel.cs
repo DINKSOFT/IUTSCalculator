@@ -104,10 +104,69 @@ namespace IUTSCalculator.ViewModels
         public ICommand EstimateCommand { get; private set; }
         public ICommand ExportToExcelCommand { get; private set; }
 
+        /// <summary>
+        /// Ouvre une fiche de création d'employé reprenant le résultat de l'estimation.
+        /// Active seulement après une estimation réussie.
+        /// </summary>
+        public ICommand CreerFicheEmployeCommand { get; private set; }
+
+        /// <summary>
+        /// Levé avec la fiche pré-remplie : l'écran principal y répond en ouvrant la
+        /// gestion des employés, qui reste seule à enregistrer (voir MainViewModel).
+        /// </summary>
+        public event EventHandler<Employee> CreationFicheDemandee;
+
         private TaxCalculation _lastTaxCalculation;
+
+        /// <summary>
+        /// Hypothèses et résultats de la dernière estimation réussie, figés à cet
+        /// instant : modifier ensuite les champs sans relancer « Estimer » ne doit
+        /// pas produire une fiche incohérente avec le résultat affiché.
+        /// </summary>
+        private Employee _derniereEstimation;
+
+        public bool EstimationDisponible => _derniereEstimation != null;
+
+        /// <summary>
+        /// Construit une fiche employé vierge portant les éléments de la dernière
+        /// estimation. Nulle tant qu'aucune estimation n'a abouti. Chaque appel rend
+        /// une nouvelle instance.
+        /// </summary>
+        public Employee ConstruireFicheEmploye()
+        {
+            var source = _derniereEstimation;
+            if (source == null) return null;
+
+            return new Employee
+            {
+                Category = source.Category,
+                FamilyCharges = source.FamilyCharges,
+                IsSpouseWorking = source.IsSpouseWorking,
+                // Un conjoint salarié suppose un mariage ; sinon la situation reste
+                // à renseigner plutôt que d'être devinée.
+                SituationMatrimoniale = source.IsSpouseWorking ? "Marié(e)" : null,
+                BaseSalary = source.BaseSalary,
+                HousingAllowance = source.HousingAllowance,
+                FunctionAllowance = source.FunctionAllowance,
+                TransportAllowance = source.TransportAllowance
+            };
+        }
+
+        private void CreerFicheEmploye()
+        {
+            var fiche = ConstruireFicheEmploye();
+            if (fiche == null) return;
+
+            CreationFicheDemandee?.Invoke(this, fiche);
+        }
 
         private void InitializeCommands()
         {
+            CreerFicheEmployeCommand = new RelayCommand(
+                execute: CreerFicheEmploye,
+                canExecute: () => !IsBusy && EstimationDisponible && CanEditData
+            );
+
             EstimateCommand = new RelayCommand(
                 execute: async () => await EstimateBaseSalaryAsync(),
                 canExecute: () => !IsBusy
@@ -119,12 +178,15 @@ namespace IUTSCalculator.ViewModels
             );
         }
 
-        private async Task EstimateBaseSalaryAsync()
+        /// <summary>Lance l'estimation (EstimateCommand) ; publique pour pouvoir l'attendre dans les tests.</summary>
+        public async Task EstimateBaseSalaryAsync()
         {
             try
             {
                 IsBusy = true;
                 StatusMessage = "Estimation en cours...";
+                _derniereEstimation = null;
+                OnPropertyChanged(nameof(EstimationDisponible));
 
                 await Task.Run(() =>
                 {
@@ -156,6 +218,7 @@ namespace IUTSCalculator.ViewModels
 
                     var taxCalculation = _taxCalculatorService.CalculateMonthlyTax(employee);
                     _lastTaxCalculation = taxCalculation;
+                    _derniereEstimation = employee;
 
                     Result = $"Salaire de base estimé : {EstimatedBaseSalary:N0} FCFA\n" +
                              $"Indemnité logement : {EstimatedHousing:N0} FCFA\n" +
@@ -175,6 +238,8 @@ namespace IUTSCalculator.ViewModels
             finally
             {
                 IsBusy = false;
+                OnPropertyChanged(nameof(EstimationDisponible));
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
