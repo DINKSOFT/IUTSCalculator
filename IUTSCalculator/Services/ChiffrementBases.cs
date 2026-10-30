@@ -18,6 +18,23 @@ namespace IUTSCalculator.Services
         public List<string> Echecs { get; } = new List<string>();
     }
 
+    /// <summary>Avancement du chiffrement : bases déjà traitées sur le total à chiffrer, et base en cours.</summary>
+    public class AvancementChiffrement
+    {
+        public AvancementChiffrement(int traitees, int total, string baseEnCours)
+        {
+            Traitees = traitees;
+            Total = total;
+            Base = baseEnCours;
+        }
+
+        public int Traitees { get; }
+        public int Total { get; }
+
+        /// <summary>Base en cours de chiffrement ; null une fois toutes les bases traitées.</summary>
+        public string Base { get; }
+    }
+
     /// <summary>
     /// Chiffrement des bases existantes (créées en clair par les versions précédentes) avec la
     /// clé du poste (<see cref="CleDonnees"/>).
@@ -62,12 +79,20 @@ namespace IUTSCalculator.Services
             return Directory.GetFiles(dossierDonnees, "*", SearchOption.AllDirectories).Where(EstFichierDeBase);
         }
 
-        /// <summary>Chiffre toutes les bases en clair du dossier de données ; une base en échec n'empêche pas les autres.</summary>
-        public static ResultatChiffrement ChiffrerDossierDonnees(string dossierDonnees, string cle)
+        /// <summary>
+        /// Chiffre toutes les bases en clair du dossier de données ; une base en échec n'empêche pas les autres.
+        /// <paramref name="avancement"/> est prévenu avant chaque base, puis une dernière fois à la fin.
+        /// </summary>
+        public static ResultatChiffrement ChiffrerDossierDonnees(string dossierDonnees, string cle,
+            IProgress<AvancementChiffrement> avancement = null)
         {
             var resultat = new ResultatChiffrement();
-            foreach (var fichier in BasesDuDossier(dossierDonnees))
+            // Les bases déjà chiffrées sont écartées d'emblée : la barre ne compte que le vrai travail.
+            var aChiffrer = BasesDuDossier(dossierDonnees).Where(EstEnClair).ToList();
+            for (int i = 0; i < aChiffrer.Count; i++)
             {
+                string fichier = aChiffrer[i];
+                avancement?.Report(new AvancementChiffrement(i, aChiffrer.Count, fichier));
                 try
                 {
                     if (ChiffrerSiEnClair(fichier, cle))
@@ -78,6 +103,7 @@ namespace IUTSCalculator.Services
                     resultat.Echecs.Add(fichier + " : " + ex.Message);
                 }
             }
+            avancement?.Report(new AvancementChiffrement(aChiffrer.Count, aChiffrer.Count, null));
             return resultat;
         }
 

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace IUTSCalculator
 {
@@ -31,7 +32,7 @@ namespace IUTSCalculator
             // « 2,120,686 » au lieu de « 2 120 686 ». La parade est locale : ajouter
             // ConverterCulture=fr-FR à la liaison concernée.
         }
-        protected override void OnStartup(StartupEventArgs e)
+        protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
@@ -85,7 +86,7 @@ namespace IUTSCalculator
                 return;
             }
 
-            if (!ActiverChiffrementDesBases())
+            if (!await ActiverChiffrementDesBasesAsync())
             {
                 Shutdown();
                 return;
@@ -200,22 +201,41 @@ namespace IUTSCalculator
         /// Chiffre les bases encore en clair avec la clé du poste, puis la branche pour toutes les
         /// connexions. Renvoie false si la clé est illisible ou absente : aucune clé n'est alors
         /// régénérée, car elle rendrait les bases chiffrées définitivement inaccessibles.
+        ///
+        /// Le travail tourne hors du fil de l'interface, derrière une fenêtre de démarrage dont la
+        /// barre avance base après base : sinon l'écran restait vide pendant tout le chiffrement.
         /// </summary>
-        private bool ActiverChiffrementDesBases()
+        private async Task<bool> ActiverChiffrementDesBasesAsync()
         {
             string dossier = Helpers.Constants.AppDataFolder;
-            string cle;
+            string cle = null;
+            Services.ResultatChiffrement resultat = null;
+            Exception erreurCle = null;
+
+            var demarrage = new Views.DemarrageWindow();
+            demarrage.Show();
+            demarrage.AfficherEtape("Ouverture des données…");
             try
             {
-                cle = Services.ChiffrementBases.ObtenirCleDuPoste(dossier);
+                cle = await Task.Run(() => Services.ChiffrementBases.ObtenirCleDuPoste(dossier));
+                var avancement = new Progress<Services.AvancementChiffrement>(demarrage.AfficherAvancement);
+                resultat = await Task.Run(() => Services.ChiffrementBases.ChiffrerDossierDonnees(dossier, cle, avancement));
             }
             catch (Exception ex) when (ex is Services.CleDonneesIllisibleException || ex is Services.CleDonneesAbsenteException)
             {
-                MessageBox.Show(ex.Message, "Clé de chiffrement des données", MessageBoxButton.OK, MessageBoxImage.Error);
+                erreurCle = ex;
+            }
+            finally
+            {
+                demarrage.Close();
+            }
+
+            if (erreurCle != null)
+            {
+                MessageBox.Show(erreurCle.Message, "Clé de chiffrement des données", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
 
-            var resultat = Services.ChiffrementBases.ChiffrerDossierDonnees(dossier, cle);
             Services.SQLiteService.FournisseurCle = () => cle;
 
             // Une base restée en clair n'est pas perdue : son ouverture retentera le chiffrement.

@@ -192,6 +192,37 @@ namespace IUTSCalculator.Tests
             Assert.That(ChiffrementBases.ChiffrerDossierDonnees(dir, ChiffrementBases.ObtenirCleDuPoste(dir)).Chiffrees, Is.Empty);
         }
 
+        /// <summary>Relève les avancements sur le fil appelant (Progress&lt;T&gt; les différerait).</summary>
+        private class AvancementsReleves : IProgress<AvancementChiffrement>
+        {
+            public System.Collections.Generic.List<AvancementChiffrement> Releves { get; } = new System.Collections.Generic.List<AvancementChiffrement>();
+            public void Report(AvancementChiffrement value) => Releves.Add(value);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void Avancement_NeCompteQueLesBasesEnClair()
+        {
+            string dir = NouveauDossier();
+            string cle = CleDonnees.ObtenirOuCreer(dir);
+            string premiere = BaseEnClair(dir, "a.db", "AWA");
+            string seconde = BaseEnClair(dir, "b.db", "ISSA");
+            ChiffrementBases.ChiffrerSiEnClair(premiere, cle);
+
+            var avancement = new AvancementsReleves();
+            ChiffrementBases.ChiffrerDossierDonnees(dir, cle, avancement);
+
+            // Une seule base reste à chiffrer : un relevé avant elle, un à la fin.
+            Assert.That(avancement.Releves.Select(a => a.Total), Is.All.EqualTo(1));
+            Assert.That(avancement.Releves.Select(a => a.Traitees), Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(avancement.Releves.Select(a => a.Base), Is.EqualTo(new[] { seconde, null }));
+
+            // Rien à faire : un seul relevé, à zéro sur zéro.
+            var rien = new AvancementsReleves();
+            ChiffrementBases.ChiffrerDossierDonnees(dir, cle, rien);
+            Assert.That(rien.Releves.Select(a => a.Total), Is.EqualTo(new[] { 0 }));
+        }
+
         [Test]
         [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
         public void BaseDejaChiffree_LaisseeTelleQuelle()
