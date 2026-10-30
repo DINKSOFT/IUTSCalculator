@@ -51,10 +51,13 @@ namespace IUTSCalculator.Tests
             string dir = NouveauDossier();
             string db = Path.Combine(dir, "dossier.db");
             new SQLiteService(db);   // base neuve, au niveau du programme
-            // Ramène la base au niveau précédent en plaçant un obstacle à la dernière migration.
-            Sql(db, "DROP TABLE AccidentsTravail; CREATE TABLE AccidentsTravail (Id INTEGER PRIMARY KEY); " +
-                    "DELETE FROM SchemaVersion WHERE Version >= " + SQLiteService.SchemaCible + "; " +
-                    "INSERT INTO SchemaVersion (Version, AppliedOn) VALUES (" + (SQLiteService.SchemaCible - 1) + ", '2026-01-01 00:00:00');");
+            // Ramène la base au niveau précédent, puis place un obstacle à la dernière migration :
+            // un déclencheur qui refuse l'enregistrement de la nouvelle version. Il ne dépend
+            // d'aucune migration en particulier (l'ancien obstacle, une table AccidentsTravail
+            // tronquée, ne gênait que la migration 37 et laissait passer la 38).
+            Sql(db, "DELETE FROM SchemaVersion WHERE Version >= " + SQLiteService.SchemaCible + "; " +
+                    "INSERT INTO SchemaVersion (Version, AppliedOn) VALUES (" + (SQLiteService.SchemaCible - 1) + ", '2026-01-01 00:00:00'); " +
+                    "CREATE TRIGGER ObstacleMiseANiveau BEFORE INSERT ON SchemaVersion BEGIN SELECT RAISE(ABORT, 'obstacle de test'); END;");
             string avant = Empreinte(db);
 
             var ex = Assert.Throws<InvalidOperationException>(() => new SQLiteService(db));
@@ -63,7 +66,7 @@ namespace IUTSCalculator.Tests
             Assert.That(SQLiteService.LireVersionFichier(db), Is.EqualTo(SQLiteService.SchemaCible - 1));
             Assert.That(File.Exists(db + SQLiteService.SuffixeCopieMigration), Is.False);
 
-            Sql(db, "DROP TABLE AccidentsTravail;");
+            Sql(db, "DROP TRIGGER ObstacleMiseANiveau;");
             new SQLiteService(db);
             Assert.That(SQLiteService.LireVersionFichier(db), Is.EqualTo(SQLiteService.SchemaCible));
         }
