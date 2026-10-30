@@ -250,7 +250,8 @@ namespace IUTSCalculator.Services
             {
                 SupprimerSiPresent(cible);
                 if (ChiffrementBases.EstEnClair(source)) cleSource = null;
-                using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(source), cleSource))
+                // Tout format : une sauvegarde faite avant le passage à la clé brute reste restaurable.
+                using (var connection = SQLiteService.OuvrirConnexionToutFormat(SQLiteService.ChaineConnexion(source), cleSource))
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = "VACUUM INTO " + SQLiteService.CibleVacuum(cible, cleCible) + ";";
@@ -260,7 +261,7 @@ namespace IUTSCalculator.Services
                 // (seulement quand ce poste n'a pas de clé, c'est-à-dire hors de l'application).
                 if (cleCible == null && cleSource != null)
                 {
-                    using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(cible), cleSource))
+                    using (var connection = SQLiteService.OuvrirConnexionToutFormat(SQLiteService.ChaineConnexion(cible), cleSource))
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = "PRAGMA rekey = '';";

@@ -192,6 +192,70 @@ namespace IUTSCalculator.Tests
             Assert.That(ChiffrementBases.ChiffrerDossierDonnees(dir, ChiffrementBases.ObtenirCleDuPoste(dir)).Chiffrees, Is.Empty);
         }
 
+        /// <summary>Chiffre une base en clair comme les premières versions : clé passée en hexkey (dérivée par PBKDF2).</summary>
+        private static void ChiffrerAncienFormat(string db, string cle)
+        {
+            IUTSCalculator.Helpers.SqliteNatif.Initialiser();
+            using (var c = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + db + ";Pooling=False"))
+            {
+                c.Open();
+                using (var cmd = c.CreateCommand())
+                {
+                    cmd.CommandText = "PRAGMA cipher = 'sqlcipher'; PRAGMA legacy = 4; PRAGMA hexrekey = '" + cle + "';";
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            Assert.That(EnteteEnClair(db), Is.False);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void AncienFormat_ConvertiALaCleBrute()
+        {
+            string dir = NouveauDossier();
+            string cle = CleDonnees.ObtenirOuCreer(dir);
+            string ancienne = BaseEnClair(dir, "ancienne.db", "AWA");
+            ChiffrerAncienFormat(ancienne, cle);
+            // Base d'un autre poste (autre clé) : ni convertie, ni signalée en échec.
+            string etrangere = BaseEnClair(dir, "etrangere.db", "ISSA");
+            ChiffrerAncienFormat(etrangere, CleDonnees.ObtenirOuCreer(NouveauDossier()));
+            byte[] etrangereAvant = File.ReadAllBytes(etrangere);
+
+            // Avant conversion, l'ancien format reste lisible (restauration d'anciennes sauvegardes).
+            Assert.That(SQLiteService.LireVersionFichier(ancienne, cle), Is.EqualTo(SQLiteService.SchemaCible));
+
+            var avancement = new AvancementsReleves();
+            var resultat = ChiffrementBases.ChiffrerDossierDonnees(dir, cle, avancement);
+
+            Assert.That(resultat.Echecs, Is.Empty);
+            Assert.That(resultat.Chiffrees, Is.Empty);
+            Assert.That(resultat.Converties, Is.EqualTo(new[] { ancienne }));
+            Assert.That(avancement.Releves.Select(a => a.Total), Is.All.EqualTo(2));
+            Assert.That(PrenomLu(ancienne, cle), Is.EqualTo("AWA"));
+            Assert.That(Encoding.UTF8.GetString(File.ReadAllBytes(ancienne)), Does.Not.Contain("OUEDRAOGO"));
+            Assert.That(SQLiteService.LireVersionFichier(ancienne), Is.EqualTo(-1), "illisible sans clé");
+            Assert.That(File.ReadAllBytes(etrangere), Is.EqualTo(etrangereAvant));
+            Assert.That(Directory.GetFiles(dir, "*" + ChiffrementBases.SuffixeCopie, SearchOption.AllDirectories), Is.Empty);
+            Assert.That(Directory.GetFiles(dir, "*" + ChiffrementBases.SuffixeSecurite, SearchOption.AllDirectories), Is.Empty);
+
+            // Deuxième lancement : plus rien à convertir.
+            Assert.That(ChiffrementBases.ChiffrerDossierDonnees(dir, cle).Converties, Is.Empty);
+        }
+
+        [Test]
+        [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+        public void AncienFormat_ConvertiALOuvertureDuDossier()
+        {
+            string dir = NouveauDossier();
+            string cle = CleDonnees.ObtenirOuCreer(dir);
+            string db = BaseEnClair(dir, "dossier.db", "AWA");
+            ChiffrerAncienFormat(db, cle);
+
+            // Ouvrir le dossier (SQLiteService) le convertit au passage, comme une base restée en clair.
+            Assert.That(PrenomLu(db, cle), Is.EqualTo("AWA"));
+            Assert.That(ChiffrementBases.ConvertirSiAncienFormat(db, cle), Is.False, "déjà converti");
+        }
+
         /// <summary>Relève les avancements sur le fil appelant (Progress&lt;T&gt; les différerait).</summary>
         private class AvancementsReleves : IProgress<AvancementChiffrement>
         {

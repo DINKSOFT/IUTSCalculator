@@ -241,7 +241,7 @@ namespace IUTSCalculator
             // Une base restée en clair n'est pas perdue : son ouverture retentera le chiffrement.
             if (resultat.Echecs.Count > 0)
                 MessageBox.Show(
-                    "Certaines bases n'ont pas pu être chiffrées ; elles restent intactes, en clair :\n\n• " +
+                    "Certaines bases n'ont pas pu être chiffrées ou converties ; elles restent intactes, dans leur état précédent :\n\n• " +
                     string.Join("\n• ", resultat.Echecs),
                     "Chiffrement des données", MessageBoxButton.OK, MessageBoxImage.Warning);
             return true;

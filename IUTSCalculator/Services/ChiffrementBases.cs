@@ -14,7 +14,10 @@ namespace IUTSCalculator.Services
         /// <summary>Bases en clair désormais chiffrées.</summary>
         public List<string> Chiffrees { get; } = new List<string>();
 
-        /// <summary>Bases restées en clair, avec la raison de l'échec (le fichier n'a pas été modifié).</summary>
+        /// <summary>Bases chiffrées à l'ancien format de clé, désormais à la clé brute.</summary>
+        public List<string> Converties { get; } = new List<string>();
+
+        /// <summary>Bases restées en clair ou à l'ancien format, avec la raison de l'échec (le fichier n'a pas été modifié).</summary>
         public List<string> Echecs { get; } = new List<string>();
     }
 
@@ -46,6 +49,9 @@ namespace IUTSCalculator.Services
     ///
     /// Les copies « avant mise à niveau » (<c>.avant-vNN.bak</c>) sont des bases complètes : elles
     /// sont chiffrées de la même façon, sans quoi elles laisseraient les données en clair à côté.
+    ///
+    /// Les bases chiffrées par les premières versions (clé passée en <c>hexkey</c>, voir
+    /// <see cref="SQLiteService.OuvrirConnexion"/>) sont converties à la clé brute de la même façon.
     /// </summary>
     public static class ChiffrementBases
     {
@@ -80,30 +86,47 @@ namespace IUTSCalculator.Services
         }
 
         /// <summary>
-        /// Chiffre toutes les bases en clair du dossier de données ; une base en échec n'empêche pas les autres.
+        /// Chiffre toutes les bases en clair du dossier de données et convertit celles chiffrées à
+        /// l'ancien format ; une base en échec n'empêche pas les autres.
         /// <paramref name="avancement"/> est prévenu avant chaque base, puis une dernière fois à la fin.
         /// </summary>
         public static ResultatChiffrement ChiffrerDossierDonnees(string dossierDonnees, string cle,
             IProgress<AvancementChiffrement> avancement = null)
         {
             var resultat = new ResultatChiffrement();
-            // Les bases déjà chiffrées sont écartées d'emblée : la barre ne compte que le vrai travail.
-            var aChiffrer = BasesDuDossier(dossierDonnees).Where(EstEnClair).ToList();
-            for (int i = 0; i < aChiffrer.Count; i++)
+            // Les bases déjà au format actuel sont écartées d'emblée (~3 ms chacune) : la barre ne
+            // compte que le vrai travail.
+            var aTraiter = new List<string>();
+            foreach (var fichier in BasesDuDossier(dossierDonnees))
             {
-                string fichier = aChiffrer[i];
-                avancement?.Report(new AvancementChiffrement(i, aChiffrer.Count, fichier));
                 try
                 {
-                    if (ChiffrerSiEnClair(fichier, cle))
-                        resultat.Chiffrees.Add(fichier);
+                    if (EstEnClair(fichier) || EstAConvertir(fichier, cle))
+                        aTraiter.Add(fichier);
                 }
                 catch (Exception ex)
                 {
                     resultat.Echecs.Add(fichier + " : " + ex.Message);
                 }
             }
-            avancement?.Report(new AvancementChiffrement(aChiffrer.Count, aChiffrer.Count, null));
+
+            for (int i = 0; i < aTraiter.Count; i++)
+            {
+                string fichier = aTraiter[i];
+                avancement?.Report(new AvancementChiffrement(i, aTraiter.Count, fichier));
+                try
+                {
+                    if (ChiffrerSiEnClair(fichier, cle))
+                        resultat.Chiffrees.Add(fichier);
+                    else if (ConvertirSiAncienFormat(fichier, cle))
+                        resultat.Converties.Add(fichier);
+                }
+                catch (Exception ex)
+                {
+                    resultat.Echecs.Add(fichier + " : " + ex.Message);
+                }
+            }
+            avancement?.Report(new AvancementChiffrement(aTraiter.Count, aTraiter.Count, null));
             return resultat;
         }
 
@@ -168,31 +191,9 @@ namespace IUTSCalculator.Services
                 File.Copy(chemin, copie);
 
                 using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(copie), null))
-                using (var cmd = connection.CreateCommand())
-                {
-                    // La clé n'est faite que de chiffres hexadécimaux (vérifiée) : aucune injection possible.
-                    cmd.CommandText = "PRAGMA cipher = 'sqlcipher'; PRAGMA legacy = 4; PRAGMA hexrekey = '" + SQLiteService.VerifierCle(cle) + "';";
-                    cmd.ExecuteNonQuery();
-                }
+                    Rechiffrer(connection, SQLiteService.FormatChiffrement, cle);
 
-                Controler(copie, cle, contenuAvant);
-
-                // Substitution : l'original devient la copie de sécurité le temps du contrôle final.
-                SupprimerSiPresent(securite);
-                Remplacer(copie, chemin, securite);
-                try
-                {
-                    Controler(chemin, cle, contenuAvant);
-                }
-                catch
-                {
-                    // Contrôle final en échec : l'original revient à sa place.
-                    Remplacer(securite, chemin, null);
-                    throw;
-                }
-
-                // La copie de sécurité est en clair : la conserver annulerait le chiffrement.
-                File.Delete(securite);
+                Substituer(copie, chemin, securite, cle, contenuAvant);
                 return true;
             }
             catch (Exception ex)
@@ -202,6 +203,97 @@ namespace IUTSCalculator.Services
                 throw new InvalidOperationException(
                     "Le chiffrement de la base " + chemin + " a échoué ; elle reste en clair et n'a pas été modifiée. Détail : " + ex.Message, ex);
             }
+        }
+
+        /// <summary>
+        /// Passe à la clé brute une base chiffrée à l'ancien format (clé en <c>hexkey</c>). Renvoie faux
+        /// si elle est en clair, vide, absente, déjà au format actuel, ou illisible avec cette clé (base
+        /// d'un autre poste : laissée telle quelle) ; lève une exception (fichier inchangé) si la
+        /// conversion échoue.
+        /// </summary>
+        public static bool ConvertirSiAncienFormat(string chemin, string cle)
+        {
+            if (cle == null) throw new ArgumentNullException(nameof(cle));
+            if (!EstAConvertir(chemin, cle)) return false;
+
+            string copie = chemin + SuffixeCopie;
+            string securite = chemin + SuffixeSecurite;
+            try
+            {
+                Dictionary<string, long> contenuAvant;
+                using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(chemin), cle, ancienFormat: true))
+                {
+                    if (!SQLiteService.EstLisible(connection)) return false;
+                    if (!EstIntegre(connection))
+                        throw new InvalidOperationException("la base est endommagée (contrôle d'intégrité en échec)");
+                    contenuAvant = CompterLignes(connection);
+                }
+
+                SupprimerSiPresent(copie);
+                SupprimerSiPresent(copie + "-journal");
+                File.Copy(chemin, copie);
+
+                using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(copie), cle, ancienFormat: true))
+                    Rechiffrer(connection, "", cle);
+
+                Substituer(copie, chemin, securite, cle, contenuAvant);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                SupprimerSiPresent(copie);
+                SupprimerSiPresent(copie + "-journal");
+                throw new InvalidOperationException(
+                    "La conversion de la base " + chemin + " a échoué ; elle reste à l'ancien format et n'a pas été modifiée. Détail : " + ex.Message, ex);
+            }
+        }
+
+        /// <summary>
+        /// Vrai si la base est chiffrée mais que la clé brute ne l'ouvre pas : ancien format, ou base
+        /// d'un autre poste (<see cref="ConvertirSiAncienFormat"/> fait la différence). Coût : ~3 ms.
+        /// </summary>
+        private static bool EstAConvertir(string chemin, string cle)
+        {
+            if (!File.Exists(chemin) || EstEnClair(chemin) || new FileInfo(chemin).Length == 0) return false;
+            using (var connection = SQLiteService.OuvrirConnexion(SQLiteService.ChaineConnexion(chemin, lectureSeule: true), cle))
+                return !SQLiteService.EstLisible(connection);
+        }
+
+        /// <summary>Chiffre la base ouverte par la clé brute <paramref name="cle"/> (<c>PRAGMA rekey</c>).</summary>
+        private static void Rechiffrer(SqliteConnection connection, string formatChiffrement, string cle)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                // La clé n'est faite que de chiffres hexadécimaux (vérifiée) : aucune injection possible.
+                cmd.CommandText = formatChiffrement + "PRAGMA rekey = \"x'" + SQLiteService.VerifierCle(cle) + "'\";";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Contrôle la copie rechiffrée, la substitue à l'original (qui devient la copie de sécurité le
+        /// temps du contrôle final), puis retire la copie de sécurité.
+        /// </summary>
+        private static void Substituer(string copie, string chemin, string securite, string cle, Dictionary<string, long> contenuAvant)
+        {
+            Controler(copie, cle, contenuAvant);
+
+            SupprimerSiPresent(securite);
+            Remplacer(copie, chemin, securite);
+            try
+            {
+                Controler(chemin, cle, contenuAvant);
+            }
+            catch
+            {
+                // Contrôle final en échec : l'original revient à sa place.
+                Remplacer(securite, chemin, null);
+                throw;
+            }
+
+            // La copie de sécurité est en clair ou à l'ancien format : la conserver annulerait le
+            // chiffrement, ou garderait l'ancien format à côté de la base convertie.
+            File.Delete(securite);
         }
 
         /// <summary>La base est chiffrée, intègre, lisible avec la clé, illisible sans, et contient les mêmes lignes.</summary>

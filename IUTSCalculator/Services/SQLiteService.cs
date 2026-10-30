@@ -78,10 +78,13 @@ namespace IUTSCalculator.Services
             // on patiente au lieu de lever immédiatement SQLITE_BUSY.
             _connectionString = ChaineConnexion(_dbPath);
 
-            // Base restée en clair (rangée à part, restaurée d'une ancienne sauvegarde, échec au
-            // démarrage) : chiffrée avant usage, sans quoi la clé la rendrait illisible.
+            // Base restée en clair ou à l'ancien format de clé (rangée à part, échec au démarrage) :
+            // mise au format actuel avant usage, sans quoi la clé la rendrait illisible.
             if (_cle != null)
+            {
                 ChiffrementBases.ChiffrerSiEnClair(_dbPath, _cle);
+                ChiffrementBases.ConvertirSiAncienFormat(_dbPath, _cle);
+            }
 
             EnsureSchema();
             _schemaPret = true;
@@ -472,8 +475,13 @@ namespace IUTSCalculator.Services
         /// <summary>
         /// Ouvre une connexion et, si <paramref name="cle"/> est fournie, la déverrouille : format
         /// SQLCipher 4 (« legacy=4 ») pour rester lisible par les outils SQLCipher standard.
+        ///
+        /// La clé est passée BRUTE (<c>x'…'</c>) : c'est déjà une clé aléatoire de 256 bits, pas un
+        /// mot de passe. Passée en <c>hexkey</c>, SQLCipher la traitait comme un mot de passe et la
+        /// dérivait (PBKDF2, 256 000 tours) à CHAQUE ouverture : ~450 ms par connexion, contre ~3 ms.
+        /// <paramref name="ancienFormat"/> ouvre les bases chiffrées ainsi, le temps de les convertir.
         /// </summary>
-        internal static SqliteConnection OuvrirConnexion(string chaine, string cle)
+        internal static SqliteConnection OuvrirConnexion(string chaine, string cle, bool ancienFormat = false)
         {
             var connection = new SqliteConnection(chaine);
             try
@@ -484,7 +492,9 @@ namespace IUTSCalculator.Services
                     using (var cmd = connection.CreateCommand())
                     {
                         // La clé n'est faite que de chiffres hexadécimaux : aucune injection possible.
-                        cmd.CommandText = "PRAGMA cipher = 'sqlcipher'; PRAGMA legacy = 4; PRAGMA hexkey = '" + VerifierCle(cle) + "';";
+                        cmd.CommandText = FormatChiffrement + (ancienFormat
+                            ? "PRAGMA hexkey = '" + VerifierCle(cle) + "';"
+                            : "PRAGMA key = \"x'" + VerifierCle(cle) + "'\";");
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -494,6 +504,55 @@ namespace IUTSCalculator.Services
             {
                 connection.Dispose();
                 throw;
+            }
+        }
+
+        /// <summary>Choix du chiffrement, préalable à toute clé (key, hexkey, rekey).</summary>
+        internal const string FormatChiffrement = "PRAGMA cipher = 'sqlcipher'; PRAGMA legacy = 4; ";
+
+        /// <summary>
+        /// Comme <see cref="OuvrirConnexion"/>, pour une base dont on ignore si elle est au format
+        /// actuel ou à l'ancien (sauvegarde faite avant la conversion) : la clé brute est essayée
+        /// d'abord, et la base effectivement lue. Lève l'erreur de SQLite si aucun des deux ne convient.
+        /// </summary>
+        internal static SqliteConnection OuvrirConnexionToutFormat(string chaine, string cle)
+        {
+            var connection = OuvrirConnexion(chaine, cle);
+            if (cle == null || EstLisible(connection)) return connection;
+            connection.Dispose();
+
+            connection = OuvrirConnexion(chaine, cle, ancienFormat: true);
+            try
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master;";
+                    cmd.ExecuteScalar();
+                }
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>Vrai si la clé posée sur la connexion déchiffre la base (SQLite ne le vérifie qu'à la première lecture).</summary>
+        internal static bool EstLisible(SqliteConnection connection)
+        {
+            try
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master;";
+                    cmd.ExecuteScalar();
+                    return true;
+                }
+            }
+            catch (SqliteException)
+            {
+                return false;
             }
         }
 
@@ -507,7 +566,7 @@ namespace IUTSCalculator.Services
             // Dans une URI, « % », « ? » et « # » ont un sens : ils sont échappés dans le chemin.
             string uri = "file:" + chemin.Replace('\\', '/').Replace("%", "%25").Replace("?", "%3f").Replace("#", "%23");
             if (cle != null)
-                uri += "?cipher=sqlcipher&legacy=4&hexkey=" + VerifierCle(cle);
+                uri += "?cipher=sqlcipher&legacy=4&key=x%27" + VerifierCle(cle) + "%27"; // clé brute x'…'
             return "'" + uri.Replace("'", "''") + "'";
         }
 
@@ -585,7 +644,7 @@ namespace IUTSCalculator.Services
             {
                 if (!File.Exists(chemin)) return -1;
                 if (ChiffrementBases.EstEnClair(chemin)) cle = null;
-                using (var connection = OuvrirConnexion(ChaineConnexion(chemin, lectureSeule: true), cle))
+                using (var connection = OuvrirConnexionToutFormat(ChaineConnexion(chemin, lectureSeule: true), cle))
                 {
                     using (var cmd = connection.CreateCommand())
                     {
