@@ -724,6 +724,7 @@
             <converters:BooleanToTextConverter x:Key="BooleanToTextConverter"/>
             <converters:DecimalToStringConverter x:Key="DecimalToStringConverter"/>
             <converters:StringEqualsConverter x:Key="StringEqualsConverter"/>
+            <converters:SubtractConverter x:Key="SubtractConverter"/>
             <converters:PourcentageConverter x:Key="PourcentageConverter"/>
             <converters:MontantConverter x:Key="MontantConverter"/>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>

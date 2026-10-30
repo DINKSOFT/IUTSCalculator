@@ -100,15 +100,17 @@
 
             <!-- ───────── Colonne gauche : état des créances ───────── -->
             <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="0">
-                <Grid>
+                <Grid x:Name="CarteCreances">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*" MinHeight="90"/>
+                        <!-- 120 = en-tête de colonnes, une ligne de 34 px et les marges
+                             de FormDataGridStyle. Le formulaire retranche cette valeur (+4). -->
+                        <RowDefinition Height="*" MinHeight="120"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0"
+                    <Border Grid.Row="0" x:Name="EnteteCreances"
                             Background="{StaticResource SurfaceAltBrush}"
                             BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
                             Padding="14,8">
@@ -122,7 +124,7 @@
                     </Border>
 
                     <!-- ═══════════ Barre de recherche et filtres prêts ═══════════ -->
-                    <Border Grid.Row="1" Background="#F8FAFC"
+                    <Border Grid.Row="1" x:Name="FiltresCreances" Background="#F8FAFC"
                             BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,0,0,1"
                             Padding="12,8">
                         <Grid>
@@ -240,180 +242,203 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <!-- Formulaire, ouvert seulement quand un prêt est en cours -->
-                    <Border Grid.Row="3"
-                            BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
-                            Padding="14,10"
-                            Visibility="{Binding EditionOuverte, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <StackPanel Grid.Row="0" Grid.Column="0">
-                                <TextBlock Text="Salarié" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                <!-- Recherche rapide du salarié pour entreprises à fort effectif -->
-                                <Grid Margin="0,0,0,4">
-                                    <TextBox Text="{Binding FiltreSalarie, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource FormTextBoxStyle}"
-                                             Height="28" Padding="24,2,22,2" Margin="0"
-                                             VerticalContentAlignment="Center"
-                                             ToolTip="Filtrer par nom, prénom, matricule ou emploi..."/>
-                                    <TextBlock Text="{StaticResource IconSearch}"
-                                               FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                               Foreground="{StaticResource InkSubtleBrush}"
-                                               HorizontalAlignment="Left" VerticalAlignment="Center"
-                                               Margin="6,0,0,0" IsHitTestVisible="False"/>
-                                    <Button Command="{Binding ClearFiltreSalarieCommand}"
-                                            HorizontalAlignment="Right" VerticalAlignment="Center"
-                                            Margin="0,0,4,0" Width="16" Height="16"
-                                            Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                            ToolTip="Effacer la recherche"
-                                            Visibility="{Binding HasFiltreSalarie, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="9"
-                                                   Foreground="{StaticResource InkSubtleBrush}"/>
-                                    </Button>
-                                </Grid>
-                                <ComboBox Height="32" Margin="0,0,0,8"
-                                          Style="{StaticResource FormComboBoxStyle}"
-                                          ItemsSource="{Binding SalariesFiltres}"
-                                          SelectedItem="{Binding SalarieSelectionne, Mode=TwoWay}">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock TextTrimming="CharacterEllipsis">
-                                                <Run Text="{Binding LastName, Mode=OneWay}" FontWeight="SemiBold"/>
-                                                <Run Text="{Binding FirstName, Mode=OneWay}"/>
-                                                <Run Text="·" Foreground="{StaticResource InkSubtleBrush}"/>
-                                                <Run Text="{Binding Matricule, Mode=OneWay}" Foreground="{StaticResource InkSubtleBrush}" FontSize="11"/>
-                                            </TextBlock>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="0" Grid.Column="2">
-                                <TextBlock Text="Nature" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                <ComboBox Height="32" Margin="0,0,0,8"
-                                          Style="{StaticResource FormComboBoxStyle}"
-                                          ItemsSource="{Binding TypesPret}"
-                                          SelectedItem="{Binding TypeSelectionne, Mode=TwoWay}">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Libelle}"/>
-                                                <TextBlock Text="{Binding Precision, StringFormat=' — {0}'}"
-                                                           FontSize="11"
-                                                           Foreground="{StaticResource InkSubtleBrush}"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal">
-                                <StackPanel Margin="0,0,10,0">
-                                    <TextBlock Text="Date d'octroi" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <DatePicker Width="128" Margin="0,0,0,8"
-                                                Style="{StaticResource FormDatePickerStyle}"
-                                                SelectedDate="{Binding PretEnCours.DateOctroi, Mode=TwoWay}"/>
-                                </StackPanel>
-                                <StackPanel>
-                                    <TextBlock Text="Référence" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <TextBox Width="140" Margin="0,0,0,8"
-                                             Style="{StaticResource FormTextBoxStyle}"
-                                             ToolTip="Numéro de la convention ou du bon d'avance. Il est repris sur la ligne du bulletin."
-                                             Text="{Binding PretEnCours.Reference, UpdateSourceTrigger=PropertyChanged}"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal">
-                                <StackPanel Margin="0,0,10,0">
-                                    <TextBlock Text="Montant accordé" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <TextBox Width="118" Margin="0,0,0,8" TextAlignment="Right"
-                                             Style="{StaticResource FormTextBoxStyle}"
-                                             Text="{Binding PretEnCours.MontantAccorde, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"/>
-                                </StackPanel>
-                                <StackPanel Margin="0,0,10,0">
-                                    <TextBlock Text="Échéances" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <TextBox Width="62" Margin="0,0,0,8" TextAlignment="Right"
-                                             Style="{StaticResource FormTextBoxStyle}"
-                                             ToolTip="Nombre de mois de remboursement."
-                                             Text="{Binding PretEnCours.NombreEcheances, UpdateSourceTrigger=PropertyChanged}"/>
-                                </StackPanel>
-                                <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,8">
-                                    <Button Content="Calculer" MinWidth="0" Padding="10,0" Margin="0"
-                                            Style="{StaticResource SecondaryButtonStyle}"
-                                            ToolTip="Divise le montant par le nombre d'échéances. La dernière est ajustée au franc près pour ne retenir ni plus ni moins que la somme avancée."
-                                            Command="{Binding CalculerEcheanceCommand}"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="2" Grid.Column="0">
-                                <TextBlock Text="Retenue mensuelle" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                <TextBox Width="128" HorizontalAlignment="Left" Margin="0,0,0,8" TextAlignment="Right"
-                                         Style="{StaticResource FormTextBoxStyle}"
-                                         Text="{Binding PretEnCours.MontantEcheance, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal">
-                                <StackPanel Margin="0,0,10,0">
-                                    <TextBlock Text="Première retenue" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <ComboBox Width="128" Height="32" Margin="0,0,0,8"
-                                              Style="{StaticResource FormComboBoxStyle}"
-                                              ItemsSource="{Binding MoisDisponibles}"
-                                              DisplayMemberPath="Nom"
-                                              SelectedItem="{Binding MoisPremiereEcheanceSelectionne, Mode=TwoWay}"/>
-                                </StackPanel>
-                                <StackPanel>
-                                    <TextBlock Text="Année" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <ComboBox Width="88" Height="32" Margin="0,0,0,8"
-                                              Style="{StaticResource FormComboBoxStyle}"
-                                              ItemsSource="{Binding AnneesDisponibles}"
-                                              SelectedItem="{Binding PretEnCours.AnneePremiereEcheance, Mode=TwoWay}"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <!-- Commentaire et boutons sur la même ligne : c'est la ligne
-                                 qu'on perdait sous le bord de la fenêtre. -->
-                            <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3">
+                    <!-- Formulaire, ouvert seulement quand un prêt est en cours.
+                         Une ligne « Auto » prend toute la hauteur qu'elle demande : sur un
+                         petit écran le formulaire était rogné en bas et le tableau réduit à
+                         une bande vide. On le plafonne à la hauteur de la carte moins
+                         l'en-tête et les filtres (mesurés) et la hauteur minimale du
+                         tableau, en-tête de colonnes compris ; au-delà, il défile. -->
+                    <ScrollViewer Grid.Row="3"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Visibility="{Binding EditionOuverte, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ScrollViewer.MaxHeight>
+                            <MultiBinding Converter="{StaticResource SubtractConverter}" ConverterParameter="124">
+                                <Binding Path="ActualHeight" ElementName="CarteCreances"/>
+                                <Binding Path="ActualHeight" ElementName="EnteteCreances"/>
+                                <Binding Path="ActualHeight" ElementName="FiltresCreances"/>
+                            </MultiBinding>
+                        </ScrollViewer.MaxHeight>
+                        <Border BorderBrush="{StaticResource RuleBrush}" BorderThickness="0,1,0,0"
+                                Padding="14,10">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" MinWidth="120"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Commentaire" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
-                                    <TextBox Margin="0"
+                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                    <TextBlock Text="Salarié" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                    <!-- Recherche rapide et liste sur une seule ligne : empilées,
+                                         elles ajoutaient une ligne entière au formulaire. -->
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" MinWidth="90"/>
+                                            <ColumnDefinition Width="6"/>
+                                            <ColumnDefinition Width="3*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Grid.Column="0">
+                                            <TextBox Text="{Binding FiltreSalarie, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource FormTextBoxStyle}"
+                                                     Height="32" Padding="24,2,22,2" Margin="0"
+                                                     VerticalContentAlignment="Center"
+                                                     ToolTip="Filtrer par nom, prénom, matricule ou emploi..."/>
+                                            <TextBlock Text="{StaticResource IconSearch}"
+                                                       FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                       Foreground="{StaticResource InkSubtleBrush}"
+                                                       HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                       Margin="6,0,0,0" IsHitTestVisible="False"/>
+                                            <Button Command="{Binding ClearFiltreSalarieCommand}"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                    Margin="0,0,4,0" Width="16" Height="16"
+                                                    Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                    ToolTip="Effacer la recherche"
+                                                    Visibility="{Binding HasFiltreSalarie, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                                           Foreground="{StaticResource InkSubtleBrush}"/>
+                                            </Button>
+                                        </Grid>
+                                        <ComboBox Grid.Column="2" Height="32" Margin="0"
+                                                  Style="{StaticResource FormComboBoxStyle}"
+                                                  ItemsSource="{Binding SalariesFiltres}"
+                                                  SelectedItem="{Binding SalarieSelectionne, Mode=TwoWay}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding LastName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                                        <Run Text="{Binding FirstName, Mode=OneWay}"/>
+                                                        <Run Text="·" Foreground="{StaticResource InkSubtleBrush}"/>
+                                                        <Run Text="{Binding Matricule, Mode=OneWay}" Foreground="{StaticResource InkSubtleBrush}" FontSize="11"/>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                    <TextBlock Text="Nature" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                    <ComboBox Height="32" Margin="0,0,0,8"
+                                              Style="{StaticResource FormComboBoxStyle}"
+                                              ItemsSource="{Binding TypesPret}"
+                                              SelectedItem="{Binding TypeSelectionne, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Libelle}"/>
+                                                    <TextBlock Text="{Binding Precision, StringFormat=' — {0}'}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource InkSubtleBrush}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal">
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="Date d'octroi" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <DatePicker Width="128" Margin="0,0,0,8"
+                                                    Style="{StaticResource FormDatePickerStyle}"
+                                                    SelectedDate="{Binding PretEnCours.DateOctroi, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="Référence" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <TextBox Width="140" Margin="0,0,0,8"
+                                                 Style="{StaticResource FormTextBoxStyle}"
+                                                 ToolTip="Numéro de la convention ou du bon d'avance. Il est repris sur la ligne du bulletin."
+                                                 Text="{Binding PretEnCours.Reference, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal">
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="Montant accordé" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <TextBox Width="118" Margin="0,0,0,8" TextAlignment="Right"
+                                                 Style="{StaticResource FormTextBoxStyle}"
+                                                 Text="{Binding PretEnCours.MontantAccorde, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="Échéances" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <TextBox Width="62" Margin="0,0,0,8" TextAlignment="Right"
+                                                 Style="{StaticResource FormTextBoxStyle}"
+                                                 ToolTip="Nombre de mois de remboursement."
+                                                 Text="{Binding PretEnCours.NombreEcheances, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,8">
+                                        <Button Content="Calculer" MinWidth="0" Padding="10,0" Margin="0"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                ToolTip="Divise le montant par le nombre d'échéances. La dernière est ajustée au franc près pour ne retenir ni plus ni moins que la somme avancée."
+                                                Command="{Binding CalculerEcheanceCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="0">
+                                    <TextBlock Text="Retenue mensuelle" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                    <TextBox Width="128" HorizontalAlignment="Left" Margin="0,0,0,8" TextAlignment="Right"
                                              Style="{StaticResource FormTextBoxStyle}"
-                                             Text="{Binding PretEnCours.Commentaire, UpdateSourceTrigger=PropertyChanged}"/>
+                                             Text="{Binding PretEnCours.MontantEcheance, StringFormat=N0, UpdateSourceTrigger=PropertyChanged}"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
-                                    <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
-                                            MinWidth="0" Padding="10,0"
-                                            Style="{StaticResource MenuButtonStyle}"
-                                            ToolTip="Les échéances déjà retenues sur des mois clôturés ne sont pas touchées : seul le reliquat est replanifié."
-                                            Command="{Binding EnregistrerCommand}"/>
-                                    <Button Content="Annuler" MinWidth="0" Padding="10,0"
-                                            Style="{StaticResource SecondaryButtonStyle}"
-                                            Command="{Binding AnnulerSaisieCommand}"/>
-                                    <Button Content="Supprimer" Margin="0" MinWidth="0" Padding="10,0"
-                                            Style="{StaticResource DangerButtonStyle}"
-                                            ToolTip="Possible tant qu'aucune retenue n'a été opérée sur une période clôturée."
-                                            Command="{Binding SupprimerCommand}"/>
+                                <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal">
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="Première retenue" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <ComboBox Width="128" Height="32" Margin="0,0,0,8"
+                                                  Style="{StaticResource FormComboBoxStyle}"
+                                                  ItemsSource="{Binding MoisDisponibles}"
+                                                  DisplayMemberPath="Nom"
+                                                  SelectedItem="{Binding MoisPremiereEcheanceSelectionne, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="Année" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <ComboBox Width="88" Height="32" Margin="0,0,0,8"
+                                                  Style="{StaticResource FormComboBoxStyle}"
+                                                  ItemsSource="{Binding AnneesDisponibles}"
+                                                  SelectedItem="{Binding PretEnCours.AnneePremiereEcheance, Mode=TwoWay}"/>
+                                    </StackPanel>
                                 </StackPanel>
+
+                                <!-- Commentaire et boutons sur la même ligne : c'est la ligne
+                                     qu'on perdait sous le bord de la fenêtre. -->
+                                <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Commentaire" Style="{StaticResource FormTextBlockLabelStyle}" Margin="0,0,0,2"/>
+                                        <TextBox Margin="0"
+                                                 Style="{StaticResource FormTextBoxStyle}"
+                                                 Text="{Binding PretEnCours.Commentaire, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                                        <Button Content="Enregistrer" Tag="{StaticResource IconSave}"
+                                                MinWidth="0" Padding="10,0"
+                                                Style="{StaticResource MenuButtonStyle}"
+                                                ToolTip="Les échéances déjà retenues sur des mois clôturés ne sont pas touchées : seul le reliquat est replanifié."
+                                                Command="{Binding EnregistrerCommand}"/>
+                                        <Button Content="Annuler" MinWidth="0" Padding="10,0"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding AnnulerSaisieCommand}"/>
+                                        <Button Content="Supprimer" Margin="0" MinWidth="0" Padding="10,0"
+                                                Style="{StaticResource DangerButtonStyle}"
+                                                ToolTip="Possible tant qu'aucune retenue n'a été opérée sur une période clôturée."
+                                                Command="{Binding SupprimerCommand}"/>
+                                    </StackPanel>
+                                </Grid>
                             </Grid>
-                        </Grid>
-                    </Border>
+                        </Border>
+                    </ScrollViewer>
                 </Grid>
             </Border>
 

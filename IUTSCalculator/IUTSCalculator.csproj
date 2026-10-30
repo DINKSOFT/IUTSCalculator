@@ -181,6 +181,7 @@
     <Compile Include="Converters\PourcentageConverter.cs" />
     <Compile Include="Converters\DecimalToStringConverter.cs" />
     <Compile Include="Converters\StringEqualsConverter.cs" />
+    <Compile Include="Converters\SubtractConverter.cs" />
     <Compile Include="Helpers\CheminsDossier.cs" />
     <Compile Include="Helpers\Constants.cs" />
     <Compile Include="Helpers\DemandeMotDePasse.cs" />
